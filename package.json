@@ -1,0 +1,29 @@
+{
+  "dependencies": {
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2"
+  },
+  "scripts": {
+    "dev": "NODE_ENV=development webpack --mode development --config webpack.js --watch"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.17.5",
+    "@babel/preset-env": "^7.16.11",
+    "@babel/preset-react": "^7.16.7",
+    "babel-loader": "^8.2.3",
+    "copy-webpack-plugin": "^10.2.4",
+    "css-loader": "^6.6.0",
+    "file-loader": "^6.2.0",
+    "html-webpack-plugin": "^5.5.0",
+    "style-loader": "^3.3.1",
+    "webpack": "^5.69.1",
+    "webpack-cli": "^4.9.2",
+    "webpack-extension-manifest-plugin": "^0.8.0"
+  },
+  "name": "wave-reader",
+  "version": "0.0.0",
+  "description": "A motion reader to help people effected by tracking problems.",
+  "main": "webpack.js",
+  "author": "John Holland",
+  "license": "MIT"
+}
