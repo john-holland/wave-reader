@@ -74,11 +74,19 @@ A motion assisted reading extension for Chrome.
     - }
   - }
 
-### sequence diagram
-<details>
-  <summary>Click to expand!</summary>
+### acknowledgements
 
-  <div>
+[@SunnyGolovine react chrome extension tutorial](https://medium.com/@SunnyGolovine/build-a-chrome-extension-using-reactjs-and-webpack-part-1-976a414b85d0)
+
+### license
+
+MIT
+
+## appendix
+
+### sequence diagram
+
+[sequence diagram image](https://imgur.com/a/olcUuw0)
 
   ```mermaid
   sequenceDiagram
@@ -118,19 +126,3 @@ A motion assisted reading extension for Chrome.
         tab->>+🌊 r receiver: send shortcut_stopped message
         🌊 r receiver->>+🌊 r: send shortcut_stopped message for state parity
   ```
-  
-  </div>
-
-</details>
-
-[sequence diagram image](https://imgur.com/a/olcUuw0)
-
-
-### acknowledgements
-
-
-[@SunnyGolovine react chrome extension tutorial](https://medium.com/@SunnyGolovine/build-a-chrome-extension-using-reactjs-and-webpack-part-1-976a414b85d0)
-
-### license
-
-MIT
