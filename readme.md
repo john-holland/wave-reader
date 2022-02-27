@@ -126,3 +126,5 @@ MIT
         tab->>+🌊 r receiver: send shortcut_stopped message
         🌊 r receiver->>+🌊 r: send shortcut_stopped message for state parity
   ```
+
+🌊 👋
