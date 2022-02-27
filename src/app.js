@@ -1,7 +1,8 @@
 import React, { Component } from 'react'
 
 //todo:
-// * Material UI, styled components, functional component style
+// * Material UI, scss, styled components
+// * typescript, functional component style
 // * Controls: read speed, reset speed, rotation angle, wave width
 //
 // https://medium.com/@seanlumjy/build-a-chrome-extension-that-injects-css-into-your-favourite-website-9b65f722f409
