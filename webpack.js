@@ -14,7 +14,7 @@ const config = {
         filename: "[name].js"
     },
     resolve: {
-        extensions: ["*", ".js"]
+        extensions: [".tsx", ".ts", ".js", ".jsx", "*"]
     },
     plugins: [
         new HtmlWebpackPlugin({
@@ -46,9 +46,14 @@ const config = {
     module: {
         rules: [
             {
-                test: /\.js$/,
+                test: /\.(js|jsx)$/,
                 exclude: /node_modules/,
                 use: ["babel-loader"]
+            },
+            {
+                test: /\.(ts|tsx)$/,
+                exclude: /node_modules/,
+                use: ["ts-loader"],
             },
             {
                 test: /\.css$/,
