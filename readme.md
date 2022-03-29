@@ -49,6 +49,9 @@ A motion assisted reading extension for Chrome.
 
 ### models:
 
+  - text:
+    - textSize: String?
+    - textColor: String?
   - startMessage:
     - wave: Wave
   - stopMessage:
@@ -128,3 +131,8 @@ MIT
   ```
 
 🌊 👋
+
+## todo / ideas
+
+- mouse control for waves
+- mouse control with shortcut, toggle or hold
