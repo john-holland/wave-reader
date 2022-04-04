@@ -136,3 +136,9 @@ MIT
 
 - mouse control for waves
 - mouse control with shortcut, toggle or hold
+
+
+help & acknowledgements, from & to https://medium.com/@seanlumjy/build-a-chrome-extension-that-injects-css-into-your-favourite-website-9b65f722f409
+
+adds chrome extension api as a type for ts compiler option,
+https://stackoverflow.com/a/64440752/790045 (maybe look at `getBrowserInstance` method)

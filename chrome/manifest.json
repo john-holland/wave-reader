@@ -13,5 +13,27 @@
     "default_title": "Wave Reader",
     "default_popup": "index.html"
   },
-  "permissions": []
+  "page_action": {
+    "default_icon": "./images/background16.png",
+    "default_popup": "popup.html",
+    "default_title": "Custom google chrome background"
+  },
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.google.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "permissions": [
+    "https://www.google.com/*",
+    "declarativeContent",
+    "storage",
+    "notifications",
+    "webNavigation"
+  ]
 }

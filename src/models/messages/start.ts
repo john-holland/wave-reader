@@ -1,5 +1,14 @@
 import Wave from "../wave";
+import Message from "../message";
 
-export default class StartMessage {
+interface StartMessageProps {
     wave?: Wave;
+}
+
+export default class StartMessage implements Message {
+    name = 'start';
+
+    constructor(attributes: StartMessageProps = {}) {
+        Object.assign(this, attributes)
+    }
 }
