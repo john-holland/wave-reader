@@ -1,14 +1,10 @@
 import Wave from "../wave";
 import Message from "../message";
 
-interface StartMessageProps {
+export default class StartMessage extends Message<StartMessage> {
     wave?: Wave;
-}
 
-export default class StartMessage implements Message {
-    name = 'start';
-
-    constructor(attributes: StartMessageProps = {}) {
-        Object.assign(this, attributes)
+    constructor(attributes: Partial<StartMessage> = {}) {
+        super('start', 'popup', attributes)
     }
 }

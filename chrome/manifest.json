@@ -1,36 +1,34 @@
 {
-  "manifest_version": 2,
-  "name": "Your Extension's Name",
-  "short_name": "Your Extensions 'Short Name'",
+  "manifest_version": 3,
+  "name": "Wave Reader",
+  "short_name": "🌊r.",
   "version": "1.0.0",
-  "description": "Your extensions description",
+  "description": "Smoothly wobble text blocks, to improve eye tracking for reading!",
   "icons": {
     "16": "icons/waver16.jpg",
     "48": "icons/waver48.png",
     "128": "icons/waver128.jpg"
   },
-  "browser_action": {
+  "action": {
     "default_title": "Wave Reader",
-    "default_popup": "index.html"
-  },
-  "page_action": {
-    "default_icon": "./images/background16.png",
-    "default_popup": "popup.html",
-    "default_title": "Custom google chrome background"
+    "default_popup": "index.html",
+    "default_icon": "./icons/waver16.jpg"
   },
   "background": {
-    "scripts": ["background.js"],
-    "persistent": false
+    "service_worker": "background.js",
+    "matches": ["https://*/*"]
   },
   "content_scripts": [
     {
-      "matches": ["https://www.google.com/*"],
+      "matches": ["https://*/*"],
       "js": ["content.js"],
       "run_at": "document_end"
     }
   ],
+  "host_permissions": [
+    "https://*/*"
+  ],
   "permissions": [
-    "https://www.google.com/*",
     "declarativeContent",
     "storage",
     "notifications",

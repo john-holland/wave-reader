@@ -1,17 +1,14 @@
 import Message from "../message";
+import Text from "../text";
 
-interface UpdateWaveMessageProps {
+export default class UpdateWaveMessage extends Message<UpdateWaveMessage> {
+    text?: Text;
     waveSpeed?: string;
     axisRotationAmount?: number;
-    text: Text;
-}
 
-export default class UpdateWaveMessage implements Message {
-    name = 'update-wave';
-
-    constructor(attributes: UpdateWaveMessageProps = {
+    constructor(attributes: Partial<UpdateWaveMessage> = {
         text: new Text()
     }) {
-        Object.assign(this, attributes)
+        super('update-wave', 'popup', attributes)
     }
 }

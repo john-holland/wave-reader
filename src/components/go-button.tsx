@@ -17,7 +17,7 @@ const GoButton: FunctionComponent<SelectorProps> = ({ going, onGo, onStop }: Sel
 
     useEffect(() => {
         if (going) {
-            setGoDisplayText("🌊");
+            setGoDisplayText("waving"); // 🌊
         } else {
             setGoDisplayText("go!")
         }
@@ -34,7 +34,7 @@ const GoButton: FunctionComponent<SelectorProps> = ({ going, onGo, onStop }: Sel
     }
 
     return (
-        <Go type={"button"} onClick={goClicked}>{goDisplayText}</Go>
+        <Go type={"button"} onClick={goClicked} value={goDisplayText}></Go>
     );
 }
 

@@ -1,14 +1,14 @@
 
-interface TextProps {
-    textSize: string;
-    textColor: string;
-}
-
 export default class Text {
-    constructor(attributes: TextProps = {
-        textSize: '1rem',
-        textColor: 'initial'
+    size: string;
+    color: string;
+
+    constructor(attributes: Partial<Text> = {
+        size: 'initial',
+        color: 'initial'
     }) {
+        this.size = attributes.size!!
+        this.color = attributes.color!!
         Object.assign(this, attributes)
     }
 }

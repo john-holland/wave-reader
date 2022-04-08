@@ -1,17 +1,13 @@
 import Wave from "../wave";
 import Message from "../message";
 
-interface UpdateSelectorMessageProps {
+export default class UpdateSelectorMessage extends Message<UpdateSelectorMessage> {
+    reset: boolean = false;
     selector?: string;
-    reset: false;
-}
 
-export default class UpdateSelectorMessage implements Message {
-    name = 'update-selector';
-
-    constructor(attributes: UpdateSelectorMessageProps = {
+    constructor(attributes: Partial<UpdateSelectorMessage> = {
         reset: false
     }) {
-        Object.assign(this, attributes)
+        super('update-selector', 'popup', attributes)
     }
 }

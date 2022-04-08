@@ -1,13 +1,9 @@
 import Message from "../message";
 
-interface StartSelectorChooseMessageProps {
+export default class StartSelectorChooseMessage extends Message<StartSelectorChooseMessage> {
     selector?: string;
-}
 
-export default class StartSelectorChooseMessage implements Message {
-    name = 'start-selection-choose';
-
-    constructor(attributes: StartSelectorChooseMessageProps = {}) {
-        Object.assign(this, attributes)
+    constructor(attributes: Partial<StartSelectorChooseMessage> = {}) {
+        super('start-selection-choose', 'popup', attributes)
     }
 }
