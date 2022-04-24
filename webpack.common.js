@@ -1,8 +1,11 @@
 const path = require("path");
+const webpack = require('webpack');
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const CopyPlugin = require("copy-webpack-plugin");
 const baseManifest = require("./chrome/manifest.json");
 const WebpackExtensionManifestPlugin = require("webpack-extension-manifest-plugin");
+
+//config: path.join(__dirname, "./src/config/config.common.js")
 const config = {
     mode: "development",
     devtool: "cheap-module-source-map",
@@ -16,9 +19,15 @@ const config = {
         filename: "[name].js"
     },
     resolve: {
-        extensions: [".tsx", ".ts", ".js", ".jsx", "*"]
+        extensions: [".tsx", ".ts", ".js", ".jsx", "*"],
+        alias: {
+            config: path.join(__dirname, "./src/config/config.common.js")
+        }
     },
     plugins: [
+        new webpack.ProvidePlugin({
+            'config': 'config'
+        }),
         new HtmlWebpackPlugin({
             title: "boilerplate", // change this to your app title
             meta: {
@@ -68,4 +77,5 @@ const config = {
         ]
     }
 };
+
 module.exports = config;

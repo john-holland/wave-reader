@@ -8,13 +8,12 @@ import Tab = chrome.tabs.Tab;
 import Options from "./models/options";
 import { getSyncObject, setSyncObject } from './util/sync';
 import StopMessage from "./models/messages/stop";
-import Message from "./models/message";
-import BootstrapMessage from "./models/messages/bootstrap";
 import {fromMessage} from "./util/messages";
 import Port = chrome.runtime.Port;
 import {Deferred} from "./util/deferred";
 import SelectorUpdated from "./models/messages/selector-updated";
 import MessageSender = chrome.runtime.MessageSender;
+import configured from './config/config';
 
 //todo:
 // * Material UI
@@ -22,6 +21,7 @@ import MessageSender = chrome.runtime.MessageSender;
 // * Controls: read speed, reset speed, rotation angle, wave width, read duration
 // * NOTE: popup, chrome.runtime.sendMessage -> background, chrome.tabs.query...sendMessage -> content
 // * NOTE: content, chrome.runtime.sendMessage -> background, chrome.runtime.sendMessage -> popup
+// * use BootstrapMessage to get the chrome.storage.local `waving` parameter, and use that as `going`
 //
 //todo-ne:
 // * scss, styled components
@@ -33,11 +33,11 @@ const WaveSymbol = styled.h2`
   display: inline;
 `;
 
-const popupPort = chrome.runtime.connect({ name: "content" });
+//const popupPort = chrome.runtime.connect({ name: "content" });
 
 const startPageCss = (wave: Wave) => {
-    //chrome.runtime.sendMessage(new StartMessage({
-    popupPort.postMessage(new StartMessage({
+    chrome.runtime.sendMessage(new StartMessage({
+    //popupPort.postMessage(new StartMessage({
         wave: wave.update()
     }));
 
@@ -53,15 +53,18 @@ const startPageCss = (wave: Wave) => {
             };
 
             // @ts-ignore
-            chrome.notifications.create("", notifOptions, function () {
-                console.log("Last error:", chrome.runtime.lastError);
+            chrome.notifications.create("", notifOptions, function (e) {
+                if (chrome.runtime.lastError) {
+                    console.log("Last error:", chrome.runtime.lastError);
+                }
             });
         }
     })
 }
 
 const stopPageCss = () => {
-    popupPort.postMessage(new StopMessage());
+    //popupPort.postMessage(new StopMessage());
+    chrome.runtime.sendMessage(new StopMessage());
     setSyncObject("going", { going: false });
 }
 
@@ -76,6 +79,20 @@ const deferredOptions = new Deferred<Options>(() => {
         }
     });
 })
+
+const bootstrapCondition = (going: boolean) => {
+    deferredOptions.waitFor().then((options) => {
+        if (going) {
+            chrome.runtime.sendMessage(new StartMessage({
+                //popupPort.postMessage(new StartMessage({
+                wave: options.wave.update()
+            }))
+        } else {
+            chrome.runtime.sendMessage(new StopMessage())
+            //popupPort.postMessage(new StopMessage())
+        }
+    });
+}
 
 const App: FunctionComponent = () => {
     const [ selector, setSelector ] = useState('p');
@@ -106,20 +123,6 @@ const App: FunctionComponent = () => {
         stopPageCss();
     }
 
-    const bootstrapCondition = () => {
-        deferredOptions.waitFor().then((options) => {
-            if (going) {
-                //chrome.runtime.sendMessage(new StartMessage({
-                popupPort.postMessage(new StartMessage({
-                    wave: options.wave.update()
-                }))
-            } else {
-                //chrome.runtime.sendMessage(new StopMessage())
-                popupPort.postMessage(new StopMessage())
-            }
-        });
-    }
-
     const selectorUpdated = (message: SelectorUpdated) => {
         setSelector(message.selector || 'p');
         deferredOptions.waitFor().then((options) => {
@@ -137,11 +140,18 @@ const App: FunctionComponent = () => {
             setOptions(options);
         });
 
+        if (configured.mode === "production") {
+            window.onblur = () => {
+                window.close();
+            }
+        }
+
         // upon first load, get a default value for 'going'
         getSyncObject("going", { going: false }, (result) => {
             setGoing(result.going);
 
-            bootstrapCondition();
+            // use result.going as useState is an async call
+            bootstrapCondition(result.going);
 
             chrome.runtime.onMessage.addListener((message: any) => {
                 //port.onMessage.addListener((message: any, port) => {
