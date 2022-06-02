@@ -1,5 +1,5 @@
 
-interface AttributeAccessor {
+export interface AttributeAccessor {
     [key: string]: any;
 }
 

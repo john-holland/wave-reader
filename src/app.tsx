@@ -6,7 +6,7 @@ import StartMessage from "./models/messages/start";
 import Wave from "./models/wave";
 import Tab = chrome.tabs.Tab;
 import Options from "./models/options";
-import { getSyncObject, setSyncObject } from './util/sync';
+import {getSyncObject, newSyncObject, setSyncObject} from './util/sync';
 import StopMessage from "./models/messages/stop";
 import {fromMessage} from "./util/messages";
 import Port = chrome.runtime.Port;
@@ -14,16 +14,19 @@ import {Deferred} from "./util/deferred";
 import SelectorUpdated from "./models/messages/selector-updated";
 import MessageSender = chrome.runtime.MessageSender;
 import configured from './config/config';
+import {guardLastError} from "./util/util";
+import UpdateSelectorMessage from "./models/messages/update-selector";
+import UpdateWaveMessage from "./models/messages/update-wave";
 
 //todo:
 // * Material UI
-// * save selector and settings with chrome sync
 // * Controls: read speed, reset speed, rotation angle, wave width, read duration
+// * save selector and settings with chrome sync
+//
+//todo,ne:
 // * NOTE: popup, chrome.runtime.sendMessage -> background, chrome.tabs.query...sendMessage -> content
 // * NOTE: content, chrome.runtime.sendMessage -> background, chrome.runtime.sendMessage -> popup
 // * use BootstrapMessage to get the chrome.storage.local `waving` parameter, and use that as `going`
-//
-//todo-ne:
 // * scss, styled components
 // * typescript, functional component style
 
@@ -33,8 +36,6 @@ const WaveSymbol = styled.h2`
   display: inline;
 `;
 
-//const popupPort = chrome.runtime.connect({ name: "content" });
-
 const startPageCss = (wave: Wave) => {
     chrome.runtime.sendMessage(new StartMessage({
     //popupPort.postMessage(new StartMessage({
@@ -43,7 +44,7 @@ const startPageCss = (wave: Wave) => {
 
     setSyncObject("going", { going: true });
 
-    getSyncObject<Options>('options', Options.getDefaultOptions(), (options) => {
+    newSyncObject(Options,'options', Options.getDefaultOptions(), (options) => {
         if (options.showNotifications) {
             const notifOptions = {
                 type: "basic",
@@ -53,17 +54,12 @@ const startPageCss = (wave: Wave) => {
             };
 
             // @ts-ignore
-            chrome.notifications.create("", notifOptions, function (e) {
-                if (chrome.runtime.lastError) {
-                    console.log("Last error:", chrome.runtime.lastError);
-                }
-            });
+            chrome.notifications.create("", notifOptions, guardLastError);
         }
     })
 }
 
 const stopPageCss = () => {
-    //popupPort.postMessage(new StopMessage());
     chrome.runtime.sendMessage(new StopMessage());
     setSyncObject("going", { going: false });
 }
@@ -71,7 +67,7 @@ const stopPageCss = () => {
 const deferredOptions = new Deferred<Options>(() => {
     return new Promise((resolve, reject) => {
         try {
-            getSyncObject('options', Options.getDefaultOptions(), (result) => {
+            newSyncObject(Options,'options', Options.getDefaultOptions(), (result) => {
                 resolve(result);
             });
         } catch (e) {
@@ -82,15 +78,15 @@ const deferredOptions = new Deferred<Options>(() => {
 
 const bootstrapCondition = (going: boolean) => {
     deferredOptions.waitFor().then((options) => {
-        if (going) {
-            chrome.runtime.sendMessage(new StartMessage({
-                //popupPort.postMessage(new StartMessage({
-                wave: options.wave.update()
-            }))
-        } else {
-            chrome.runtime.sendMessage(new StopMessage())
-            //popupPort.postMessage(new StopMessage())
-        }
+        setTimeout(() => {
+            if (going) {
+                chrome.runtime.sendMessage(new StartMessage({
+                    wave: options.wave.update()
+                }))
+            } else {
+                chrome.runtime.sendMessage(new StopMessage())
+            }
+        }, 3000);
     });
 }
 
@@ -98,7 +94,7 @@ const App: FunctionComponent = () => {
     const [ selector, setSelector ] = useState('p');
     const [ saved, setSaved ] = useState(true);
     const [ going, setGoing ] = useState(false);
-    const [ options, setOptions ] = useState<Options>();
+    const [ options, setOptions ] = useState<Options>(Options.getDefaultOptions());
 
     const selectorClicked = () => {
         setSaved(false);
@@ -107,14 +103,19 @@ const App: FunctionComponent = () => {
     const onSaved = (selector: string) => {
         setSelector(selector);
         setSaved(true);
+        selectorUpdated(new SelectorUpdated({ selector })).then(() => {
+            chrome.runtime.sendMessage(new UpdateWaveMessage({
+                wave: options!!.wave
+            }))
+        });
     };
 
     const onGo = () => {
         setGoing(true);
 
-        getSyncObject<Options>("options", Options.getDefaultOptions(), (result) => {
+        newSyncObject(Options, "options", Options.getDefaultOptions(), (result) => {
             // use workboots and send message with wave params to interpolate css
-            startPageCss(result.wave);
+            startPageCss(result.wave!!);
         });
     }
 
@@ -123,21 +124,24 @@ const App: FunctionComponent = () => {
         stopPageCss();
     }
 
-    const selectorUpdated = (message: SelectorUpdated) => {
+    const selectorUpdated = async (message: SelectorUpdated) => {
         setSelector(message.selector || 'p');
+        options!!.wave.selector = message.selector;
+        options!!.wave.update();
         deferredOptions.waitFor().then((options) => {
-            options.wave.selector = message.selector;
-            setSyncObject('options', options, () => {
-                deferredOptions.update();
-            });
+            setSyncObject('options', options);
         });
+        deferredOptions.update();
     }
 
     useEffect(() => {
-        // const port = chrome.runtime.connect({ name: 'popup' });
-
-        deferredOptions.waitFor().then((options: Options) => {
-            setOptions(options);
+        deferredOptions.subscribe((options?: Options, error?: any) => {
+            if (error) {
+                console.log(error);
+                if (!options) return;
+            }
+            setOptions(options!!);
+            setSelector(options?.wave?.selector || 'p');
         });
 
         if (configured.mode === "production") {
@@ -154,7 +158,6 @@ const App: FunctionComponent = () => {
             bootstrapCondition(result.going);
 
             chrome.runtime.onMessage.addListener((message: any) => {
-                //port.onMessage.addListener((message: any, port) => {
                 const typedMessage = fromMessage(message);
 
                 switch (typeof typedMessage) {
@@ -170,17 +173,6 @@ const App: FunctionComponent = () => {
 
                 return true;
             });
-
-            // chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
-            //     chrome.tabs..addListener(changeInfo, changeInfo)
-            // });
-            //
-            // chrome.tabs.onActivated.addListener(function (activeInfo) {
-            //     // how to fetch tab url using activeInfo.tabid
-            //     chrome.tabs.get(activeInfo.tabId, function (tab) {
-            //         console.log(tab.url);
-            //     });
-            // });
         });
     }, []);
 

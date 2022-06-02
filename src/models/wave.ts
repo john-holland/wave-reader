@@ -7,7 +7,7 @@ export const defaultCssTemplate = (options: Wave) => `
   15% { transform: translateX(${options.axisTranslateAmountXMin}%) rotateY(${options.axisRotationAmountYMax}deg); }
 }
 
-.wave-reader__text {
+${options.selector || '.wave-reader__text'} {
   font-size: ${options.text?.size || 'inherit'};
   -webkit-animation-name: wobble;
   animation-name: wobble;

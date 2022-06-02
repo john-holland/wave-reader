@@ -5,6 +5,7 @@ export class Deferred<T> {
     value?: T;
     ready: boolean = false;
     subscriptions: { (val?: T, fail?: any): void } [] = [];
+    waitForSubscriptions: { (val?: T, fail?: any): void } [] = [];
     accessor: { (): Promise<T> };
     
     constructor(accessor: () => Promise<T>) {
@@ -12,11 +13,19 @@ export class Deferred<T> {
         accessor().then((value: T) => {
             this.value = value;
             this.subscriptions.forEach((sub) => sub(value));
+            this.waitForSubscriptions.forEach((sub) => sub(value))
+            this.waitForSubscriptions = [];
             this.ready = true;
         }).catch(reason => {
             this.subscriptions.forEach((sub) => sub(undefined, reason));
+            this.waitForSubscriptions.forEach((sub) => sub(undefined, reason));
+            this.waitForSubscriptions = [];
             this.ready = true;
         });
+    }
+
+    subscribe(callback: (val?: T, fail?: any) => void): void {
+        this.subscriptions.push(callback);
     }
 
     async waitFor(): Promise<T> {
@@ -25,7 +34,7 @@ export class Deferred<T> {
         }
 
         return new Promise<T>((resolve, reject) => {
-            this.subscriptions.push((val?: T, error?: any) => {
+            this.waitForSubscriptions.push((val?: T, error?: any) => {
                 if (val !== undefined && !error) {
                     resolve(val!!);
                 } else {
@@ -46,20 +55,27 @@ export class Deferred<T> {
                 this.value = val;
                 this.ready = true;
                 this.subscriptions.forEach((sub) => sub(val));
+                this.waitForSubscriptions.forEach((sub) => sub(val))
+                this.waitForSubscriptions = [];
             }).catch((reason) => {
                 this.ready = true;
                 this.subscriptions.forEach((sub) => sub(undefined, reason));
+                this.waitForSubscriptions.forEach((sub) => sub(undefined, reason));
+                this.waitForSubscriptions = [];
             });
         }
 
         return new Promise<T>((resolve, reject) => {
-           this.subscriptions.push((val?: T, error?: any) => {
+            const callback = (val?: T, error?: any) => {
                 if (val !== undefined && !error) {
                     resolve(val!!);
                 } else {
                     reject(error);
                 }
-            });
+            };
+
+            this.subscriptions.push(callback);
+            this.waitForSubscriptions.push(callback);
         });
     }
 }

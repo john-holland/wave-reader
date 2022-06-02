@@ -2159,6 +2159,15 @@ concat-map@0.0.1:
   resolved "https://registry.yarnpkg.com/concat-map/-/concat-map-0.0.1.tgz#d8a96bd77fd68df7793a73036a3ba0d5405d477b"
   integrity sha1-2Klr13/Wjfd5OnMDajug1UBdR3s=
 
+content-scripts-register-polyfill@^3.2.1:
+  version "3.2.1"
+  resolved "https://registry.yarnpkg.com/content-scripts-register-polyfill/-/content-scripts-register-polyfill-3.2.1.tgz#509342eb50058e5d85694a7e96dbc73b17095fee"
+  integrity sha512-0ICk6qluUyEKFJWeK2BadXZDUBwfFW1j842pNuiTG0dERr4HiGJ1iDy6REFEKWZQX99fph8x16Pktgg8hcV2og==
+  dependencies:
+    webext-content-scripts "^0.12.0"
+    webext-patterns "^1.1.1"
+    webext-polyfill-kinda "^0.9.0"
+
 convert-source-map@^1.4.0, convert-source-map@^1.6.0, convert-source-map@^1.7.0:
   version "1.8.0"
   resolved "https://registry.npmjs.org/convert-source-map/-/convert-source-map-1.8.0.tgz"
@@ -4025,6 +4034,11 @@ regenerator-runtime@^0.13.4:
   resolved "https://registry.npmjs.org/regenerator-runtime/-/regenerator-runtime-0.13.9.tgz"
   integrity sha512-p3VT+cOEgxFsRRA9X4lkI1E+k2/CtnKtU4gcxyaCUreilL/vqI6CdZ3wxVUx3UOUg+gnUOQQcRI7BmSI656MYA==
 
+regenerator-runtime@^0.13.9:
+  version "0.13.9"
+  resolved "https://registry.yarnpkg.com/regenerator-runtime/-/regenerator-runtime-0.13.9.tgz#8925742a98ffd90814988d7566ad30ca3b263b52"
+  integrity sha512-p3VT+cOEgxFsRRA9X4lkI1E+k2/CtnKtU4gcxyaCUreilL/vqI6CdZ3wxVUx3UOUg+gnUOQQcRI7BmSI656MYA==
+
 regenerator-transform@^0.14.2:
   version "0.14.5"
   resolved "https://registry.npmjs.org/regenerator-transform/-/regenerator-transform-0.14.5.tgz"
@@ -4607,6 +4621,23 @@ watchpack@^2.3.1:
     glob-to-regexp "^0.4.1"
     graceful-fs "^4.1.2"
 
+webext-content-scripts@^0.12.0:
+  version "0.12.0"
+  resolved "https://registry.yarnpkg.com/webext-content-scripts/-/webext-content-scripts-0.12.0.tgz#62f8758d4398b696997c34d6c7e4961cce00895b"
+  integrity sha512-IWeFx80vhGfFVFYkZJURgMg8oZqtpFhCafXYO0u7fD2Tnd+4xKbgGYCwgvSVFB/NME8i1ZB8jTvk6ofdgYFNig==
+  dependencies:
+    webext-polyfill-kinda "^0.9.0"
+
+webext-patterns@^1.1.1:
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/webext-patterns/-/webext-patterns-1.1.1.tgz#8751219417a995e9600c0be10bbce63739ee586b"
+  integrity sha512-mrOzbthOHKYX6T40jo6PGxFRcnKPnsF4/SFBtnRn5CmfEA79Z7jWZyn7/RzasloKT9hh1ISGoH9ZHU22f7/fag==
+
+webext-polyfill-kinda@^0.9.0:
+  version "0.9.0"
+  resolved "https://registry.yarnpkg.com/webext-polyfill-kinda/-/webext-polyfill-kinda-0.9.0.tgz#f881b44e56514a1960a352db4e3efa056abe2bd2"
+  integrity sha512-TTtitT7rgdaR2nx0+TZDIYHpZ5TXH9Ak8C2TaBaJT9qNeHXexKzde6uQ6cjdOK2G80C04r8fcx98Iy+PTCNN7Q==
+
 webidl-conversions@^5.0.0:
   version "5.0.0"
   resolved "https://registry.yarnpkg.com/webidl-conversions/-/webidl-conversions-5.0.0.tgz#ae59c8a00b121543a2acc65c0434f57b0fc11aff"
@@ -4644,17 +4675,9 @@ webpack-extension-manifest-plugin@^0.8.0:
     deepmerge "^4.0.0"
     schema-utils "^3.1.1"
 
-webpack-merge@^5.7.3:
+webpack-merge@^5.7.3, webpack-merge@^5.8.0:
   version "5.8.0"
   resolved "https://registry.npmjs.org/webpack-merge/-/webpack-merge-5.8.0.tgz"
-  integrity sha512-/SaI7xY0831XwP6kzuwhKWVKDP9t1QY1h65lAFLbZqMPIuYcD9QAW4u9STIbU9kaJbPBB/geU/gLr1wDjOhQ+Q==
-  dependencies:
-    clone-deep "^4.0.1"
-    wildcard "^2.0.0"
-
-webpack-merge@^5.8.0:
-  version "5.8.0"
-  resolved "https://registry.yarnpkg.com/webpack-merge/-/webpack-merge-5.8.0.tgz#2b39dbf22af87776ad744c390223731d30a68f61"
   integrity sha512-/SaI7xY0831XwP6kzuwhKWVKDP9t1QY1h65lAFLbZqMPIuYcD9QAW4u9STIbU9kaJbPBB/geU/gLr1wDjOhQ+Q==
   dependencies:
     clone-deep "^4.0.1"

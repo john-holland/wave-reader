@@ -44,9 +44,9 @@ const SelectorInput: FunctionComponent<SelectorProps> = ({ selector, saved, sele
     const selectorRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        if (selectorRef.current?.value) {
+        //if (selectorRef.current?.value) {
             setSelectorText(selector);
-        }
+        //}
     }, [selector, selectorRef]);
 
     const _selectorClicked = () => {
