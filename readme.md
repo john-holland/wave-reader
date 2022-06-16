@@ -134,8 +134,12 @@ MIT
 
 ## todo / ideas
 
-- mouse control for waves
+- [in progress] mouse control for waves
 - mouse control with shortcut, toggle or hold
+- [in progress] settings
+- write a test for settings.tsx
+- setSyncObject for settings doesn't seem to persist values
+- message sending again
 
 
 help & acknowledgements, from & to https://medium.com/@seanlumjy/build-a-chrome-extension-that-injects-css-into-your-favourite-website-9b65f722f409

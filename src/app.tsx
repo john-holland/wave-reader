@@ -17,6 +17,7 @@ import configured from './config/config';
 import {guardLastError} from "./util/util";
 import UpdateSelectorMessage from "./models/messages/update-selector";
 import UpdateWaveMessage from "./models/messages/update-wave";
+import {Settings} from "./components/settings";
 
 //todo:
 // * Material UI
@@ -134,6 +135,12 @@ const App: FunctionComponent = () => {
         deferredOptions.update();
     }
 
+    const settingsUpdated = () => {
+        newSyncObject(Options, "options", Options.getDefaultOptions(), (result: Options) => {
+            setOptions(result);
+        });
+    }
+
     useEffect(() => {
         deferredOptions.subscribe((options?: Options, error?: any) => {
             if (error) {
@@ -184,6 +191,7 @@ const App: FunctionComponent = () => {
                            selectorClicked={selectorClicked}
                            onSave={onSaved}></SelectorInput>
             <GoButton onGo={onGo} onStop={onStop} going={going}></GoButton>
+            <Settings initialSettings={options} onUpdateSettings={settingsUpdated}></Settings>
         </div>
     );
 };
