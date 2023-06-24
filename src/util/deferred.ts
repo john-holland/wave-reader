@@ -1,6 +1,8 @@
 import "core-js/stable";
 import "regenerator-runtime/runtime";
 
+// this works, but i think i should look into using observables / rxjs (rxts?)
+// also doe not have unsub
 export class Deferred<T> {
     value?: T;
     ready: boolean = false;
@@ -25,6 +27,7 @@ export class Deferred<T> {
     }
 
     subscribe(callback: (val?: T, fail?: any) => void): void {
+        // return new Guid();
         this.subscriptions.push(callback);
     }
 

@@ -19,10 +19,13 @@ import UpdateSelectorMessage from "./models/messages/update-selector";
 import UpdateWaveMessage from "./models/messages/update-wave";
 import {Settings} from "./components/settings";
 
+import WaveTabs from './components/wave-tabs';
+
 //todo:
 // * Material UI
 // * Controls: read speed, reset speed, rotation angle, wave width, read duration
 // * save selector and settings with chrome sync
+// * audio from the ocean or the highway, coffee shop, or white or brown noise
 //
 //todo,ne:
 // * NOTE: popup, chrome.runtime.sendMessage -> background, chrome.tabs.query...sendMessage -> content
@@ -183,15 +186,30 @@ const App: FunctionComponent = () => {
         });
     }, []);
 
+    const [tabIndex, setTabIndex] = useState('1');
+
+    const handleChange = (event: React.SyntheticEvent, newValue: string) => {
+        setTabIndex(newValue);
+    }
+
     return (
         <div>
             <WaveSymbol>🌊</WaveSymbol>
-            <SelectorInput selector={selector}
-                           saved={saved}
-                           selectorClicked={selectorClicked}
-                           onSave={onSaved}></SelectorInput>
-            <GoButton onGo={onGo} onStop={onStop} going={going}></GoButton>
-            <Settings initialSettings={options} onUpdateSettings={settingsUpdated}></Settings>
+            <GoButton onGo={onGo} onStop={onStop} going={going}/>
+            <WaveTabs>
+                <SelectorInput
+                    tab-name={"Selector"}
+                    selector={selector}
+                    saved={saved}
+                    selectorClicked={selectorClicked}
+                    onSave={onSaved}>
+                </SelectorInput>
+                <Settings
+                    tab-name={"Settings"}
+                    initialSettings={options}
+                    onUpdateSettings={settingsUpdated}>
+                </Settings>
+            </WaveTabs>
         </div>
     );
 };
