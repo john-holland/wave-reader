@@ -56,15 +56,15 @@ const WaveTabs: FunctionComponent<SelectorProps> = ({ children }: TabPanelProps)
                 <Tabs value={value} onChange={handleChange} aria-label="basic tabs example">
                     {arrayChildren.map((c: ReactNode, i) => {
                         if (!c) {
-                            return (<Tab label={"unknown"}></Tab>);
+                            return (<Tab label={"unknown"} key={i}/>);
                         }
                         // @ts-ignore
-                        return (<Tab label={c.props['tab-name'] || `tab-error-${i}`} {...a11yProps(i)} />);
+                        return (<Tab label={c.props['tab-name'] || `tab-error-${i}`} key={i} {...a11yProps(i)} />);
                     })}
                 </Tabs>
             </Box>
             {arrayChildren.map((c, i) => {
-                return (<TabPanel value={value} index={i}>
+                return (<TabPanel value={value} index={i} key={i}>
                     {c}
                 </TabPanel>);
             })}
