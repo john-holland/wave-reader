@@ -31,7 +31,7 @@ console.log('background script loaded...')
         {
             conditions: [
                 new chrome.declarativeContent.PageStateMatcher({
-                    pageUrl: { urlMatches: "https://*/*" },
+                    pageUrl: { urlMatches: "https://*/*" }
                 }),
             ],
             // And shows the extension's page action.
@@ -39,28 +39,56 @@ console.log('background script loaded...')
         },
     ]);
 
+const initializeContentInterchange = () => {
+    chrome.runtime.onMessage.addListener((message, sender, callback) => {
+        if (!guardLastError()) {
+            console.log('background message: ', message)
+        }
+
+        //debugger;
+        if (message.from === 'popup') {
+            chrome.windows.getCurrent(w => {
+                chrome.tabs.query({active: true, windowId: w.id}).then((tabs) => {
+                    chrome.tabs.sendMessage(tabs[0].id, message);
+                    guardLastError()
+                    callback(true);
+                })
+            })
+        } else if (message.from === 'content') {
+            chrome.runtime.sendMessage(message, callback);
+            guardLastError()
+        } else {
+            console.log('unknown source!');
+        }
+
+        guardLastError()
+        // returning true or false is meaningful
+        return true;
+    });
+}
+
 const CONTENT_SCRIPT_ID = 'content_script_wave_reader';
+
 
 chrome.scripting.getRegisteredContentScripts().then((scripts) => {
     if (scripts.some(script => script.id === CONTENT_SCRIPT_ID)) {
         return Promise.resolve();
     } else {
         return p(resolve => {
+
             currentTab().then((tabs) => {
                 //return chrome.scripting.registerContentScripts([{
-                resolve();
-                // chrome.scripting.executeScript({
-                //     //id: CONTENT_SCRIPT_ID,
-                //     //matches: ['*://*/*'],
-                //     //runAt: 'document_start',
-                //     target: {tabId: tabs[0].id, allFrames: true},
-                //     files: ['content.js']
-                // }, resolve);
-            });
+                    //id: CONTENT_SCRIPT_ID,
+                  //  matches: ['*://*/*'],
+                    //runAt: 'document_start',
+                chrome.scripting.executeScript({
+                    target: {tabId: tabs[0].id, allFrames: true},
+                    files: ['content.js']
+                }, resolve);
+            }).catch(guardLastError);
         });
     }
-}).then(() => {
-
+}).then(initializeContentInterchange);
         // chrome.runtime.onConnect.addListener((port) => {
         //
         //     const popupPort = chrome.runtime.connect({ name: "popup" });
@@ -90,29 +118,4 @@ chrome.scripting.getRegisteredContentScripts().then((scripts) => {
         //     });
         // });
 
-        chrome.runtime.onMessage.addListener((message, sender, callback) => {
-            if (!guardLastError()) {
-                console.log('background message: ', message)
-            }
-
-            //debugger;
-            if (message.from === 'popup') {
-                chrome.windows.getCurrent(w => {
-                     chrome.tabs.query({active: true, windowId: w.id}).then((tabs) => {
-                        chrome.tabs.sendMessage(tabs[0].id, message);
-                        guardLastError()
-                        callback(true);
-                    })
-                })
-            } else if (message.from === 'content') {
-                chrome.runtime.sendMessage(message, callback);
-                guardLastError()
-            } else {
-                console.log('unknown source!');
-            }
-
-            guardLastError()
-            // returning true or false is meaningful
-            return true;
-        });
-    });
+    // });
