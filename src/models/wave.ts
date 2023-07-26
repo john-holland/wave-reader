@@ -1,5 +1,6 @@
 
 import Text from '../models/text';
+import AttributeConstructor from "../util/attribute-constructor";
 
 export const defaultCssTemplate = (options: Wave) => `
 @-webkit-keyframes wobble {
@@ -49,8 +50,8 @@ export const replaceAnimationVariables = (wave: Wave, translateX: string, rotate
         .replaceAll(ROTATE_Y, rotateY);
 }
 
-export default class Wave {
-    text: Text;
+export default class Wave extends AttributeConstructor<Wave>{
+    text: Text = new Text();
     selector?: string;
     cssTemplate?: string;
     cssMouseTemplate?: string;
@@ -63,10 +64,10 @@ export default class Wave {
     constructor(attributes: Partial<Wave> = {
         text: new Text()
     }) {
+        super(attributes);
         this.text = attributes.text!!
         this.cssTemplate = attributes.cssTemplate || defaultCssTemplate(attributes as Wave);
         this.cssMouseTemplate = attributes.cssMouseTemplate || defaultCssMouseTemplate(attributes as Wave)
-        Object.assign(this, attributes)
     }
 
     // mutates the wave if necessary to update the css

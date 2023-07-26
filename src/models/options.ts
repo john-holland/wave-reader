@@ -12,7 +12,7 @@ export default class Options extends AttributeConstructor<Options> {
     waveAnimationControl: WaveAnimationControl = WaveAnimationControl.CSS;
     wave: Wave = Wave.getDefaultWave();
 
-    constructor(props: Partial<Options> = { }) {
+    constructor(props: Partial<Options> = Options.getDefaultOptions()) {
         super(props);
     }
 

@@ -12,6 +12,14 @@ interface TabPanelProps {
     value: number;
 }
 
+const TypographyOrDiv = (children?: ReactNodeChildren | any) => {
+    if (typeof children === 'string') {
+        return <Typography>{children}</Typography>
+    } else {
+        return <div>{children}</div>
+    }
+}
+
 function TabPanel(props: TabPanelProps) {
     const { children, value, index, ...other } = props;
 
@@ -25,7 +33,7 @@ function TabPanel(props: TabPanelProps) {
         >
             {value === index && (
                 <Box sx={{ p: 3 }}>
-                    <Typography>{children}</Typography>
+                    <div>{children}</div>
                 </Box>
             )}
         </div>

@@ -17,7 +17,7 @@ import configured from './config/config';
 import {guardLastError} from "./util/util";
 import UpdateSelectorMessage from "./models/messages/update-selector";
 import UpdateWaveMessage from "./models/messages/update-wave";
-import {Settings} from "./components/settings";
+import {Settings, LoadSettings} from "./components/settings";
 
 import WaveTabs from './components/wave-tabs';
 
@@ -38,6 +38,10 @@ import WaveTabs from './components/wave-tabs';
 
 const WaveSymbol = styled.h2`
   display: inline;
+`;
+
+const WaveReader = styled.div`
+  width: 800px;
 `;
 
 const startPageCss = (wave: Wave) => {
@@ -100,6 +104,10 @@ const App: FunctionComponent = () => {
     const [ going, setGoing ] = useState(false);
     const [ options, setOptions ] = useState<Options>(Options.getDefaultOptions());
 
+    useEffect(() => {
+        LoadSettings().then(setOptions)
+    }, []);
+
     const selectorClicked = () => {
         setSaved(false);
     };
@@ -118,8 +126,10 @@ const App: FunctionComponent = () => {
         setGoing(true);
 
         newSyncObject(Options, "options", Options.getDefaultOptions(), (result) => {
+            result.going = true;
+            setSyncObject("options", result)
             // use workboots and send message with wave params to interpolate css
-            startPageCss(result.wave!!);
+            startPageCss(result.wave!!!!);
         });
     }
 
@@ -193,7 +203,7 @@ const App: FunctionComponent = () => {
     }
 
     return (
-        <div>
+        <WaveReader>
             <WaveSymbol>🌊</WaveSymbol>
             <GoButton onGo={onGo} onStop={onStop} going={going}/>
             <WaveTabs>
@@ -210,7 +220,7 @@ const App: FunctionComponent = () => {
                     onUpdateSettings={settingsUpdated}>
                 </Settings>
             </WaveTabs>
-        </div>
+        </WaveReader>
     );
 };
 
