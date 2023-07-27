@@ -1,7 +1,6 @@
 import * as React from 'react';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
-import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import {Children, FunctionComponent, ReactNode, useState} from "react";
 
@@ -10,14 +9,6 @@ interface TabPanelProps {
     children?: ReactNodeChildren;
     index: number;
     value: number;
-}
-
-const TypographyOrDiv = (children?: ReactNodeChildren | any) => {
-    if (typeof children === 'string') {
-        return <Typography>{children}</Typography>
-    } else {
-        return <div>{children}</div>
-    }
 }
 
 function TabPanel(props: TabPanelProps) {

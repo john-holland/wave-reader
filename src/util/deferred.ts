@@ -31,15 +31,15 @@ export class Deferred<T> {
         this.subscriptions.push(callback);
     }
 
-    async waitFor(): Promise<T> {
+    async waitFor(): Promise<T | undefined> {
         if (this.ready) {
-            return Promise.resolve<T>(this.value!!);
+            return Promise.resolve(this.value);
         }
 
         return new Promise<T>((resolve, reject) => {
             this.waitForSubscriptions.push((val?: T, error?: any) => {
                 if (val !== undefined && !error) {
-                    resolve(val!!);
+                    resolve(val);
                 } else {
                     reject(error);
                 }
@@ -71,7 +71,7 @@ export class Deferred<T> {
         return new Promise<T>((resolve, reject) => {
             const callback = (val?: T, error?: any) => {
                 if (val !== undefined && !error) {
-                    resolve(val!!);
+                    resolve(val);
                 } else {
                     reject(error);
                 }

@@ -1,5 +1,4 @@
 import Message from "../message";
-import Text from "../text";
 import Wave from "../wave";
 
 export default class UpdateWaveMessage extends Message<UpdateWaveMessage> {

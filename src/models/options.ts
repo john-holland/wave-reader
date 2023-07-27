@@ -13,7 +13,11 @@ export default class Options extends AttributeConstructor<Options> {
     wave: Wave = Wave.getDefaultWave();
 
     constructor(props: Partial<Options> = Options.getDefaultOptions()) {
-        super(props);
+        super(undefined);
+        // typescript auto-fills defaults here, if this is the desired behavior
+        super.assign(props);
+        // rehydrate the wave property as it surprisingly loses type after deserialization
+        this.wave = new Wave(this.wave);
     }
 
     public static getDefaultOptions(): Options {

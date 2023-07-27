@@ -1,5 +1,5 @@
-import {ChangeEvent, FunctionComponent, useEffect, useState} from "react";
-import Options, {WaveAnimationControl} from "../models/options";
+import { FunctionComponent, useEffect, useState } from "react";
+import Options, { WaveAnimationControl } from "../models/options";
 import Text from "../models/text";
 
 import {getSyncObject, newSyncObject, setSyncObject} from "../util/sync";
@@ -48,8 +48,15 @@ const eventVal = (fn: {(e: any): void}) =>
 
 // This may be a bit cleaner with redux or some other data store
 //  maybe it's worth while to make something like nested('property.prop.value', object)
+/**
+ * TODO: this class needs to have an index on url, and maybe a search + copy / paste
+ * @param initialSettings the initial settings object, use [Option.getDefaultOptions()] for defaults
+ * @param onUpdateSettings evented update callback
+ * @constructor
+ */
 export const Settings: FunctionComponent<SettingsProps> = ({ initialSettings, onUpdateSettings }: SettingsProps) => {
     const [settings, setSettings] = useState(new Options(initialSettings));
+    const typedSetSettings = (deltaSettings: Partial<Options> = settings) => setSettings(new Options(deltaSettings));
 
     const [waveAnimationControl, setWaveAnimationControl] = useState(initialSettings.waveAnimationControl)
     const [textColor, setTextColor] = useState(initialSettings.wave.text.color);
@@ -66,13 +73,13 @@ export const Settings: FunctionComponent<SettingsProps> = ({ initialSettings, on
 
 
     useEffect(() => {
-        newSyncObject(Options, "options", Options.getDefaultOptions(), (result: Options) => {
-            setSettings(new Options(result));
+        newSyncObject<Options>(Options, "options", Options.getDefaultOptions(), (result: Options) => {
+            typedSetSettings(result);
         });
-    });
+    }, []);
 
     useEffect(() => {
-        setSettings({
+        typedSetSettings({
             showNotifications,
             going: settings.going,
             waveAnimationControl,
@@ -111,7 +118,7 @@ export const Settings: FunctionComponent<SettingsProps> = ({ initialSettings, on
     }
 
     const saveSettings = (deltaSettings?: Partial<Options>) => {
-        const settingsToSave: Options = new Options(deltaSettings || {
+        const settingsToSave: Options = new Options({
                     showNotifications,
                     going: settings.going || false,
                     waveAnimationControl,
@@ -127,8 +134,9 @@ export const Settings: FunctionComponent<SettingsProps> = ({ initialSettings, on
                         axisTranslateAmountXMin,
                         axisRotationAmountYMax,
                         axisRotationAmountYMin,
-                    })
-                });
+                    }),
+            ...deltaSettings});
+
         setSettings(settingsToSave);
         setSyncObject("options", settingsToSave, onUpdateSettings);
     }
@@ -226,7 +234,7 @@ export const Settings: FunctionComponent<SettingsProps> = ({ initialSettings, on
                 />
             </FormControl>
             <ButtonGroup variant="text" aria-label="text button group">
-                <Button onClick={() => saveSettings(settings)}>Save Settings</Button>
+                <Button onClick={() => saveSettings()}>Save Settings</Button>
                 <Button onClick={resetSettings}>Reset</Button>
             </ButtonGroup>
         </SettingsStyleContainer>

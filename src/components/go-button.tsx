@@ -1,4 +1,4 @@
-import {FunctionComponent, useEffect, useState} from "react";
+import React, {FunctionComponent, useEffect, useState} from "react";
 import styled from "styled-components";
 
 type SelectorProps = {

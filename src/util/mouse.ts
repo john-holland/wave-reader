@@ -1,5 +1,3 @@
-import {List} from "@mui/material";
-
 type MousePosition = {
     x: number;
     y: number;
@@ -13,6 +11,7 @@ type MousePosition = {
  * @param rotationAmountDegrees the spread of rotation angle, from perpendicular tangent
  * @param event mouseMove event
  */
+/* eslint-disable  @typescript-eslint/no-unused-vars */
 export function getMousePos(rotationAmount: number, translationAmount: number, e: any): MousePosition {
     let posx = 0, posy = 0;
 

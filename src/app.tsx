@@ -1,21 +1,18 @@
 import React, { FunctionComponent, useEffect, useState } from 'react'
 import styled from "styled-components";
+import './styles.scss';
 import SelectorInput from "./components/selector-input";
 import GoButton from "./components/go-button";
 import StartMessage from "./models/messages/start";
 import Wave from "./models/wave";
-import Tab = chrome.tabs.Tab;
 import Options from "./models/options";
 import {getSyncObject, newSyncObject, setSyncObject} from './util/sync';
 import StopMessage from "./models/messages/stop";
 import {fromMessage} from "./util/messages";
-import Port = chrome.runtime.Port;
 import {Deferred} from "./util/deferred";
 import SelectorUpdated from "./models/messages/selector-updated";
-import MessageSender = chrome.runtime.MessageSender;
 import configured from './config/config';
 import {guardLastError} from "./util/util";
-import UpdateSelectorMessage from "./models/messages/update-selector";
 import UpdateWaveMessage from "./models/messages/update-wave";
 import {Settings, LoadSettings} from "./components/settings";
 
@@ -52,7 +49,7 @@ const startPageCss = (wave: Wave) => {
 
     setSyncObject("going", { going: true });
 
-    newSyncObject(Options,'options', Options.getDefaultOptions(), (options) => {
+    newSyncObject<Options>(Options,'options', Options.getDefaultOptions(), (options) => {
         if (options.showNotifications) {
             const notifOptions = {
                 type: "basic",
@@ -75,7 +72,7 @@ const stopPageCss = () => {
 const deferredOptions = new Deferred<Options>(() => {
     return new Promise((resolve, reject) => {
         try {
-            newSyncObject(Options,'options', Options.getDefaultOptions(), (result) => {
+            newSyncObject<Options>(Options,'options', Options.getDefaultOptions(), (result) => {
                 resolve(result);
             });
         } catch (e) {
@@ -86,8 +83,9 @@ const deferredOptions = new Deferred<Options>(() => {
 
 const bootstrapCondition = (going: boolean) => {
     deferredOptions.waitFor().then((options) => {
+        options = new Options(options);
         setTimeout(() => {
-            if (going) {
+            if (going && options) {
                 chrome.runtime.sendMessage(new StartMessage({
                     wave: options.wave.update()
                 }))
@@ -117,7 +115,7 @@ const App: FunctionComponent = () => {
         setSaved(true);
         selectorUpdated(new SelectorUpdated({ selector })).then(() => {
             chrome.runtime.sendMessage(new UpdateWaveMessage({
-                wave: options!!.wave
+                wave: options.wave
             }))
         });
     };
@@ -125,11 +123,11 @@ const App: FunctionComponent = () => {
     const onGo = () => {
         setGoing(true);
 
-        newSyncObject(Options, "options", Options.getDefaultOptions(), (result) => {
+        newSyncObject<Options>(Options, "options", Options.getDefaultOptions(), (result) => {
             result.going = true;
             setSyncObject("options", result)
             // use workboots and send message with wave params to interpolate css
-            startPageCss(result.wave!!!!);
+            startPageCss(result.wave);
         });
     }
 
@@ -140,27 +138,31 @@ const App: FunctionComponent = () => {
 
     const selectorUpdated = async (message: SelectorUpdated) => {
         setSelector(message.selector || 'p');
-        options!!.wave.selector = message.selector;
-        options!!.wave.update();
+        options.wave.selector = message.selector;
+        options.wave.update();
         deferredOptions.waitFor().then((options) => {
-            setSyncObject('options', options);
+            if (options) {
+                setSyncObject('options', options);
+            } else {
+                throw new Error("empty options");
+            }
         });
         deferredOptions.update();
     }
 
     const settingsUpdated = () => {
-        newSyncObject(Options, "options", Options.getDefaultOptions(), (result: Options) => {
+        newSyncObject<Options>(Options, "options", Options.getDefaultOptions(), (result: Options) => {
             setOptions(result);
         });
     }
 
     useEffect(() => {
-        deferredOptions.subscribe((options?: Options, error?: any) => {
+        deferredOptions.subscribe((options: Options = Options.getDefaultOptions(), error?: any) => {
             if (error) {
                 console.log(error);
                 if (!options) return;
             }
-            setOptions(options!!);
+            setOptions(options);
             setSelector(options?.wave?.selector || 'p');
         });
 
@@ -195,12 +197,6 @@ const App: FunctionComponent = () => {
             });
         });
     }, []);
-
-    const [tabIndex, setTabIndex] = useState('1');
-
-    const handleChange = (event: React.SyntheticEvent, newValue: string) => {
-        setTabIndex(newValue);
-    }
 
     return (
         <WaveReader>

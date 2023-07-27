@@ -1,6 +1,6 @@
-import {guardLastError} from "../src/util/util";
-import {getMousePos, mousePos} from "../src/util/mouse";
-import {replaceAnimationVariables} from "../src/models/wave";
+import { guardLastError } from "../src/util/util";
+import { mousePos } from "../src/util/mouse";
+import { replaceAnimationVariables } from "../src/models/wave";
 
 function loadCSS(css) {
     const head = document.head || document.getElementsByTagName("head")[0];

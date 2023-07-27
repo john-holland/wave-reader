@@ -65,22 +65,21 @@ export default class Wave extends AttributeConstructor<Wave>{
         text: new Text()
     }) {
         super(attributes);
-        this.text = attributes.text!!
         this.cssTemplate = attributes.cssTemplate || defaultCssTemplate(attributes as Wave);
         this.cssMouseTemplate = attributes.cssMouseTemplate || defaultCssMouseTemplate(attributes as Wave)
     }
 
     // mutates the wave if necessary to update the css
-    update(): Wave {
+    public update(): Wave {
         const css = defaultCssTemplate(this);
-        if (css != this.cssTemplate) {
+        if (css != this.cssTemplate && !this.cssTemplate) {
             this.cssTemplate = defaultCssTemplate(this);
             this.cssMouseTemplate = defaultCssMouseTemplate(this);
         }
         return this
     }
 
-    static getDefaultWave() {
+    static getDefaultWave(): Wave {
         return new Wave({
             selector: "p,h2,h3,h4,h5,h6,h7,h8,article,section,aside,figcaption",
             waveSpeed: 4,

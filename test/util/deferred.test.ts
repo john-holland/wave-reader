@@ -9,7 +9,7 @@ describe('Deferred', () => {
             });
         });
 
-        deferred.waitFor().then((value: string) => {
+        deferred.waitFor().then((value: string | undefined) => {
             expect(value).toBe('test');
             done();
         });

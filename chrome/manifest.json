@@ -28,7 +28,8 @@
     }
   ],
   "host_permissions": [
-    "*://*/*"
+    "*://*/*",
+    "<all_urls>"
   ],
   "permissions": [
     "scripting",
@@ -37,6 +38,7 @@
     "notifications",
     "webNavigation",
     "activeTab",
+    "<all_urls>",
     "tabs"
   ]
 }

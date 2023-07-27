@@ -45,6 +45,7 @@ const initializeContentInterchange = () => {
             console.log('background message: ', message)
         }
 
+
         //debugger;
         if (message.from === 'popup') {
             chrome.windows.getCurrent(w => {
@@ -72,7 +73,7 @@ const CONTENT_SCRIPT_ID = 'content_script_wave_reader';
 
 chrome.scripting.getRegisteredContentScripts().then((scripts) => {
     if (scripts.some(script => script.id === CONTENT_SCRIPT_ID)) {
-        return Promise.resolve();
+        return Promise.resolve()
     } else {
         return p(resolve => {
 
