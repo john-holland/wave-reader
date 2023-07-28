@@ -12,6 +12,7 @@
   },
   "scripts": {
     "dev": "NODE_ENV=development webpack --mode development --config webpack.develop.js --watch",
+    "build": "NODE_ENV=development webpack --mode development --config webpack.develop.js",
     "production": "NODE_ENV=development webpack --mode development --config webpack.prod.js --watch",
     "test": "npx jest"
   },
@@ -47,6 +48,8 @@
     "jest-environment-jsdom": "^29.6.2",
     "mini-css-extract-plugin": "^2.7.6",
     "node-sass": "^9.0.0",
+    "react-is": "^18.2.0",
+    "react-shallow-renderer": "^16.15.0",
     "react-test-renderer": "^18.0.0",
     "sass-loader": "^13.3.2",
     "style-loader": "^3.3.3",
