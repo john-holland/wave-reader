@@ -1,4 +1,13 @@
-export default class Text {
-    textSize: string = '1rem';
-    textColor: string = 'initial';
+import AttributeConstructor from "../util/attribute-constructor";
+
+export default class Text extends AttributeConstructor<Text> {
+    size?: string;
+    color?: string;
+
+    constructor(attributes: Partial<Text> = {
+        size: 'initial',
+        color: 'initial'
+    }) {
+        super(attributes)
+    }
 }

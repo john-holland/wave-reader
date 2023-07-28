@@ -4,8 +4,11 @@
         "lib": [
             "dom",
             "dom.iterable",
-            "esnext"
+            "esnext",
+            "es6",
+            "es2017"
         ],
+        "types": ["chrome", "jest"],
         "allowJs": true,
         "skipLibCheck": true,
         "esModuleInterop": true,
@@ -13,12 +16,12 @@
         "strict": true,
         "forceConsistentCasingInFileNames": true,
         "noFallthroughCasesInSwitch": true,
-        "module": "esnext",
+        "module": "es6",
         "moduleResolution": "node",
         "resolveJsonModule": true,
         "isolatedModules": true,
         "noEmit": false,
-        "jsx": "react-jsx"
+        "jsx": "react"
     },
     "include": [
         "src"

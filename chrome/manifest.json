@@ -1,17 +1,48 @@
 {
-  "manifest_version": 2,
-  "name": "Your Extension's Name",
-  "short_name": "Your Extensions 'Short Name'",
+  "manifest_version": 3,
+  "name": "Wave Reader",
+  "short_name": "🌊r.",
   "version": "1.0.0",
-  "description": "Your extensions description",
+  "description": "Smoothly wobble text blocks, to improve eye tracking for reading!",
   "icons": {
     "16": "icons/waver16.jpg",
     "48": "icons/waver48.png",
     "128": "icons/waver128.jpg"
   },
-  "browser_action": {
+  "action": {
     "default_title": "Wave Reader",
-    "default_popup": "index.html"
+    "default_popup": "index.html",
+    "default_icon": "icons/waver16.jpg"
   },
-  "permissions": []
+  "background": {
+    "service_worker": "background.js",
+    "matches": [
+      "<all_urls>",
+      "*://*/*"
+    ],
+    "run_at": "document_end"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_end",
+      "all_frames": true
+    }
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "permissions": [
+    "scripting",
+    "declarativeContent",
+    "storage",
+    "notifications",
+    "webNavigation",
+    "activeTab",
+    "<all_urls>",
+    "tabs"
+  ]
 }

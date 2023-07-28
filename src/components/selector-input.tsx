@@ -17,16 +17,16 @@ const SaveButton = styled.input`
   display: ${((props: VisibilityProps) => props.visible ? 'inline' : 'none')}
 `;
 
-const SelectorTextDisplay = styled.span`
+const SelectorTextDisplay = styled.div`
   display: ${((props: VisibilityProps) => props.visible ? 'inline' : 'none')}
 `;
 
-const SelectorNote = styled.span`
+const SelectorNote = styled.div`
   color: #333;
   display: ${((props: VisibilityProps) => props.visible ? 'inline' : 'none')};
 `;
 
-const ClickableSelectorTextContainer = styled.span`
+const ClickableSelectorTextContainer = styled.div`
   display: inline;
 `;
 
@@ -38,15 +38,15 @@ type SelectorProps = {
     onSave: (selector: string) => void
 }
 
-export const SelectorInput: FunctionComponent<SelectorProps> = ({ selector, saved, selectorClicked, onSave }: SelectorProps) => {
+const SelectorInput: FunctionComponent<SelectorProps> = ({ selector, saved, selectorClicked, onSave }: SelectorProps) => {
     const [ selectorText, setSelectorText ] = useState(selector);
 
     const selectorRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        if (selectorRef.current?.value) {
+        //if (selectorRef.current?.value) {
             setSelectorText(selector);
-        }
+        //}
     }, [selector, selectorRef]);
 
     const _selectorClicked = () => {
@@ -68,8 +68,10 @@ export const SelectorInput: FunctionComponent<SelectorProps> = ({ selector, save
                 <SelectorTextDisplay visible={saved}>{ selectorText }</SelectorTextDisplay>
                 <SelectorNote visible={saved}>&nbsp;(click to set selector)</SelectorNote>
             </ClickableSelectorTextContainer>
-            <SelectorTextInput visible={!saved} type="text" defaultValue={selectorText} ref={selectorRef}></SelectorTextInput>
-            <SaveButton visible={!saved} type="button" value={"Save"} onClick={saveClicked}></SaveButton>
+            <SelectorTextInput visible={!saved} type="text" defaultValue={selectorText} ref={selectorRef} />
+            <SaveButton visible={!saved} type="button" value={"Save"} onClick={saveClicked} />
         </div>
     );
 }
+
+export default SelectorInput;

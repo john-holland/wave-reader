@@ -1,5 +1,12 @@
-export default class UpdateWaveMessage {
-    waveSpeed?: string;
-    axisRotationAmount?: number;
-    text: Text = new Text();
+import Message from "../message";
+import Wave from "../wave";
+
+export default class UpdateWaveMessage extends Message<UpdateWaveMessage> {
+    wave?: Wave
+
+    constructor(attributes: Partial<UpdateWaveMessage> = {
+        wave: new Wave()
+    }) {
+        super('update-wave', 'popup', attributes)
+    }
 }
