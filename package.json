@@ -60,7 +60,7 @@
   },
   "name": "wave-reader",
   "version": "0.0.0",
-  "description": "A motion reader to help people effected by tracking problems.",
+  "description": "A motion reader to help eye tracking while reading.",
   "main": "webpack.develop.js",
   "author": "John Holland",
   "license": "MIT"

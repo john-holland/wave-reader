@@ -17,11 +17,14 @@ import UpdateWaveMessage from "./models/messages/update-wave";
 import {Settings, LoadSettings} from "./components/settings";
 
 import WaveTabs from './components/wave-tabs';
+import InstalledDetails = chrome.runtime.InstalledDetails;
 
 //todo:
 // * Material UI
 // * Controls: read speed, reset speed, rotation angle, wave width, read duration
 // * save selector and settings with chrome sync
+// * keyboard shortcut toggle
+// * mouse movement
 // * audio from the ocean or the highway, coffee shop, or white or brown noise
 //
 //todo,ne:
@@ -32,10 +35,6 @@ import WaveTabs from './components/wave-tabs';
 // * typescript, functional component style
 
 // https://medium.com/@seanlumjy/build-a-chrome-extension-that-injects-css-into-your-favourite-website-9b65f722f409
-
-const WaveSymbol = styled.h2`
-  display: inline;
-`;
 
 const WaveReader = styled.div`
   width: 800px;
@@ -172,35 +171,37 @@ const App: FunctionComponent = () => {
             }
         }
 
-        // upon first load, get a default value for 'going'
-        getSyncObject("going", { going: false }, (result) => {
-            setGoing(result.going);
+        chrome.runtime.onInstalled.addListener((details: InstalledDetails) => {
+            console.log(`install details: ${details}`);
+            // upon first load, get a default value for 'going'
+            getSyncObject("going", { going: false }, (result) => {
+                setGoing(result.going);
 
-            // use result.going as useState is an async call
-            bootstrapCondition(result.going);
+                // use result.going as useState is an async call
+                bootstrapCondition(result.going);
 
-            chrome.runtime.onMessage.addListener((message: any) => {
-                const typedMessage = fromMessage(message);
+                chrome.runtime.onMessage.addListener((message: any) => {
+                    const typedMessage = fromMessage(message);
 
-                switch (typeof typedMessage) {
-                    // case typeof BootstrapMessage:
-                    //     bootstrapCondition();
-                    //     break;
-                    case typeof SelectorUpdated:
-                        selectorUpdated(message);
-                        break;
-                    default:
-                        console.log(`${typeof typedMessage} unhandled typed message from content script`)
-                }
+                    switch (typeof typedMessage) {
+                        // case typeof BootstrapMessage:
+                        //     bootstrapCondition();
+                        //     break;
+                        case typeof SelectorUpdated:
+                            selectorUpdated(message);
+                            break;
+                        default:
+                            console.log(`${typeof typedMessage} unhandled typed message from content script`)
+                    }
 
-                return true;
+                    return true;
+                });
             });
         });
     }, []);
 
     return (
         <WaveReader>
-            <WaveSymbol>🌊</WaveSymbol>
             <GoButton onGo={onGo} onStop={onStop} going={going}/>
             <WaveTabs>
                 <SelectorInput

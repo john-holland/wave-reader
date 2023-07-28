@@ -16,19 +16,23 @@
   },
   "background": {
     "service_worker": "background.js",
-    "matches": ["https://*/*", "http://*/*"],
+    "matches": [
+      "<all_urls>",
+      "*://*/*"
+    ],
     "run_at": "document_end"
   },
   "content_scripts": [
     {
-      "matches": ["https://*/*", "http://*/*"],
+      "matches": [
+        "<all_urls>"
+      ],
       "js": ["content.js"],
       "run_at": "document_end",
       "all_frames": true
     }
   ],
   "host_permissions": [
-    "*://*/*",
     "<all_urls>"
   ],
   "permissions": [
