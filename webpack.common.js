@@ -4,6 +4,10 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 const CopyPlugin = require("copy-webpack-plugin");
 const baseManifest = require("./chrome/manifest.json");
 const WebpackExtensionManifestPlugin = require("webpack-extension-manifest-plugin");
+const ESLintPlugin = require('eslint-webpack-plugin');
+const { CleanWebpackPlugin } = require('clean-webpack-plugin');
+const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 
 //config: path.join(__dirname, "./src/config/config.common.js")
 const config = {
@@ -40,6 +44,14 @@ const config = {
             template: "./static/index.html",
             hash: true
         }),
+        new MiniCssExtractPlugin({
+            // Options similar to the same options in webpackOptions.output
+            // both options are optional
+            filename: '[name].[contenthash].css',
+            chunkFilename: '[id].css'
+        }),
+        new CleanWebpackPlugin(),
+        new ForkTsCheckerWebpackPlugin(),
         new CopyPlugin({
             patterns: [
                 {
@@ -52,6 +64,10 @@ const config = {
             config: {
                 base: baseManifest
             }
+        }),
+        new ESLintPlugin({
+            extensions: ['.tsx', '.ts', '.js'],
+            exclude: 'node_modules'
         })
     ],
     module: {
@@ -62,17 +78,34 @@ const config = {
                 use: ["babel-loader"]
             },
             {
-                test: /\.(ts|tsx)$/,
-                exclude: /node_modules/,
-                use: ["ts-loader"],
-            },
-            {
-                test: /\.css$/,
-                use: ["style-loader", "css-loader"]
-            },
-            {
                 test: /\.(png|svg|jpg|gif)$/,
                 use: ["file-loader"]
+            },
+            {
+                test: /\.(ts|tsx)$/,
+                exclude: /node_modules/,
+                use: {
+                    loader: 'ts-loader',
+                    options: {
+                        // disable type checker - we will use it in fork plugin
+                        transpileOnly: true
+                    }
+                }
+            },
+            {
+                test: /\.(scss|css)$/,
+                use: [
+                    process.env.NODE_ENV !== 'production'
+                        ? 'style-loader'
+                        : MiniCssExtractPlugin.loader,
+                    'css-loader',
+                    {
+                        loader: 'sass-loader',
+                        options: {
+                            sourceMap: true
+                        }
+                    }
+                ]
             }
         ]
     }

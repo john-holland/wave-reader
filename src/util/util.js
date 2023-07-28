@@ -1,3 +1,4 @@
+
 /**
  * A Promise proxy function
  *
@@ -7,6 +8,7 @@
  * @param promiseFn a promise function body
  * @returns {Promise<unknown>} another promise or a value wrapped in resolve promise
  */
+/* eslint-disable  @typescript-eslint/no-unused-vars */
 const p = (promiseFn = (resolve = () => {}, reject = () => {}) => {}) => {
     return new Promise(promiseFn);
 };

@@ -17,16 +17,16 @@ const SaveButton = styled.input`
   display: ${((props: VisibilityProps) => props.visible ? 'inline' : 'none')}
 `;
 
-const SelectorTextDisplay = styled.span`
+const SelectorTextDisplay = styled.div`
   display: ${((props: VisibilityProps) => props.visible ? 'inline' : 'none')}
 `;
 
-const SelectorNote = styled.span`
+const SelectorNote = styled.div`
   color: #333;
   display: ${((props: VisibilityProps) => props.visible ? 'inline' : 'none')};
 `;
 
-const ClickableSelectorTextContainer = styled.span`
+const ClickableSelectorTextContainer = styled.div`
   display: inline;
 `;
 

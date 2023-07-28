@@ -4,10 +4,15 @@ export interface AttributeAccessor {
 }
 
 export default abstract class AttributeConstructor<T> {
+
     protected constructor(attributes?: AttributeAccessor & Partial<T>, requireAllAssigned: boolean = false) {
-        if (attributes && requireAllAssigned) {
-            if (!new Array(...Object.keys(attributes)).every(k => attributes[k] !== undefined)) {
-                throw new Error('a message must contain properties')
+        this.assign(attributes, requireAllAssigned)
+    }
+
+    protected assign(attributes?: AttributeAccessor & Partial<T>, requireAllAssigned: boolean = false) {
+        if (attributes) {
+            if (requireAllAssigned && !new Array(...Object.keys(attributes)).every(k => attributes[k] !== undefined)) {
+                throw new Error('if [requireAllAssigned == true], a message must contain properties with no undefined values!')
             }
             Object.assign(this, attributes)
         }

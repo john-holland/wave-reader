@@ -1,14 +1,13 @@
+import AttributeConstructor from "../util/attribute-constructor";
 
-export default class Text {
-    size: string;
-    color: string;
+export default class Text extends AttributeConstructor<Text> {
+    size?: string;
+    color?: string;
 
     constructor(attributes: Partial<Text> = {
         size: 'initial',
         color: 'initial'
     }) {
-        this.size = attributes.size!!
-        this.color = attributes.color!!
-        Object.assign(this, attributes)
+        super(attributes)
     }
 }

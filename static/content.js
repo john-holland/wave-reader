@@ -1,6 +1,6 @@
-import {guardLastError} from "../src/util/util";
-import {getMousePos, mousePos} from "../src/util/mouse";
-import {replaceAnimationVariables} from "../src/models/wave";
+import { guardLastError } from "../src/util/util";
+import { mousePos } from "../src/util/mouse";
+import { replaceAnimationVariables } from "../src/models/wave";
 
 function loadCSS(css) {
     const head = document.head || document.getElementsByTagName("head")[0];
@@ -30,6 +30,10 @@ const applyMouseMove = (event, selector, message, elements) => {
     loadCSS(replaceAnimationVariables(wave, translationAmountX, rotationAmountY));
 }
 
+const mouseMoveListener = (e) => {
+    applyMouseMove(e, message.wave.selector, message, elements)
+}
+
 chrome.runtime.onMessage.addListener( (message, sender, sendResponse) => {
         console.log(`message: ${JSON.stringify(message)}`)
 
@@ -53,12 +57,14 @@ chrome.runtime.onMessage.addListener( (message, sender, sendResponse) => {
         } else if (message.name === "stop-mouse-move") {
             // maybe unloadCSS and reload each time?
             unloadCSS()
+            const elements = document.querySelectorAll(message.wave.selector);
+            elements.forEach(element => {
+                element.removeEventListener("mousemove", mouseMoveListener);
+            })
         } else if (message.name === "start-mouse-move") {
             const elements = document.querySelectorAll(message.wave.selector);
             elements.forEach(element => {
-                element.addEventListener("mousemove", (e) => {
-                    applyMouseMove(e, message.wave.selector, message, elements)
-                });
+                element.addEventListener("mousemove", mouseMoveListener);
             })
         } else {
             console.log('unknown message name' + message.name)
