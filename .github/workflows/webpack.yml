@@ -26,7 +26,7 @@ jobs:
     - name: Build
       run: |
         yarn install
-        npx webpack
+        yarn run build
         
     - name: Test
       run: |
