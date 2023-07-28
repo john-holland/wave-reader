@@ -12,6 +12,7 @@
   },
   "scripts": {
     "dev": "NODE_ENV=development webpack --mode development --config webpack.develop.js --watch",
+    "build": "NODE_ENV=development webpack --mode development --config webpack.develop.js",
     "production": "NODE_ENV=development webpack --mode development --config webpack.prod.js --watch",
     "test": "npx jest"
   },
