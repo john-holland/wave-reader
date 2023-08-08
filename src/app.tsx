@@ -152,6 +152,10 @@ const App: FunctionComponent = () => {
     const settingsUpdated = () => {
         newSyncObject<Options>(Options, "options", Options.getDefaultOptions(), (result: Options) => {
             setOptions(result);
+            chrome.runtime.sendMessage(new UpdateWaveMessage({
+                //popupPort.postMessage(new StartMessage({
+                wave: result.wave
+            }));
         });
     }
 

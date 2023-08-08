@@ -51,7 +51,8 @@ chrome.runtime.onMessage.addListener( (message, sender, sendResponse) => {
             unloadCSS()
         } else if (message.name === "update-wave") {
             unloadCSS()
-            loadCSSTemplate(message.wave.cssTemplate)
+            loadCSSTemplate(message.options.wave.cssTemplate)
+            updateWaveToggleKeys(message.options.toggleKeys)
         } else if (message.name === "start-selection-choose") {
             console.log('start selection choose')
         } else if (message.name === "stop-mouse-move") {

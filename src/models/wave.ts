@@ -61,9 +61,7 @@ export default class Wave extends AttributeConstructor<Wave>{
     axisRotationAmountYMax?: number;
     axisRotationAmountYMin?: number;
 
-    constructor(attributes: Partial<Wave> = {
-        text: new Text()
-    }) {
+    constructor(attributes: Partial<Wave> = Wave.getDefaultWave()) {
         super(attributes);
         this.cssTemplate = attributes.cssTemplate || defaultCssTemplate(attributes as Wave);
         this.cssMouseTemplate = attributes.cssMouseTemplate || defaultCssMouseTemplate(attributes as Wave)
