@@ -1,6 +1,7 @@
 import { guardLastError } from "../src/util/util";
 import { mousePos } from "../src/util/mouse";
 import { replaceAnimationVariables } from "../src/models/wave";
+import {FollowKeyChordObserver, WindowKeyDownKey} from "../src/components/util/user-input";
 
 function loadCSS(css) {
     const head = document.head || document.getElementsByTagName("head")[0];
@@ -34,6 +35,44 @@ const mouseMoveListener = (e) => {
     applyMouseMove(e, message.wave.selector, message, elements)
 }
 
+let keychordObserver /*Observable<boolean> | undefined*/ = undefined;
+let eventListener /*{(event: KeyboardEvent): void} | undefined*/ = undefined;
+let callStop = false;
+let stopKeyChordEventListenerPredicate = () => {
+    if (callStop && eventListener !== undefined) {
+        window.removeEventListener("keydown", eventListener);
+    }
+    return callStop;
+}
+
+const initializeOrUpdateToggleObserver = (message) => {
+    if (keychordObserver !== undefined) {
+        // a little awkward but it's nice to loosely guard against key events
+        callStop = true;
+        stopKeyChordEventListenerPredicate();
+        callStop = false;
+    }
+
+    keychordObserver = FollowKeyChordObserver(
+        message.options.toggleKeys.keyChord,
+        WindowKeyDownKey((e/*{(event: KeyboardEvent): void}*/) => {
+            eventListener = e
+        }),
+        stopKeyChordEventListenerPredicate
+    ).subscribe(() => {
+        // TODO: refactor with a state machine manager or something, like a WaveRemote class etc
+        if (going) {
+            unloadCSS()
+            going = false;
+        } else {
+            loadCSSTemplate(message.options.wave.cssTemplate)
+            going = true;
+        }
+    });
+}
+
+let going = false;
+
 chrome.runtime.onMessage.addListener( (message, sender, sendResponse) => {
         console.log(`message: ${JSON.stringify(message)}`)
 
@@ -46,24 +85,30 @@ chrome.runtime.onMessage.addListener( (message, sender, sendResponse) => {
         }
 
         if (message.name === "start") {
-            loadCSSTemplate(message.wave.cssTemplate)
+            loadCSSTemplate(message.options.wave.cssTemplate)
+            going = true;
+            initializeOrUpdateToggleObserver(message);
         } else if (message.name === "stop") {
             unloadCSS()
+            going = false;
         } else if (message.name === "update-wave") {
             unloadCSS()
-            loadCSSTemplate(message.options.wave.cssTemplate)
-            updateWaveToggleKeys(message.options.toggleKeys)
+            if (going) {
+                loadCSSTemplate(message.options.wave.cssTemplate)
+            }
+
+            initializeOrUpdateToggleObserver(message);
         } else if (message.name === "start-selection-choose") {
             console.log('start selection choose')
         } else if (message.name === "stop-mouse-move") {
             // maybe unloadCSS and reload each time?
             unloadCSS()
-            const elements = document.querySelectorAll(message.wave.selector);
+            const elements = document.querySelectorAll(message.options.wave.selector);
             elements.forEach(element => {
                 element.removeEventListener("mousemove", mouseMoveListener);
             })
         } else if (message.name === "start-mouse-move") {
-            const elements = document.querySelectorAll(message.wave.selector);
+            const elements = document.querySelectorAll(message.options.wave.selector);
             elements.forEach(element => {
                 element.addEventListener("mousemove", mouseMoveListener);
             })

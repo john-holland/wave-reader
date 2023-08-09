@@ -2,10 +2,10 @@ import Message from "../message";
 import Options from "../options";
 
 export default class UpdateWaveMessage extends Message<UpdateWaveMessage> {
-    wave?: Options
+    options?: Options
 
     constructor(attributes: Partial<UpdateWaveMessage> = {
-        wave: new Options()
+        options: new Options()
     }) {
         super('update-wave', 'popup', attributes)
     }

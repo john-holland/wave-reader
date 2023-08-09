@@ -1,6 +1,5 @@
 import AttributeConstructor from "../util/attribute-constructor";
 import Wave from "./wave";
-import {Key} from "react";
 import { KeyChord } from "../components/util/user-input";
 
 export enum WaveAnimationControl {
@@ -14,6 +13,7 @@ export class WaveToggleConfig extends AttributeConstructor<WaveToggleConfig> {
 
     public constructor(attributes: Partial<WaveToggleConfig> = WaveToggleConfig.getDefaultConfig()) {
         super(attributes);
+        this.keyChord = attributes.keyChord || []
     }
 
     static getDefaultConfig(): WaveToggleConfig {

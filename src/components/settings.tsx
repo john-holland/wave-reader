@@ -1,5 +1,5 @@
 import { FunctionComponent, useEffect, useState } from "react";
-import Options, { WaveAnimationControl } from "../models/options";
+import Options, {WaveAnimationControl, WaveToggleConfig} from "../models/options";
 import Text from "../models/text";
 
 import {getSyncObject, newSyncObject, setSyncObject} from "../util/sync";
@@ -16,6 +16,8 @@ import {
 import Wave from "../models/wave";
 import * as React from "react";
 import styled from "styled-components";
+import ScanForInputField from "./scan-for-input-field";
+import {KeyChord} from "./util/user-input";
 
 type SettingsProps = {
     initialSettings: Options;
@@ -70,7 +72,7 @@ export const Settings: FunctionComponent<SettingsProps> = ({ initialSettings, on
     const [axisRotationAmountYMax, setAxisRotationAmountYMax] = useState(initialSettings.wave.axisRotationAmountYMax);
     const [axisRotationAmountYMin, setAxisRotationAmountYMin] = useState(initialSettings.wave.axisRotationAmountYMin);
     const [showNotifications, setShowNotifications] = useState(initialSettings.showNotifications);
-
+    const [toggleKeys, setToggleKeys] = useState(initialSettings.toggleKeys)
 
     useEffect(() => {
         newSyncObject<Options>(Options, "options", Options.getDefaultOptions(), (result: Options) => {
@@ -83,6 +85,7 @@ export const Settings: FunctionComponent<SettingsProps> = ({ initialSettings, on
             showNotifications,
             going: settings.going,
             waveAnimationControl,
+            toggleKeys,
             wave: new Wave({
                 text: new Text({
                     color: textColor,
@@ -108,6 +111,7 @@ export const Settings: FunctionComponent<SettingsProps> = ({ initialSettings, on
         axisTranslateAmountXMin,
         axisRotationAmountYMax,
         axisRotationAmountYMin,
+        toggleKeys
     ]);
 
     const resetSettings = () => {
@@ -122,6 +126,7 @@ export const Settings: FunctionComponent<SettingsProps> = ({ initialSettings, on
                     showNotifications,
                     going: settings.going || false,
                     waveAnimationControl,
+                    toggleKeys,
                     wave: new Wave({
                         text: new Text({
                             color: textColor,
@@ -141,12 +146,31 @@ export const Settings: FunctionComponent<SettingsProps> = ({ initialSettings, on
         setSyncObject("options", settingsToSave, onUpdateSettings);
     }
 
+    const onToggleScan = (keyChord: KeyChord) => {
+        setToggleKeys(new WaveToggleConfig({
+            keyChord
+        }))
+    }
+
+    const onCancelToggleScan = (keyChord: KeyChord) => {
+        // maybe unnecessary
+        setToggleKeys(new WaveToggleConfig({
+            keyChord
+        }))
+    }
+
     // for the css template to work, we need to switch over to replacement templates instead of runtime.
     return (
         <SettingsStyleContainer>
             <FormControl className={"form-control"}>
                 <FormLabel id={"notifications-checkbox-label"}>Show Notifications</FormLabel>
                 <Checkbox aria-labelledby="notifications-checkbox-label" checked={showNotifications} onChange={val(setShowNotifications)} />
+                <ScanForInputField actionType={"Wave Toggle"}
+                                   keyLimit={4}
+                                   shortcut={toggleKeys.keyChord}
+                                   onScan={onToggleScan}
+                                   onCancelScan={onCancelToggleScan} />
+
                 <FormLabel id="wave-control-radio-buttons-group-label">Wave Control</FormLabel>
                 <RadioGroup
                     aria-labelledby="wave-control-radio-buttons-group-label"

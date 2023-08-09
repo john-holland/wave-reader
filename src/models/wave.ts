@@ -77,7 +77,7 @@ export default class Wave extends AttributeConstructor<Wave>{
         return this
     }
 
-    static getDefaultWave(): Wave {
+    public static getDefaultWave(): Wave {
         return new Wave({
             selector: "p,h2,h3,h4,h5,h6,h7,h8,article,section,aside,figcaption",
             waveSpeed: 4,
