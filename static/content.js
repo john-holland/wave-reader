@@ -21,6 +21,8 @@ stateMachineMap.set("base", Base);
 
 const stateMachine = new StateMachine()
 
+let latestOptions = undefined;
+
 function loadCSS(css) {
     const head = document.head || document.getElementsByTagName("head")[0];
     const style = document.createElement("style");
@@ -103,7 +105,8 @@ function StateNameMap(map = new Map()) {
             return map.get('base')
         }, true),
         "start": CState("start", StartVentures, false, (message, state, previousState) => {
-            loadCSSTemplate(message.options.wave.cssTemplate)
+            latestOptions = message.options;
+            loadCSSTemplate(latestOptions.wave.cssTemplate)
             // TODO: see if the state machine will let us remove this
             going = true;
             initializeOrUpdateToggleObserver(message);
@@ -116,9 +119,10 @@ function StateNameMap(map = new Map()) {
         }, false),
         "update": CState("update", BaseVentures, false, (message, state, previousState) => {
             unloadCSS()
+            latestOptions = message.options;
             console.log("Update called with previous state: " + previousState.name);
             if (previousState.name === "waving") {
-                loadCSSTemplate(message.options.wave.cssTemplate)
+                loadCSSTemplate(latestOptions.wave.cssTemplate)
             }
 
             // may need to separate steps for clarity
@@ -126,7 +130,7 @@ function StateNameMap(map = new Map()) {
             return previousState
             }, true),
         "toggle start": CState("toggle start", StartVentures, false, (message, state, previousState) => {
-            loadCSSTemplate(message.options.wave.cssTemplate)
+            loadCSSTemplate(latestOptions.wave.cssTemplate)
             return map.get('waving')
             }, false),
         "toggle stop": CState("toggle stop", StopVentures, false, (message, state, previousState) => {
@@ -134,6 +138,8 @@ function StateNameMap(map = new Map()) {
             return map.get('base')
             }, false),
         "start mouse": CState("start mouse", StartVentures, false, (message, state, previousState) => {
+            // TODO: this may need to be merged with the start and toggle logic
+            latestOptions = message.options;
             const elements = document.querySelectorAll(message.options.wave.selector);
             elements.forEach(element => {
                 element.addEventListener("mousemove", mouseMoveListener);
@@ -202,7 +208,11 @@ chrome.runtime.onMessage.addListener( (message, sender, sendResponse) => {
             return false;
         }
 
-        stateMachine.handleState(message);
+        try {
+            stateMachine.handleState(message);
+        } catch (e) {
+            throw new Error(`Failed with message: ${JSON.stringify(message)}, and error, ${e.message}`);
+        }
 
         sendResponse(true);
 
