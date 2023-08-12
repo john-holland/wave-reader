@@ -57,7 +57,7 @@ let keychordObserver /*Observable<boolean> | undefined*/ = undefined;
 let eventListener /*{(event: KeyboardEvent): void} | undefined*/ = undefined;
 
 let stopKeyChordEventListenerPredicate = () => {
-    if (callStop && eventListener !== undefined) {
+    if (eventListener !== undefined) {
         window.removeEventListener("keydown", eventListener);
     }
     // fx. callstop
@@ -78,9 +78,9 @@ const initializeOrUpdateToggleObserver = (message) => {
     ).subscribe(() => {
         // TODO: refactor with a state machine manager or something, like a WaveRemote class etc
         if (stateMachine.getCurrentState().name === "waving") {
-            stateMachine.handle(stateMachine.getState("toggle stop"))
+            stateMachine.handleState(stateMachine.getState("toggle stop"))
         } else {
-            stateMachine.handle(stateMachine.getState("toggle start"))
+            stateMachine.handleState(stateMachine.getState("toggle start"))
         }
     });
 }
@@ -116,6 +116,7 @@ function StateNameMap(map = new Map()) {
         }, false),
         "update": CState("update", BaseVentures, false, (message, state, previousState) => {
             unloadCSS()
+            console.log("Update called with previous state: " + previousState.name);
             if (previousState.name === "waving") {
                 loadCSSTemplate(message.options.wave.cssTemplate)
             }
@@ -201,7 +202,7 @@ chrome.runtime.onMessage.addListener( (message, sender, sendResponse) => {
             return false;
         }
 
-        stateMachine.handleState(message, stateMachine);
+        stateMachine.handleState(message);
 
         sendResponse(true);
 

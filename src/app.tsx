@@ -151,11 +151,12 @@ const App: FunctionComponent = () => {
         deferredOptions.update();
     }
 
+    // TODO: when we can't reach the tab, we want to instruct the user to try refreshing the tab, then the browser
     const settingsUpdated = () => {
         newSyncObject<Options>(Options, "options", Options.getDefaultOptions(), (result: Options) => {
             result.wave = result.wave.update();
             setOptions(result);
-            chrome.runtime.sendMessage(new StartMessage({
+            chrome.runtime.sendMessage(new UpdateWaveMessage({
                 options: result
             }));
         });
@@ -177,6 +178,9 @@ const App: FunctionComponent = () => {
                 window.close();
             }
         }
+        getSyncObject("going", { going: false }, (result) => {
+            setGoing(result.going);
+        });
 
         chrome.runtime.onInstalled.addListener((details: InstalledDetails) => {
             console.log(`install details: ${details}`);
