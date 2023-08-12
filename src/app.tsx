@@ -88,6 +88,8 @@ const bootstrapCondition = (going: boolean) => {
                 chrome.runtime.sendMessage(new StartMessage({
                     options: options
                 }));
+            } else if (!going && options) {
+                chrome.runtime.sendMessage(new UpdateWaveMessage({ options }))
             } else {
                 chrome.runtime.sendMessage(new StopMessage())
             }
@@ -160,6 +162,7 @@ const App: FunctionComponent = () => {
     }
 
     useEffect(() => {
+        // TODO: this needs a revision to send a start or update message depending on the state of "going" in google sync
         deferredOptions.subscribe((options: Options = Options.getDefaultOptions(), error?: any) => {
             if (error) {
                 console.log(error);

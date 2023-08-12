@@ -1,6 +1,6 @@
 import "jest";
 import StateMachine from "../../../src/util/state-machine";
-import { State, CState, NameAccessMapInterface } from "../../../src/util/state"
+import {State, CState, NameAccessMapInterface, Named} from "../../../src/util/state"
 
 import {
     StartVentures,
@@ -9,6 +9,7 @@ import {
     AllVentures,
     Base
 } from "../../../src/util/venture-states";
+import UpdateWaveMessage from "../../../src/models/messages/update-wave";
 
 const BaseVentures = ["base", "error"]
 
@@ -33,39 +34,39 @@ const StateNameMap = (map: Map<string, State> = new Map<string, State>()): NameA
 
         // base defined above
         "waving": CState("waving", WavingVentures, false),
-        "error": CState("error", AllVentures, true, (state: State, previousState: State): State | undefined => {
+        "error": CState("error", AllVentures, true, (message: Named, state: State, previousState: State): State | undefined => {
             console.log("transitioning from error to base state from " + previousState.name)
             return map.get('base') as State
         }),
-        "start": CState("start", StartVentures, false, (state: State, previousState: State): State | undefined => {
+        "start": CState("start", StartVentures, false, (message: Named, state: State, previousState: State): State | undefined => {
             return map.get('waving') as State
         }),
-        "stop": CState("stop", StopVentures, false, (state: State, previousState: State): State | undefined => {
+        "stop": CState("stop", StopVentures, false, (message: Named, state: State, previousState: State): State | undefined => {
             return map.get('base') as State
         }),
-        "update": CState("update", BaseVentures, true, (state: State, previousState: State): State | undefined => {
+        "update": CState("update", BaseVentures, true, (message: Named, state: State, previousState: State): State | undefined => {
             return previousState
         }),
-        "toggle start": CState("toggle start", StartVentures, false, (state: State, previousState: State): State | undefined => {
+        "toggle start": CState("toggle start", StartVentures, false, (message: Named, state: State, previousState: State): State | undefined => {
             return map.get('waving') as State
         }),
-        "toggle stop": CState("toggle stop", StopVentures, false, (state: State, previousState: State): State | undefined => {
+        "toggle stop": CState("toggle stop", StopVentures, false, (message: Named, state: State, previousState: State): State | undefined => {
             return map.get('base') as State
         }),
-        "start mouse": CState("start mouse", StartVentures, false, (state: State, previousState: State): State | undefined => {
+        "start mouse": CState("start mouse", StartVentures, false, (message: Named, state: State, previousState: State): State | undefined => {
             return map.get('waving') as State
         }),
-        "stop mouse": CState("stop mouse", StopVentures, false, (state: State, previousState: State): State | undefined => {
+        "stop mouse": CState("stop mouse", StopVentures, false, (message: Named, state: State, previousState: State): State | undefined => {
             return map.get('base') as State
         }),
-        "selection mode activate": CState("selection mode activate", ["selection mode deactivate", "selection made"], false, (state: State, previousState: State): State | undefined => {
+        "selection mode activate": CState("selection mode activate", ["selection mode deactivate", "selection made"], false, (message: Named, state: State, previousState: State): State | undefined => {
             return map.get('selection mode') as State
         }),
         "selection mode": CState("selection mode", ["selection mode activate", "selection mode", "selection made", "selection mode deactivate"], false),
-        "selection made": CState("selection made", BaseVentures, false, (state: State, previousState: State): State | undefined => {
+        "selection made": CState("selection made", BaseVentures, false, (message: Named, state: State, previousState: State): State | undefined => {
             return map.get('base') as State
         }),
-        "selection mode deactivate": CState("selection mode deactivate", [], false, (state: State, previousState: State): State | undefined => {
+        "selection mode deactivate": CState("selection mode deactivate", [], false, (message: Named, state: State, previousState: State): State | undefined => {
             return map.get('base') as State
         })
     }
@@ -100,6 +101,22 @@ describe("state machine", () => {
     test("validate error moves to base state", () => {
         const { stateMachine, stateNameMap } = newStateMachine();
         expect(stateMachine.handleState(stateNameMap.getState("error")!!).name).toBe("base");
+    })
+
+    test("validate we receive the message passed to handleState", () => {
+        const message = new UpdateWaveMessage()
+        message.name = "message-test"
+        if (message.options) message.options.wave.text.color = "test green";
+        const map = new Map()
+        map.set("message-test", CState("message-test", BaseVentures, true,
+            (message: Named, state: State, previousState: State): State | undefined => {
+                const convertedMessage = (message as unknown as UpdateWaveMessage);
+                expect(convertedMessage?.options?.wave.text.color).toBe("test green");
+                return undefined
+            }))
+        const { stateMachine, stateNameMap } = newStateMachine(StateNameMap(map));
+
+        expect(stateMachine.handleState(message).name).toBe("base");
     })
 
     test("stop moves to base state", () => {

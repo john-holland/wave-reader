@@ -1,5 +1,5 @@
-import { State, NameAccessMapInterface } from "./state"
-import {BaseVentures} from "./venture-states";
+import {State, NameAccessMapInterface, Named} from "./state"
+// import {BaseVentures} from "./venture-states";
 
 class StateMachine {
     initialized: boolean = false;
@@ -27,27 +27,25 @@ class StateMachine {
         return this.map?.getState("error");
     }
 
-    protected validateState(newState: State): State | undefined {
+    protected validateState(newState: Named): State | undefined {
         if (!this.initialized) throw new Error("not initialized, no StateMachineMap")
 
         const state = this.map?.getState(newState.name);
 
         if (!state || (!state?.isBaseLevel && !this.currentState?.ventureStates.includes(newState.name))) {
-            console.error(this.currentState?.error(), newState.error());
+            console.error(this.currentState?.error(), (newState as State)?.error());
             return this.getErrorState();
         }
 
         return this.getState(newState.name)
     }
 
-    protected processState(state: State | undefined, previousState: State): State | undefined {
+    protected processState(message: Named, state: State | undefined, previousState: State): State | undefined {
         if (!this.initialized) throw new Error("not initialized, no StateMachineMap")
         if (state === undefined) console.log("State undefined for previous state" + JSON.stringify(previousState))
 
-        const stringifiedBaseVentures = JSON.stringify(BaseVentures)
-
         if (typeof state?.stateEffects === 'function') {
-            this.currentState = state.stateEffects(state, previousState) || this.getBaseState();
+            this.currentState = state.stateEffects(message, state, previousState) || this.getBaseState();
             if (this.currentState?.name === "base") {
                 console.log("transitioning back to base");
             }
@@ -58,11 +56,17 @@ class StateMachine {
         return this.currentState;
     }
 
-    handleState(newState: State): State {
+    /**
+     * Validates and processes the message, returning the state due to the [State#stateeffects()] or BaseState
+     * @param namedState the message from chrome.runtime to be passed through to the [State#stateeffects()]
+     * @return the BaseState or state from [State#stateeffects()]
+     */
+    handleState(namedState: Named): State {
         if (!this.initialized) throw new Error("not initialized, no StateMachineMap")
 
-        const state = this.validateState(newState)
-        return this.processState(state, this.currentState!!)!!;
+        const state = this.validateState(namedState)
+        /* eslint-disable  @typescript-eslint/no-extra-non-null-assertion */
+        return this.processState(namedState, state, this.currentState!!)!!;
     }
 
     getState(name: string): State | undefined {

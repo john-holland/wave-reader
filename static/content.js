@@ -16,9 +16,9 @@ import {
 // if a promised resolved state is a future, then a potential state maybe nicely referred to as a venture?
 
 
-const stateMachineMap = new Map({
-    "base": Base
-});
+const stateMachineMap = new Map();
+stateMachineMap.set("base", Base);
+
 const stateMachine = new StateMachine()
 
 function loadCSS(css) {
@@ -94,26 +94,27 @@ const initializeOrUpdateToggleObserver = (message) => {
  */
 
 function StateNameMap(map = new Map()) {
+    /* eslint-disable  @typescript-eslint/no-unused-vars */
     const states = {
         // base defined above
         "waving": CState("waving", WavingVentures, false),
-        "error": CState("error", AllVentures, true, (state, previousState) => {
+        "error": CState("error", AllVentures, true, (message, state, previousState) => {
             console.log("transitioning from error to base state from " + previousState.name)
             return map.get('base')
         }, true),
-        "start": CState("start", StartVentures, false, (state, previousState) => {
+        "start": CState("start", StartVentures, false, (message, state, previousState) => {
             loadCSSTemplate(message.options.wave.cssTemplate)
             // TODO: see if the state machine will let us remove this
             going = true;
             initializeOrUpdateToggleObserver(message);
             return map.get('waving')
             }, false),
-        "stop": CState("stop", StopVentures, false, (state, previousState) => {
+        "stop": CState("stop", StopVentures, false, (message, state, previousState) => {
             unloadCSS()
             going = false;
             return map.get('base')
         }, false),
-        "update": CState("update", BaseVentures, false, (state, previousState) => {
+        "update": CState("update", BaseVentures, false, (message, state, previousState) => {
             unloadCSS()
             if (previousState.name === "waving") {
                 loadCSSTemplate(message.options.wave.cssTemplate)
@@ -123,22 +124,22 @@ function StateNameMap(map = new Map()) {
             initializeOrUpdateToggleObserver(message);
             return previousState
             }, true),
-        "toggle start": CState("toggle start", StartVentures, false, (state, previousState) => {
+        "toggle start": CState("toggle start", StartVentures, false, (message, state, previousState) => {
             loadCSSTemplate(message.options.wave.cssTemplate)
             return map.get('waving')
             }, false),
-        "toggle stop": CState("toggle stop", StopVentures, false, (state, previousState) => {
+        "toggle stop": CState("toggle stop", StopVentures, false, (message, state, previousState) => {
             unloadCSS()
             return map.get('base')
             }, false),
-        "start mouse": CState("start mouse", StartVentures, false, (state, previousState) => {
+        "start mouse": CState("start mouse", StartVentures, false, (message, state, previousState) => {
             const elements = document.querySelectorAll(message.options.wave.selector);
             elements.forEach(element => {
                 element.addEventListener("mousemove", mouseMoveListener);
             })
             return map.get('waving')
             }, false),
-        "stop mouse": CState("stop mouse", StopVentures, false, (state, previousState) => {
+        "stop mouse": CState("stop mouse", StopVentures, false, (message, state, previousState) => {
             // maybe unloadCSS and reload each time?
             unloadCSS()
             const elements = document.querySelectorAll(message.options.wave.selector);
@@ -147,7 +148,7 @@ function StateNameMap(map = new Map()) {
             })
             return map.get('base')
             }, false),
-        "selection mode activate": CState("selection mode activate", ["selection mode deactivate", "selection made"], false, (state, previousState) => {
+        "selection mode activate": CState("selection mode activate", ["selection mode deactivate", "selection made"], false, (message, state, previousState) => {
             console.log('start selection choose cheese')
             // mouse over / enter / blur tracking
             // highlight element if larger than 20px and contains text (maybe option to select everything)
@@ -164,10 +165,10 @@ function StateNameMap(map = new Map()) {
             return map.get('selection mode')
         }),
         "selection mode": CState("selection mode", ["selection mode activate", "selection mode", "selection made", "selection mode deactivate"], false),
-        "selection made": CState("selection made", BaseVentures, false, (state, previousState) => {
+        "selection made": CState("selection made", BaseVentures, false, (message, state, previousState) => {
             return map.get('base')
             }, false),
-        "selection mode deactivate": CState("selection mode deactivate", [], false, (state, previousState) => {
+        "selection mode deactivate": CState("selection mode deactivate", [], false, (message, state, previousState) => {
             return map.get('base')
             }, false)
     }
@@ -187,7 +188,7 @@ function StateNameMap(map = new Map()) {
 
 let going = false;
 
-stateMachine.initialize(new StateNameMap(map), stateMachineMap.get("base"));
+stateMachine.initialize(new StateNameMap(stateMachineMap), Base);
 
 chrome.runtime.onMessage.addListener( (message, sender, sendResponse) => {
         console.log(`message: ${JSON.stringify(message)}`)
