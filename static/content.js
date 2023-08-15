@@ -77,8 +77,13 @@ const initializeOrUpdateToggleObserver = (message) => {
             eventListener = e
         }),
         stopKeyChordEventListenerPredicate
-    ).subscribe(() => {
-        // TODO: refactor with a state machine manager or something, like a WaveRemote class etc
+    ).subscribe((matched) => {
+        if (!matched) {
+            return;
+        } else {
+            console.log("matched: "+ matched)
+        }
+
         if (stateMachine.getCurrentState().name === "waving") {
             stateMachine.handleState(stateMachine.getState("toggle stop"))
         } else {

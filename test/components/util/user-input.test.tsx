@@ -4,12 +4,18 @@ import {Observable, Subscriber} from "rxjs";
 
 describe('user-inputs', () => {
     test('matches key chords', (done: () => void) => {
+        let callCount = 0;
         FollowKeyChordObserver(["w", "Shift"], new Observable<string>((subscriber: Subscriber<string>) => {
             subscriber.next("Shift");
             subscriber.next("w");
         }), () => false).subscribe((chord) => {
-            expect(chord).toBe(true);
-            done();
+            callCount++;
+            if (callCount > 1) {
+                expect(chord).toBe(true);
+                done();
+            } else {
+                expect(chord).toBe(false);
+            }
         });
     });
 

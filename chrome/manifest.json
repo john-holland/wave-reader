@@ -42,7 +42,6 @@
     "notifications",
     "webNavigation",
     "activeTab",
-    "<all_urls>",
     "tabs"
   ]
 }

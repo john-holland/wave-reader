@@ -54,7 +54,7 @@ export const FollowKeyChordObserver = (shortcut: KeyChord,
                                        stop: {(): boolean}): Observable<boolean> => {
     return new Observable((subscriber: Subscriber<boolean>) => {
         let typed: KeyChord = []
-        const joined = shortcut.join(', ');
+        const joined = shortcut.join(', ').toLowerCase();
         let complete = false;
         keysObservable.subscribe((key: string) => {
             if (stop()) {
@@ -68,7 +68,7 @@ export const FollowKeyChordObserver = (shortcut: KeyChord,
             typed.unshift(key);
             typed = typed.slice(0, shortcut.length);
 
-            if (typed.join(', ') === joined) {
+            if (typed.join(', ').toLowerCase() === joined) {
                 subscriber.next(true);
             } else {
                 subscriber.next(false);
