@@ -28,6 +28,9 @@ export interface NameAccessMapInterface {
     getState(name: string): State | undefined;
 }
 
+export interface StateNames {
+    [key: string]: State;
+}
 
 export const CState = (name = "default",
                        ventureStates: string[] = [],

@@ -1,15 +1,18 @@
-import {FunctionComponent, useEffect, useState} from "react";
-import {FormLabel} from "@mui/material";
+import { FunctionComponent, useEffect, useState } from "react";
+import { FormLabel } from "@mui/material";
 import * as React from "react";
-import {KeyChord, WindowKeyDownKey} from "./util/user-input";
+import { KeyChord, WindowKeyDownKey, WindowKeyDownKeyObserverDefinition } from "./util/user-input";
 import styled from "styled-components";
+import { CState, NameAccessMapInterface, Named, State, StateNames } from "../util/state";
+import StateMachine from "../util/state-machine";
 
 //const val = (fn: {(v: any): void}) => ((_: any, value: any) => fn(value));
 //const eventVal = (fn: {(e: any): void}) =>
 //    (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => fn(e.target);
 
+export type ActionType = string | undefined;
 type ScanForInputProps = {
-    actionType: string
+    actionType: ActionType | string
     shortcut: KeyChord
     keyLimit: number
     onScan: {(keyChord: KeyChord): void}
@@ -91,12 +94,130 @@ export const assignKeyChord = (keyChord: KeyChord, key: string, keyLimit: number
  * @param onCancelScan [{(keys: KeyChord): void}] cancelled! Passes the old shortcut KeyChord
  * @constructor see [ScanForInputProps]
  */
-const ScanningMap: Map<string, KeyChord> = new Map<string, KeyChord>();
-const ListenerMap: Map<string, EventListener> = new Map<string, EventListener>();
+const ScanningMap: Map<ActionType, KeyChord> = new Map<ActionType, KeyChord>();
+const ListenerMap: Map<ActionType, EventListener> = new Map<ActionType, EventListener>();
 
 export const ClearScanningMap = () => {
     ScanningMap.clear();
 }
+
+type ScanForInputStatesProps = {
+    map: Map<ActionType, State>
+    stateMachineMap: Map<ActionType, StateMachine>
+    listenerMap: Map<ActionType, EventListener>
+    scanningMap: Map<ActionType, KeyChord>
+    actionType: ActionType
+    keyLimit: number
+    shortcut: KeyChord
+    setScanning: { (scanning: boolean): void }
+    setKeyChord: { (keyChord: KeyChord): void }
+    onScan: { (keyChord: KeyChord): void }
+    onCancelScan: { (keyChord: KeyChord): void }
+    windowKeyDownObserver: WindowKeyDownKeyObserverDefinition
+}
+export const ScanForInputStates = ({
+       map,
+       stateMachineMap,
+       listenerMap,
+       scanningMap,
+       actionType,
+       keyLimit,
+       shortcut,
+       setScanning,
+       setKeyChord,
+       onScan,
+       onCancelScan,
+       windowKeyDownObserver = WindowKeyDownKey
+    }: ScanForInputStatesProps): NameAccessMapInterface =>  {
+    // TODO: shortcut is still getting passed in from settings as the previous value:
+    //   after a "click", "start scanning" "save", save settings -> "click", "save" ...
+    //   observed: back to the value saved before saving settings
+    //   expected: saves the new value scanned
+    // theory: settings isn't matriculating through properly?
+
+    /* eslint-disable  @typescript-eslint/no-unused-vars */
+    const states: StateNames = {
+        "base": CState("base", ["start scanning", "base"], true, (message, state, previousState) => {
+            if (listenerMap.has(actionType)) {
+                scanningMap.delete(actionType)
+                window.removeEventListener("keydown", listenerMap.get(actionType)!, true);
+                listenerMap.delete(actionType)
+            }
+            return map.get("base");
+        }),
+        "start scanning": CState("start scanning", ["scanning", "stop scanning"], false, (message, state, previousState) => {
+            setScanning(true);
+            scanningMap.set(actionType, []);
+
+            windowKeyDownObserver((e: {(event: KeyboardEvent): void}) => {
+                listenerMap.set(actionType, e);
+            }).subscribe((key: string) => {
+                if (!scanningMap.has(actionType)) {
+                    console.log("no scanning map found, inspect previous state!");
+                    return;
+                }
+
+                const assignment = assignKeyChord(scanningMap.get(actionType) || [], key, keyLimit)
+                if (assignment.escapeCalled) {
+                    // defer the current frame
+                    // setTimeout(() => , 0)
+                    stateMachineMap.get(actionType)?.handleState({ name: "stop scanning" } as Named)
+                } else {
+                    scanningMap.set(actionType, assignment.keyChord || [])
+                    setKeyChord(assignment.keyChord || []);
+                }
+            })
+            return map.get("scanning");
+        }),
+        "scanning": CState("scanning", ["save", "revert", "clear", "stop scanning"], false),
+        "save": CState("save", ["base"], false, (message, state, previousState) => {
+            if (listenerMap.has(actionType)) {
+                window.removeEventListener("keydown", listenerMap.get(actionType)!, true);
+                listenerMap.delete(actionType)
+            }
+            setScanning(false)
+            const update = scanningMap.get(actionType) || [];
+            scanningMap.delete(actionType);
+            setKeyChord(update);
+            onScan(update);
+            return map.get("base");
+        }),
+        "clear": CState("clear", ["scanning"], false, (message, state, previousState) => {
+            scanningMap.set(actionType, []);
+            setKeyChord([]);
+            return map.get("scanning")
+        }),
+        "revert": CState("revert", ["scanning"], false, (message, state, previousState) => {
+            // revert
+            setKeyChord(shortcut);
+            return previousState;
+        }),
+        "stop scanning": CState("base", ["base"], false, (message, state, previousState) => {
+            if (listenerMap.has(actionType)) {
+                window.removeEventListener("keydown", listenerMap.get(actionType)!, true);
+                listenerMap.delete(actionType)
+            }
+            setScanning(false)
+            setKeyChord(shortcut);
+            scanningMap.delete(actionType);
+            onCancelScan(shortcut);
+            return map.get("base");
+        })
+    }
+
+    Object.keys(states).forEach(key => {
+        map.set(key, states[key]);
+    })
+
+    return {
+        map,
+        getState(name: string): State | undefined {
+            return map.get(name);
+        }
+    } as NameAccessMapInterface;
+}
+
+const StateMachineMap = new Map<ActionType, StateMachine>()
 
 const ScanForInputField: FunctionComponent<ScanForInputProps> = ({
         actionType = "Toggle",
@@ -110,69 +231,59 @@ const ScanForInputField: FunctionComponent<ScanForInputProps> = ({
     // modifiers, shift, control, alt/option, maybe command, maybe just last key chords and see what happens?
     const [keyChord, setKeyChord] = useState<KeyChord>(shortcut);
     const [scanning, setScanning] = useState(false);
+    // refresh the states with each re-render
+    const scanForInputStateMap = ScanForInputStates({
+        map: new Map<ActionType, State>(),
+        stateMachineMap: StateMachineMap,
+        listenerMap: ListenerMap,
+        scanningMap: ScanningMap,
+        actionType: actionType,
+        keyLimit,
+        shortcut,
+        setScanning,
+        setKeyChord,
+        onScan,
+        onCancelScan,
+        windowKeyDownObserver: WindowKeyDownKey
+    });
 
-    useEffect(() => {
-        if (scanning)
-            WindowKeyDownKey((e/*{(event: KeyboardEvent): void}*/) => {
-                ListenerMap.set(actionType, e);
-            }).subscribe((key: string) => {
-                if (!ScanningMap.has(actionType)) ScanningMap.set(actionType, []);
+    const stateMachine = () => { return StateMachineMap.get(actionType); }
+    const handleState = (name: string): State | undefined => {
+        const machine = stateMachine();
 
-                const assignment = assignKeyChord(ScanningMap.get(actionType) || [], key, keyLimit)
-                if (assignment.escapeCalled) {
-                    setScanning(false);
-                    ScanningMap.set(actionType, [])
-                    setKeyChord(shortcut);
-                } else {
-                    ScanningMap.set(actionType, assignment.keyChord || [])
-                    setKeyChord(assignment.keyChord || []);
-                }
-            })
-        else
-            if (ListenerMap.has(actionType)) {
-                ScanningMap.delete(actionType)
-                window.removeEventListener("keydown", ListenerMap.get(actionType)!, true);
-                ListenerMap.delete(actionType)
-            }
-    }, [scanning])
-
-    const saveClicked = () => {
-        setScanning(false)
-        if (ListenerMap.has(actionType)) {
-            window.removeEventListener("keydown", ListenerMap.get(actionType)!, true);
-            ListenerMap.delete(actionType)
-        }
-        const update = ScanningMap.get(actionType) || [];
-        ScanningMap.delete(actionType);
-        setKeyChord(update);
-        onScan(update);
+        return machine?.handleState(machine.getState(name) as Named)
     }
 
-    const revertClicked = () => {
-        // revert
-        if (ListenerMap.has(actionType)) {
-            window.removeEventListener("keydown", ListenerMap.get(actionType)!, true);
-            ListenerMap.delete(actionType)
+    useEffect(() => {
+        if (!StateMachineMap.has(actionType)) {
+            const machine = new StateMachine();
+            StateMachineMap.set(actionType, machine);
+            machine.initialize(scanForInputStateMap, scanForInputStateMap.getState("base") as State);
+        } else {
+            StateMachineMap.get(actionType)?.handleState({ name: "base" } as Named);
         }
-        setKeyChord(shortcut);
-        ScanningMap.delete(actionType);
-        setScanning(false)
-        onCancelScan(shortcut);
+    }, [])
 
+    const saveClicked = () => {
+        handleState("save");
+    }
+
+    const cancelClicked = () => {
+        // revert
+        handleState("revert");
+        handleState("stop scanning");
     }
 
     const clearClicked = () => {
-        ScanningMap.set(actionType, []);
-        setKeyChord([])
+        handleState("clear");
     }
 
     const scanClicked = () => {
-        //ScanningMap.set(actionType, shortcut);
-        setScanning(true);
+        handleState("start scanning");
     }
 
     // TODO: the ClickableScanTextContainer and the ScanTextInput components present reversed keyChords from one another
-    // TODO: and while reveresed keyChords is cool, its confusing, as assignment to the WaveToggleConfig apparently does that
+    // TODO: and while reversed keyChords is cool, its confusing, as assignment to the WaveToggleConfig apparently does that
     return (
         <ScanForInput data-testid={"scan-for-input-field"}>
             <FormLabel id={"scan-text-label"}>{actionType}</FormLabel>
@@ -191,7 +302,7 @@ const ScanForInputField: FunctionComponent<ScanForInputProps> = ({
                 value={keyChord.reverse().join(", ")}
                 onChange={() => {}}/>
             <SaveButton data-testid={"save-button"} visible={scanning} type="button" value={"Save"} onClick={saveClicked} />
-            <RevertButton data-testid={"revert-button"} visible={scanning} type="button" value={"Cancel"} onClick={revertClicked} />
+            <RevertButton data-testid={"revert-button"} visible={scanning} type="button" value={"Cancel"} onClick={cancelClicked} />
             <ClearButton data-testid={"revert-button"} visible={scanning} type="button" value={"Clear"} onClick={clearClicked} />
         </ScanForInput>
     );

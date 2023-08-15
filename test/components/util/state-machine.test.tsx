@@ -1,6 +1,6 @@
 import "jest";
 import StateMachine from "../../../src/util/state-machine";
-import {State, CState, NameAccessMapInterface, Named} from "../../../src/util/state"
+import {State, CState, NameAccessMapInterface, Named, StateNames} from "../../../src/util/state"
 
 import {
     StartVentures,
@@ -27,9 +27,7 @@ class NameAccessMap implements NameAccessMapInterface {
 const StateNameMap = (map: Map<string, State> = new Map<string, State>()): NameAccessMap => {
     const mapObject = new NameAccessMap(map);
 
-    interface StateNames {
-        [key: string]: State;
-    }
+
     const states: StateNames = {
 
         // base defined above

@@ -1,12 +1,14 @@
 import {Observable, Subscriber} from 'rxjs';
 
+export type WindowKeyDownKeyObserverDefinition = { (listenerReturn: { (eventListener: { (event: KeyboardEvent): void }): void }): Observable<string> };
+
 /**
  * a keydown event listener returning an [Observable<string>] of [event.key]
  * @param listenerReturn probably YAGNI but a function to return the closure scoped event listener \
  *    so you can extract the listener from the listenerReturn lambda and call [window.removeEventListener()] \
  *    maybe just return a [Pair<>] idk
  */
-export const WindowKeyDownKey = (listenerReturn: {(eventListener: {(event: KeyboardEvent): void}): void}): Observable<string> => {
+export const WindowKeyDownKey: WindowKeyDownKeyObserverDefinition = (listenerReturn: {(eventListener: {(event: KeyboardEvent): void}): void}): Observable<string> => {
     return new Observable((subscriber: Subscriber<string>) => {
         const listener = (event: KeyboardEvent) => {
             if (event.defaultPrevented) {
