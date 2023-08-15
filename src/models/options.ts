@@ -18,7 +18,7 @@ export class WaveToggleConfig extends AttributeConstructor<WaveToggleConfig> {
 
     static getDefaultConfig(): WaveToggleConfig {
         return new WaveToggleConfig({
-            keyChord: ["Shift", "w"]
+            keyChord: ["w", "Shift"]
         })
     }
 }
