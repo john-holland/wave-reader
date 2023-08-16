@@ -75,7 +75,7 @@ const initializeOrUpdateToggleObserver = (message) => {
         message.options.toggleKeys.keyChord,
         WindowKeyDownKey((e/*{(event: KeyboardEvent): void}*/) => {
             eventListener = e
-        }),
+        }, false),
         stopKeyChordEventListenerPredicate
     ).subscribe((matched) => {
         if (!matched) {

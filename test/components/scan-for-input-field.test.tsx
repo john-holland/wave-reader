@@ -16,8 +16,9 @@ import {Observable, Subscriber} from "rxjs";
 const MockWindowKeyObserver = (eventListener: {(event: KeyboardEvent): void} = () => {},
                                listenerReturn: {(eventListener: {(event: KeyboardEvent): void}): void},
                                subscriberAccess: {(subscriber: Subscriber<string>): void}) => {
-    return (listenerReturn: {(eventListener: {(event: KeyboardEvent): void}): void}): Observable<string> => {
+    return (listenerReturn: {(eventListener: {(event: KeyboardEvent): void}): void}, preventDefault: boolean = true): Observable<string> => {
         listenerReturn(eventListener);
+        preventDefault = (preventDefault) || true
         return new Observable((subscriber) => {
             subscriberAccess(subscriber);
         })
@@ -90,7 +91,8 @@ describe('Scan for input', () => {
                     (e) => console.log(e),
                     eventListener => el = eventListener,
                     s => {}
-                )
+                ),
+                shouldPreventDefault: true
             });
 
             machine.initialize(nameAccessMap, nameAccessMap.getState("base") as State);
@@ -134,7 +136,8 @@ describe('Scan for input', () => {
                     (e) => console.log(e),
                     eventListener => el = eventListener,
                     s => subscriber = s
-                )
+                ),
+                shouldPreventDefault: true
             });
 
             machine.initialize(nameAccessMap, nameAccessMap.getState("base") as State);
@@ -191,7 +194,8 @@ describe('Scan for input', () => {
                     (e) => console.log(e),
                     eventListener => el = eventListener,
                     s => subscriber = s
-                )
+                ),
+                shouldPreventDefault: true
             });
 
             machine.initialize(nameAccessMap, nameAccessMap.getState("base") as State);
@@ -243,7 +247,8 @@ describe('Scan for input', () => {
                     (e) => console.log(e),
                     eventListener => el = eventListener,
                     s => subscriber = s
-                )
+                ),
+                shouldPreventDefault: true
             });
 
             machine.initialize(nameAccessMap, nameAccessMap.getState("base") as State);
@@ -301,7 +306,8 @@ describe('Scan for input', () => {
                     (e) => console.log(e),
                     eventListener => el = eventListener,
                     s => subscriber = s
-                )
+                ),
+                shouldPreventDefault: true
             });
 
             machine.initialize(nameAccessMap, nameAccessMap.getState("base") as State);
@@ -363,7 +369,8 @@ describe('Scan for input', () => {
                     (e) => console.log(e),
                     eventListener => el = eventListener,
                     s => subscriber = s
-                )
+                ),
+                shouldPreventDefault: true
             });
 
             machine.initialize(nameAccessMap, nameAccessMap.getState("base") as State);

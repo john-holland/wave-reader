@@ -1,30 +1,31 @@
 import {Observable, Subscriber} from 'rxjs';
 
-export type WindowKeyDownKeyObserverDefinition = { (listenerReturn: { (eventListener: { (event: KeyboardEvent): void }): void }): Observable<string> };
+export type WindowKeyDownKeyObserverDefinition = {
+    (
+        listenerReturn: { (eventListener: { (event: KeyboardEvent): void }): void },
+        preventDefault: boolean
+    ): Observable<string>
+};
 
 /**
  * a keydown event listener returning an [Observable<string>] of [event.key]
  * @param listenerReturn probably YAGNI but a function to return the closure scoped event listener \
  *    so you can extract the listener from the listenerReturn lambda and call [window.removeEventListener()] \
  *    maybe just return a [Pair<>] idk
+ * @param preventDefault calls event.preventDefault() optionally a key is detected, useful for scanning, bad for shortcuts
  */
-export const WindowKeyDownKey: WindowKeyDownKeyObserverDefinition = (listenerReturn: {(eventListener: {(event: KeyboardEvent): void}): void}): Observable<string> => {
+export const WindowKeyDownKey: WindowKeyDownKeyObserverDefinition = (listenerReturn: {(eventListener: {(event: KeyboardEvent): void}): void},
+                                                                     preventDefault = true): Observable<string> => {
     return new Observable((subscriber: Subscriber<string>) => {
         const listener = (event: KeyboardEvent) => {
             if (event.defaultPrevented) {
                 return; // Should do nothing if the default action has been cancelled
             }
 
-            let handled = false;
             if (event.key) {
                 // Handle the event with KeyboardEvent.key
                 subscriber.next(event.key);
-                handled = true;
-            }
-
-            if (handled) {
-                // Suppress "double action" if event handled
-                event.preventDefault();
+                if (preventDefault) event.preventDefault();
             }
         };
         listenerReturn(listener);
