@@ -114,6 +114,7 @@ type ScanForInputStatesProps = {
     onScan: { (keyChord: KeyChord): void }
     onCancelScan: { (keyChord: KeyChord): void }
     windowKeyDownObserver: WindowKeyDownKeyObserverDefinition
+    shouldPreventDefault: boolean
 }
 export const ScanForInputStates = ({
        map,
@@ -127,7 +128,8 @@ export const ScanForInputStates = ({
        setKeyChord,
        onScan,
        onCancelScan,
-       windowKeyDownObserver = WindowKeyDownKey
+       windowKeyDownObserver = WindowKeyDownKey,
+       shouldPreventDefault = true
     }: ScanForInputStatesProps): NameAccessMapInterface =>  {
     // TODO: shortcut is still getting passed in from settings as the previous value:
     //   after a "click", "start scanning" "save", save settings -> "click", "save" ...
@@ -151,7 +153,7 @@ export const ScanForInputStates = ({
 
             windowKeyDownObserver((e: {(event: KeyboardEvent): void}) => {
                 listenerMap.set(actionType, e);
-            }).subscribe((key: string) => {
+            }, shouldPreventDefault).subscribe((key: string) => {
                 if (!scanningMap.has(actionType)) {
                     console.log("no scanning map found, inspect previous state!");
                     return;
@@ -244,7 +246,8 @@ const ScanForInputField: FunctionComponent<ScanForInputProps> = ({
         setKeyChord,
         onScan,
         onCancelScan,
-        windowKeyDownObserver: WindowKeyDownKey
+        windowKeyDownObserver: WindowKeyDownKey,
+        shouldPreventDefault: true
     });
 
     const stateMachine = () => { return StateMachineMap.get(actionType); }
