@@ -41,13 +41,6 @@ const WaveReader = styled.div`
 `;
 
 const startPageCss = (wave: Wave) => {
-    chrome.runtime.sendMessage(new StartMessage({
-    //popupPort.postMessage(new StartMessage({
-        wave: wave.update()
-    }));
-
-    setSyncObject("going", { going: true });
-
     newSyncObject<Options>(Options,'options', Options.getDefaultOptions(), (options) => {
         if (options.showNotifications) {
             const notifOptions = {
@@ -60,6 +53,12 @@ const startPageCss = (wave: Wave) => {
             // @ts-ignore
             chrome.notifications.create("", notifOptions, guardLastError);
         }
+        options.wave = wave.update();
+        chrome.runtime.sendMessage(new StartMessage({
+            options: options
+        }));
+
+        setSyncObject("going", { going: true });
     })
 }
 
@@ -85,9 +84,12 @@ const bootstrapCondition = (going: boolean) => {
         options = new Options(options);
         setTimeout(() => {
             if (going && options) {
+                options.wave = options.wave.update();
                 chrome.runtime.sendMessage(new StartMessage({
-                    wave: options.wave.update()
-                }))
+                    options: options
+                }));
+            } else if (!going && options) {
+                chrome.runtime.sendMessage(new UpdateWaveMessage({ options }))
             } else {
                 chrome.runtime.sendMessage(new StopMessage())
             }
@@ -114,7 +116,7 @@ const App: FunctionComponent = () => {
         setSaved(true);
         selectorUpdated(new SelectorUpdated({ selector })).then(() => {
             chrome.runtime.sendMessage(new UpdateWaveMessage({
-                wave: options.wave
+                options: options
             }))
         });
     };
@@ -149,13 +151,19 @@ const App: FunctionComponent = () => {
         deferredOptions.update();
     }
 
+    // TODO: when we can't reach the tab, we want to instruct the user to try refreshing the tab, then the browser
     const settingsUpdated = () => {
         newSyncObject<Options>(Options, "options", Options.getDefaultOptions(), (result: Options) => {
+            result.wave = result.wave.update();
             setOptions(result);
+            chrome.runtime.sendMessage(new UpdateWaveMessage({
+                options: result
+            }));
         });
     }
 
     useEffect(() => {
+        // TODO: this needs a revision to send a start or update message depending on the state of "going" in google sync
         deferredOptions.subscribe((options: Options = Options.getDefaultOptions(), error?: any) => {
             if (error) {
                 console.log(error);
@@ -170,6 +178,9 @@ const App: FunctionComponent = () => {
                 window.close();
             }
         }
+        getSyncObject("going", { going: false }, (result) => {
+            setGoing(result.going);
+        });
 
         chrome.runtime.onInstalled.addListener((details: InstalledDetails) => {
             console.log(`install details: ${details}`);

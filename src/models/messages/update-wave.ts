@@ -1,12 +1,12 @@
 import Message from "../message";
-import Wave from "../wave";
+import Options from "../options";
 
 export default class UpdateWaveMessage extends Message<UpdateWaveMessage> {
-    wave?: Wave
+    options?: Options
 
     constructor(attributes: Partial<UpdateWaveMessage> = {
-        wave: new Wave()
+        options: new Options()
     }) {
-        super('update-wave', 'popup', attributes)
+        super('update', 'popup', attributes)
     }
 }
