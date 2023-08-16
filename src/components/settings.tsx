@@ -52,6 +52,8 @@ const eventVal = (fn: {(e: any): void}) =>
 //  maybe it's worth while to make something like nested('property.prop.value', object)
 /**
  * TODO: this class needs to have an index on url, and maybe a search + copy / paste
+ *
+ * todo: toggle for settings
  * @param initialSettings the initial settings object, use [Option.getDefaultOptions()] for defaults
  * @param onUpdateSettings evented update callback
  * @constructor
