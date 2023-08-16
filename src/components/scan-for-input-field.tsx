@@ -149,6 +149,10 @@ export const ScanForInputStates = ({
         }),
         "start scanning": CState("start scanning", ["scanning", "stop scanning"], false, (message, state, previousState) => {
             setScanning(true);
+            // maybe add a useState "started editing" variable, and keep the scanningMap defaulted to shortcut
+            //  then when we get any events from subscribe, clear it and accept the new input
+            //   - or -
+            //  alternatively, we may want to change the value type for scanningMap to include a "started editing" property
             scanningMap.set(actionType, []);
 
             windowKeyDownObserver((e: {(event: KeyboardEvent): void}) => {
