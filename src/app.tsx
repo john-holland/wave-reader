@@ -20,6 +20,7 @@ import WaveTabs from './components/wave-tabs';
 import InstalledDetails = chrome.runtime.InstalledDetails;
 import {CState, NameAccessMapInterface, State, StateNames} from "./util/state";
 import {WindowKeyDownKey} from "./components/util/user-input";
+import StateMachine from "./util/state-machine";
 
 //todo:
 // * Material UI
@@ -99,22 +100,81 @@ const bootstrapCondition = (going: boolean) => {
     });
 }
 
+const getGoingChromeStorage = (callback: {going: boolean}) => getSyncObject("going", { going: false }, callback);
+
+const getGoingAsync = async (): Promise<boolean> => new Promise((resolve) => getGoingChromeStorage(resolve));
+
 /**
  *
  */
 
 type AppStatesProps = {
+    machine: StateMachine,
     map: Map<string, State>,
     setGoing: { (going: boolean): void },
-    getGoing: { (): boolean },
-    bootstrapCondition: { (going: boolean): void }
+    getGoing: { async (): boolean },
+    _getGoingAsync: { async (): boolean },
+    bootstrapCondition: { (going: boolean): void },
+    onRunTimeInstalledListener: { (details: InstalledDetails): void },
+    onMessageListener: { (message: any): boolean}
+}
+
+const chromeRunTimeInstalledListener = (callback: {(details: InstalledDetails): void}) => {
+    // maybe direct assignment would be prettier but i'm not sure if ts binds [tbis] for class method dispatch
+    chrome.runtime.onInstalled.addListener(callback);
+}
+
+const chromeOnMessageListener = (callback: { (message: any): boolean }) => {
+    chrome.runtime.onMessage.addListener(callback);
 }
 
 export const AppStates = ({
-   map = new Map<string, State>
+    machine,
+    map = new Map<string, State>(),
+    setGoing,
+    getGoingLocal,
+    _getGoingAsync = getGoingAsync,
+    bootstrapCondition,
+    onRunTimeInstalledListener = chromeRunTimeInstalledListener,
+    onMessageListener = chromeOnMessageListener
 }: AppStatesProps): NameAccessMapInterface => {
     const states: StateNames = {
-        "bootstrap": CState("bootstrap", [], false, (message, state, previousState) => {
+        "bootstrap": CState("bootstrap", [], false, async (message, state, previousState) => {
+            if (getGoingLocal === undefined) {
+                const going = await _getGoingAsync() || false;
+                setGoing(going);
+                bootstrapCondition(going);
+            }
+
+            onRunTimeInstalledListener((details: InstalledDetails) => {
+                console.log(`install details: ${details}`);
+                // upon first load, get a default value for 'going'
+                getSyncObject("going", { going: false }, (result) => {
+                    setGoing(result.going);
+
+                    // use result.going as useState is an async call
+                    bootstrapCondition(result.going);
+
+                    onMessageListener((message: any) => {
+                        const typedMessage = fromMessage(message);
+
+                        switch (typeof typedMessage) {
+                            // case typeof BootstrapMessage:
+                            //     bootstrapCondition();
+                            //     break;
+                            case typeof SelectorUpdated:
+                                machine.handleState(message);
+                                break;
+                            default:
+                                console.log(`${typeof typedMessage} unhandled typed message from content script`)
+                        }
+
+                        return true;
+                    });
+                });
+
+            LoadSettings().then(setOptions)
+            return states.get("base");
         }),
 
         "settings updated": CState("settings updated", [], false, (message, state, previousState) => {
@@ -135,6 +195,7 @@ export const AppStates = ({
             // TODO: need a selector choose drop down component
         }),
         "add selector": CState("add selector", [], false, (message, state, previousState) => {
+                // selectorUpdated(message)
         }),
         "cancel add selector": CState("cancel add selector", [], false, (message, state, previousState) => {
         }),

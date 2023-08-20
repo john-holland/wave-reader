@@ -29,6 +29,7 @@ export default class Options extends AttributeConstructor<Options> {
     waveAnimationControl: WaveAnimationControl = WaveAnimationControl.CSS;
     wave: Wave = Wave.getDefaultWave();
     toggleKeys: WaveToggleConfig = WaveToggleConfig.getDefaultConfig();
+    selectors: string[] = [];
 
     constructor(props: Partial<Options> = Options.getDefaultOptions()) {
         super(undefined);
@@ -42,7 +43,8 @@ export default class Options extends AttributeConstructor<Options> {
         return new Options({
             showNotifications: true,
             going: false,
-            wave: Wave.getDefaultWave()
+            wave: Wave.getDefaultWave(),
+            selectors: ['p,div,pre,paragraph']
         });
     }
 }

@@ -27,4 +27,15 @@ export const guardLastError = () => {
     return false;
 }
 
+export const currentTab = () => {
+    return new Promise((resolve, reject) => {
+        chrome.tabs.query({active: true, currentWindow: true}).then((tabs) => {
+            resolve(tabs);
+        }).catch(e => {
+            console.log('error getting current tab: ', e);
+            reject(e);
+        });
+    });
+}
+
 export default p;
