@@ -18,6 +18,8 @@ import {Settings, LoadSettings} from "./components/settings";
 
 import WaveTabs from './components/wave-tabs';
 import InstalledDetails = chrome.runtime.InstalledDetails;
+import {CState, NameAccessMapInterface, State, StateNames} from "./util/state";
+import {WindowKeyDownKey} from "./components/util/user-input";
 
 //todo:
 // * Material UI
@@ -97,6 +99,69 @@ const bootstrapCondition = (going: boolean) => {
     });
 }
 
+/**
+ *
+ */
+
+type AppStatesProps = {
+    map: Map<string, State>,
+    setGoing: { (going: boolean): void },
+    getGoing: { (): boolean },
+    bootstrapCondition: { (going: boolean): void }
+}
+
+export const AppStates = ({
+   map = new Map<string, State>
+}: AppStatesProps): NameAccessMapInterface => {
+    const states: StateNames = {
+        "bootstrap": CState("bootstrap", [], false, (message, state, previousState) => {
+        }),
+
+        "settings updated": CState("settings updated", [], false, (message, state, previousState) => {
+        }),
+        "set wave": CState("set wave", [], false, (message, state, previousState) => {
+        }),
+
+        "selection mode enter": CState("selection mode enter", [], false, (message, state, previousState) => {
+        }),
+        "selection mode active (disable settings tab)": CState("selection mode active (disable settings tab)", [], false, (message, state, previousState) => {
+        }),
+        "selection made (enable settings tab)": CState("selection made (enable settings tab)", [], false, (message, state, previousState) => {
+        }),
+        "selection error report (user error, set red selection error note, revert to previous selector)": CState("selection error report (user error, set red selection error note, revert to previous selector)", [], false, (message, state, previousState) => {
+        }),
+
+        "start add selector": CState("start add selector", [], false, (message, state, previousState) => {
+            // TODO: need a selector choose drop down component
+        }),
+        "add selector": CState("add selector", [], false, (message, state, previousState) => {
+        }),
+        "cancel add selector": CState("cancel add selector", [], false, (message, state, previousState) => {
+        }),
+        "remove selector": CState("remove selector", [], false, (message, state, previousState) => {
+        }),
+        "confirm remove selector": CState("confirm remove selector", [], false, (message, state, previousState) => {
+        }),
+        "use selector": CState("use selector", [], false, (message, state, previousState) => {
+        }),
+
+        "start waving": CState("start waving", [], false, (message, state, previousState) => {
+        }),
+        "stop waving": CState("stop waving", [], false, (message, state, previousState) => {
+        }),
+    };
+
+    Object.keys(states).forEach(state => map.set(state, states[state]))
+
+    return new class implements NameAccessMapInterface {
+        getState(name: string): State | undefined {
+            return map.get(name);
+        }
+    }
+}
+
+
+
 const App: FunctionComponent = () => {
     const [ selector, setSelector ] = useState('p');
     const [ saved, setSaved ] = useState(true);
@@ -107,10 +172,12 @@ const App: FunctionComponent = () => {
         LoadSettings().then(setOptions)
     }, []);
 
+    // [sm] start add selector
     const selectorClicked = () => {
         setSaved(false);
     };
 
+    // [sm] add selector
     const onSaved = (selector: string) => {
         setSelector(selector);
         setSaved(true);
@@ -121,6 +188,7 @@ const App: FunctionComponent = () => {
         });
     };
 
+    // [sm] start waving
     const onGo = () => {
         setGoing(true);
 
@@ -132,11 +200,13 @@ const App: FunctionComponent = () => {
         });
     }
 
+    // [sm] stop waving
     const onStop = () => {
         setGoing(false);
         stopPageCss();
     }
 
+    // [sm] use selector / add selector
     const selectorUpdated = async (message: SelectorUpdated) => {
         setSelector(message.selector || 'p');
         options.wave.selector = message.selector;
@@ -151,6 +221,7 @@ const App: FunctionComponent = () => {
         deferredOptions.update();
     }
 
+    // [sm] settings updated
     // TODO: when we can't reach the tab, we want to instruct the user to try refreshing the tab, then the browser
     const settingsUpdated = () => {
         newSyncObject<Options>(Options, "options", Options.getDefaultOptions(), (result: Options) => {
@@ -162,6 +233,7 @@ const App: FunctionComponent = () => {
         });
     }
 
+    // [sm] settings update / bootstrap
     useEffect(() => {
         // TODO: this needs a revision to send a start or update message depending on the state of "going" in google sync
         deferredOptions.subscribe((options: Options = Options.getDefaultOptions(), error?: any) => {
@@ -178,10 +250,12 @@ const App: FunctionComponent = () => {
                 window.close();
             }
         }
+        // [sm] bootstrap
         getSyncObject("going", { going: false }, (result) => {
             setGoing(result.going);
         });
 
+        // [sm] bootstrap
         chrome.runtime.onInstalled.addListener((details: InstalledDetails) => {
             console.log(`install details: ${details}`);
             // upon first load, get a default value for 'going'
