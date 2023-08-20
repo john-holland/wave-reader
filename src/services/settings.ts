@@ -46,7 +46,7 @@ export interface SettingsInterface {
     getSettingsForDomain(domain: string): DomainSettings | undefined;
     addSettingsForDomain(domain: string, path: string, settings: Options): void;
     getSettingsForDomain(domain: string, path: string): Options;
-    copySettingsToDomain(from: DomainSettings, domain: string, path: string);
+    copySettingsFromDomain(from: DomainSettings, fromPath: string, domain: string, path: string, acceptExisting: boolean = true): Promise<void>;
 }
 
 interface SettingsRegistry {
@@ -140,6 +140,7 @@ export default class SettingsService implements SettingsInterface {
             })
         });
     }
+
     async getSettingsForDomain(domain: string, defaultUndefined: boolean = true): DomainSettings | undefined {
         const domainSettings = await this.getSettingsRegistryForDomain(domain, defaultUndefined);
 
