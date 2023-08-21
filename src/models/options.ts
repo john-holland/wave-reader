@@ -1,11 +1,16 @@
 import AttributeConstructor from "../util/attribute-constructor";
-import Wave from "./wave";
+import Wave, { WaveAnimationControl } from "./wave";
 import { KeyChord } from "../components/util/user-input";
+import {
+    SelectorDefault,
+    KeyChordDefault,
+    WaveAnimationControlDefault,
+    ShowNotificationsDefault,
+    GoingDefault,
+    WaveDefault,
+    SelectorsDefault, WaveDefaultFactory
+} from "./defaults"
 
-export enum WaveAnimationControl {
-    CSS,
-    MOUSE
-}
 
 export class WaveToggleConfig extends AttributeConstructor<WaveToggleConfig> {
     // a 1-4ish length array of keys
@@ -24,12 +29,12 @@ export class WaveToggleConfig extends AttributeConstructor<WaveToggleConfig> {
 }
 
 export default class Options extends AttributeConstructor<Options> {
-    showNotifications: boolean = true;
-    going: boolean = false;
-    waveAnimationControl: WaveAnimationControl = WaveAnimationControl.CSS;
-    wave: Wave = Wave.getDefaultWave();
+    showNotifications: boolean = ShowNotificationsDefault;
+    going: boolean = GoingDefault;
+    waveAnimationControl: WaveAnimationControl = WaveAnimationControlDefault;
+    wave: Wave = WaveDefaultFactory();
     toggleKeys: WaveToggleConfig = WaveToggleConfig.getDefaultConfig();
-    selectors: string[] = [];
+    selectors: string[] = SelectorsDefault;
 
     constructor(props: Partial<Options> = Options.getDefaultOptions()) {
         super(undefined);
@@ -40,11 +45,6 @@ export default class Options extends AttributeConstructor<Options> {
     }
 
     public static getDefaultOptions(): Options {
-        return new Options({
-            showNotifications: true,
-            going: false,
-            wave: Wave.getDefaultWave(),
-            selectors: ['p,div,pre,paragraph']
-        });
+        return new Options();
     }
 }

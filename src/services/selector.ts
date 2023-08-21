@@ -1,5 +1,6 @@
 import { getSyncObject, setSyncObject } from '../util/sync'
 import {SettingsInterface} from "./settings";
+import { SelectorDefault } from "../models/defaults"
 
 export interface SelectorServiceInterface {
     addSelector(selector: string): void;
@@ -17,23 +18,27 @@ export default class SelectorService implements SelectorServiceInterface {
     }
 
     async addSelector(selector: string): void {
-        // TODO: validate selector?
-        this.settings.updateCurrentSettings(options => {
+        // TODO: validate selector? because of how loose the selector protocol is, i'm not sure it's worth it, other than to
+        // todo:  callout possibly sus selector characters, like the quotes copied in
+        return this.settings.updateCurrentSettings(options => {
             options.selectors.push(selector);
             return options;
         })
     }
 
     async currentSelector(): string {
-        return (await this.settings.getCurrentSettings()).wave.selector
+        return Promise.resolve((await this.settings.getCurrentSettings()).wave.selector)
     }
 
     async removeSelector(selector: string): void {
-        return new Promise((resolve, reject) => {
-            this.settings.updateCurrentSettings(options => {
-                options.selectors.splice(options.selectors.indexOf(selector), 1);
-                return options;
-            })
+        return this.settings.updateCurrentSettings(options => {
+            options.selectors.splice(options.selectors.indexOf(selector), 1);
+
+            // if the currect selector is the one we want to remove, default gracefully
+            if (options.wave.selector === selector) {
+                options.wave.selector = options.selectors[0] as unknown as string || SelectorDefault
+            }
+            return options;
         })
     }
 

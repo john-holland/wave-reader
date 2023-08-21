@@ -42,11 +42,13 @@ export interface SettingsInterface {
      * @returns [Options] the options for the current tab or default
      */
     getCurrentSettings(): Options;
-    updateCurrentSettings(update: { (options: Options): Options });
+    updateCurrentSettings(update: { (options: Options): Options }): Promise<void>;
     getSettingsForDomain(domain: string): DomainSettings | undefined;
     addSettingsForDomain(domain: string, path: string, settings: Options): void;
     getSettingsForDomain(domain: string, path: string): Options;
     copySettingsFromDomain(from: DomainSettings, fromPath: string, domain: string, path: string, acceptExisting: boolean = true): Promise<void>;
+    removeSettingsForDomain(domain: string): Promise<boolean>;
+    removeSettingsForDomain(domain: string, path: string): Promise<boolean>;
 }
 
 interface SettingsRegistry {
@@ -147,7 +149,7 @@ export default class SettingsService implements SettingsInterface {
         return domainSettings;
     }
 
-    async getSettingsForDomain(domain: string, path?: string, defaultUndefined = true, useExistingInsteadOfNew = true): Options | undefined {
+    async getSettingsForDomain(domain: string, path: string, defaultUndefined = true, useExistingInsteadOfNew = true): Options | undefined {
         const domainSettings = await this.getSettingsForDomain(domain, defaultUndefined);
 
         if (!domainSettings?.pathSettings.has(path)) {
@@ -160,7 +162,7 @@ export default class SettingsService implements SettingsInterface {
         return domainSettings?.pathSettings.get(path);
     }
 
-    async updateCurrentSettings(update: { (options: Options): Options }): void {
+    async updateCurrentSettings(update: { (options: Options): Options }): Promise<void> {
         return this.tabUrlProvider().then(async (url) => {
             const tab = new URL(url);
 
@@ -171,4 +173,44 @@ export default class SettingsService implements SettingsInterface {
         });
     }
 
+    /**
+     * removes the selected domain settings from the settings registry
+     * @param domain the url domain to remove
+     * @returns [Promise<boolean>] if true, removed, false, not present, catch, internal error
+     */
+    async removeSettingsForDomain(domain: string): Promise<boolean> {
+        return new Promise((resolve, reject) => {
+            this.settingsRegistryProvider(settingsRegistry => {
+                if (domain in settingsRegistry) {
+                    delete settingsRegistry[domain];
+                    this.saveSettingsRegistryProvider(settingsRegistry, () => {
+                        resolve(true);
+                    })
+                }
+                resolve(false);
+            })
+        })
+    }
+
+    async removeSettingsForDomain(domain: string, path: string, deleteDomainIfEmpty: boolean = true): Promise<boolean> {
+        return new Promise((resolve, reject) => {
+            this.settingsRegistryProvider(settingsRegistry => {
+                if (domain in settingsRegistry) {
+                    const domainSettings = settingsRegistry[domain];
+                    if (domainSettings.pathSettings.has(path)) {
+                        settingsRegistry[domain].pathSettings.delete(path)
+                    }
+
+                    if (deleteDomainIfEmpty && domainSettings.pathSettings.size === 0) {
+                        delete settingsRegistry[domain]
+                    }
+
+                    this.saveSettingsRegistryProvider(settingsRegistry, () => {
+                        resolve(true);
+                    })
+                }
+                resolve(false);
+            })
+        })
+    }
 }

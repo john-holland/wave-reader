@@ -114,6 +114,7 @@ type AppStatesProps = {
     setGoing: { (going: boolean): void },
     getGoing: { async (): boolean },
     _getGoingAsync: { async (): boolean },
+    setOptions: { (options: Options): void },
     bootstrapCondition: { (going: boolean): void },
     onRunTimeInstalledListener: { (details: InstalledDetails): void },
     onMessageListener: { (message: any): boolean}
@@ -134,12 +135,15 @@ export const AppStates = ({
     setGoing,
     getGoingLocal,
     _getGoingAsync = getGoingAsync,
+    setOptions,
     bootstrapCondition,
     onRunTimeInstalledListener = chromeRunTimeInstalledListener,
     onMessageListener = chromeOnMessageListener
 }: AppStatesProps): NameAccessMapInterface => {
     const states: StateNames = {
-        "bootstrap": CState("bootstrap", [], false, async (message, state, previousState) => {
+        "base": CState("base", ["base", "bootstrap", "settings updated"], true, () => {
+        }),
+        "bootstrap": CState("bootstrap", ["base"], true, async (message, state, previousState) => {
             if (getGoingLocal === undefined) {
                 const going = await _getGoingAsync() || false;
                 setGoing(going);
@@ -149,7 +153,7 @@ export const AppStates = ({
             onRunTimeInstalledListener((details: InstalledDetails) => {
                 console.log(`install details: ${details}`);
                 // upon first load, get a default value for 'going'
-                getSyncObject("going", { going: false }, (result) => {
+                getSyncObject("going", {going: false}, (result) => {
                     setGoing(result.going);
 
                     // use result.going as useState is an async call
@@ -173,42 +177,51 @@ export const AppStates = ({
                     });
                 });
 
+            });
             LoadSettings().then(setOptions)
             return states.get("base");
         }),
 
-        "settings updated": CState("settings updated", [], false, (message, state, previousState) => {
+        "settings updated": CState("settings updated", ["base"], true, (message, state, previousState) => {
         }),
-        "set wave": CState("set wave", [], false, (message, state, previousState) => {
+        "set wave": CState("set wave", ["???"], false, (message, state, previousState) => {
         }),
-
-        "selection mode enter": CState("selection mode enter", [], false, (message, state, previousState) => {
+        // selector selection mode
+        "selection mode activate": CState("selection mode activate", ["selection mode active"], true, (message, state, previousState) => {
         }),
-        "selection mode active (disable settings tab)": CState("selection mode active (disable settings tab)", [], false, (message, state, previousState) => {
+        "selection mode active": CState("selection mode active", ["selection made", "selection error report", "settings updated"], false, (message, state, previousState) => {
+            //  (disable settings tab)
         }),
-        "selection made (enable settings tab)": CState("selection made (enable settings tab)", [], false, (message, state, previousState) => {
+        "selection made (enable settings tab)": CState("selection made (enable settings tab)", ["base"], false, (message, state, previousState) => {
         }),
-        "selection error report (user error, set red selection error note, revert to previous selector)": CState("selection error report (user error, set red selection error note, revert to previous selector)", [], false, (message, state, previousState) => {
+        "selection error report (user error, set red selection error note, revert to previous selector)": CState("selection error report (user error, set red selection error note, revert to previous selector)", ["base"], false, (message, state, previousState) => {
         }),
-
-        "start add selector": CState("start add selector", [], false, (message, state, previousState) => {
+        // selectors!
+        // add
+        "start add selector": CState("start add selector", ["add selector", "cancel add selector"], false, (message, state, previousState) => {
             // TODO: need a selector choose drop down component
         }),
-        "add selector": CState("add selector", [], false, (message, state, previousState) => {
+        "add selector": CState("add selector", ["base"], false, (message, state, previousState) => {
                 // selectorUpdated(message)
         }),
-        "cancel add selector": CState("cancel add selector", [], false, (message, state, previousState) => {
+        "cancel add selector": CState("cancel add selector", ["base"], false, (message, state, previousState) => {
         }),
-        "remove selector": CState("remove selector", [], false, (message, state, previousState) => {
+        // remove
+        "remove selector": CState("remove selector", ["confirm remove selector", "cancel remove selector"], false, (message, state, previousState) => {
         }),
-        "confirm remove selector": CState("confirm remove selector", [], false, (message, state, previousState) => {
+        "confirm remove selector": CState("confirm remove selector", ["base"], false, (message, state, previousState) => {
         }),
-        "use selector": CState("use selector", [], false, (message, state, previousState) => {
+        "cancel remove selector": CState("cancel remove selector", ["base"], false, (message, state, previousState) => {
         }),
-
-        "start waving": CState("start waving", [], false, (message, state, previousState) => {
+        // use
+        "use selector": CState("use selector", ["base"], false, (message, state, previousState) => {
         }),
-        "stop waving": CState("stop waving", [], false, (message, state, previousState) => {
+        // ~~ waves ~~
+        "start waving": CState("start waving", ["base"], true, (message, state, previousState) => {
+        }),
+        "waving": CState("start waving", ["stop wave", "settings updated"], false, (message, state, previousState) => {
+        }),
+        "stop waving": CState("stop waving", ["base"], false, (message, state, previousState) => {
         }),
     };
 

@@ -2,6 +2,12 @@
 import Text from '../models/text';
 import AttributeConstructor from "../util/attribute-constructor";
 
+
+export enum WaveAnimationControl {
+    CSS,
+    MOUSE
+}
+
 export const defaultCssTemplate = (options: Wave) => `
 @-webkit-keyframes wobble {
   0% { transform: translateX(${options.axisTranslateAmountXMax}%); rotateY(${options.axisRotationAmountYMin}deg); }
