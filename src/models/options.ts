@@ -1,30 +1,28 @@
 import AttributeConstructor from "../util/attribute-constructor";
-import Wave, { WaveAnimationControl } from "./wave";
+import Wave from "./wave";
 import { KeyChord } from "../components/util/user-input";
 import {
-    SelectorDefault,
-    KeyChordDefault,
     WaveAnimationControlDefault,
     ShowNotificationsDefault,
     GoingDefault,
-    WaveDefault,
-    SelectorsDefault, WaveDefaultFactory
+    WaveAnimationControl,
+    WaveDefaultFactory,
+    KeyChordDefaultFactory,
+    SelectorsDefaultFactory
 } from "./defaults"
 
 
 export class WaveToggleConfig extends AttributeConstructor<WaveToggleConfig> {
     // a 1-4ish length array of keys
-    keyChord: KeyChord = []
+    keyChord: KeyChord = KeyChordDefaultFactory()
 
-    public constructor(attributes: Partial<WaveToggleConfig> = WaveToggleConfig.getDefaultConfig()) {
+    public constructor(attributes: Partial<WaveToggleConfig> = {}) {
         super(attributes);
         this.keyChord = attributes.keyChord || []
     }
 
     static getDefaultConfig(): WaveToggleConfig {
-        return new WaveToggleConfig({
-            keyChord: ["w", "Shift"]
-        })
+        return new WaveToggleConfig()
     }
 }
 
@@ -34,9 +32,9 @@ export default class Options extends AttributeConstructor<Options> {
     waveAnimationControl: WaveAnimationControl = WaveAnimationControlDefault;
     wave: Wave = WaveDefaultFactory();
     toggleKeys: WaveToggleConfig = WaveToggleConfig.getDefaultConfig();
-    selectors: string[] = SelectorsDefault;
+    selectors: string[] = SelectorsDefaultFactory();
 
-    constructor(props: Partial<Options> = Options.getDefaultOptions()) {
+    constructor(props: Partial<Options> = {}) {
         super(undefined);
         // typescript auto-fills defaults here, if this is the desired behavior
         super.assign(props);

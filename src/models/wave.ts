@@ -1,12 +1,7 @@
 
 import Text from '../models/text';
 import AttributeConstructor from "../util/attribute-constructor";
-
-
-export enum WaveAnimationControl {
-    CSS,
-    MOUSE
-}
+import {SelectorDefault} from "./defaults";
 
 export const defaultCssTemplate = (options: Wave) => `
 @-webkit-keyframes wobble {
@@ -85,7 +80,7 @@ export default class Wave extends AttributeConstructor<Wave>{
 
     public static getDefaultWave(): Wave {
         return new Wave({
-            selector: "p,h2,h3,h4,h5,h6,h7,h8,article,section,aside,figcaption",
+            selector: SelectorDefault,
             waveSpeed: 4,
             axisTranslateAmountXMax: 0,
             axisTranslateAmountXMin: -1,

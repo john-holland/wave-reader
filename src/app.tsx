@@ -22,6 +22,9 @@ import {CState, NameAccessMapInterface, State, StateNames} from "./util/state";
 import {WindowKeyDownKey} from "./components/util/user-input";
 import StateMachine from "./util/state-machine";
 
+import SettingsService from "./services/settings";
+import SelectorService from "./services/selector";
+
 //todo:
 // * Material UI
 // * Controls: read speed, reset speed, rotation angle, wave width, read duration
@@ -42,6 +45,9 @@ import StateMachine from "./util/state-machine";
 const WaveReader = styled.div`
   width: 800px;
 `;
+
+const settingsService = new SettingsService();
+const selectorService = new SelectorService(settingsService);
 
 const startPageCss = (wave: Wave) => {
     newSyncObject<Options>(Options,'options', Options.getDefaultOptions(), (options) => {
@@ -100,7 +106,7 @@ const bootstrapCondition = (going: boolean) => {
     });
 }
 
-const getGoingChromeStorage = (callback: {going: boolean}) => getSyncObject("going", { going: false }, callback);
+const getGoingChromeStorage = (callback: { going: boolean }) => getSyncObject("going", { going: false }, g => callback(g));
 
 const getGoingAsync = async (): Promise<boolean> => new Promise((resolve) => getGoingChromeStorage(resolve));
 
@@ -111,9 +117,10 @@ const getGoingAsync = async (): Promise<boolean> => new Promise((resolve) => get
 type AppStatesProps = {
     machine: StateMachine,
     map: Map<string, State>,
+    setState: { (state: string): State }
     setGoing: { (going: boolean): void },
-    getGoing: { async (): boolean },
-    _getGoingAsync: { async (): boolean },
+    getGoing: { (): boolean },
+    _getGoingAsync: { (): boolean },
     setOptions: { (options: Options): void },
     bootstrapCondition: { (going: boolean): void },
     onRunTimeInstalledListener: { (details: InstalledDetails): void },
@@ -131,6 +138,12 @@ const chromeOnMessageListener = (callback: { (message: any): boolean }) => {
 
 export const AppStates = ({
     machine,
+    setState = (state) => {
+        /* eslint-disable  @typescript-eslint/no-unused-vars */
+        const resultState = machine.handleState(machine.getState(state));
+        // TODO: update settings with state property
+        //settingsService.updateCurrentSettings(settings => settings.state)
+    },
     map = new Map<string, State>(),
     setGoing,
     getGoingLocal,
@@ -140,6 +153,7 @@ export const AppStates = ({
     onRunTimeInstalledListener = chromeRunTimeInstalledListener,
     onMessageListener = chromeOnMessageListener
 }: AppStatesProps): NameAccessMapInterface => {
+    /* eslint-disable  @typescript-eslint/no-unused-vars */
     const states: StateNames = {
         "base": CState("base", ["base", "bootstrap", "settings updated"], true, () => {
         }),
@@ -183,6 +197,18 @@ export const AppStates = ({
         }),
 
         "settings updated": CState("settings updated", ["base"], true, (message, state, previousState) => {
+            // TODO: i think refactoring deferred options into an observable
+            setSelector(message.selector || 'p');
+            options.wave.selector = message.selector;
+            options.wave.update();
+            deferredOptions.waitFor().then((options) => {
+                if (options) {
+                    setSyncObject('options', options);
+                } else {
+                    throw new Error("empty options");
+                }
+            });
+            deferredOptions.update();
         }),
         "set wave": CState("set wave", ["???"], false, (message, state, previousState) => {
         }),
