@@ -1,6 +1,11 @@
 import {FunctionComponent, useEffect, useState} from "react";
-import {ForThoustPanel, HtmlElement, SelectorHierarchyService} from "../services/selector-hierarchy-service";
-import {styled} from "@mui/material";
+import {
+    ForThoustPanel,
+    HtmlElement,
+    SelectorHierarchyService,
+    SelectorHierarchyServiceInterface
+} from "../services/selector-hierarchy-service";
+import styled from "styled-components";
 import {map} from "rxjs";
 
 /**
@@ -58,15 +63,16 @@ const Cover = styled.svg`
 
 export type HierarchySelectorComponentProps = {
     selectedHtmlElement: HtmlElement,
-    htmlHierarchyRoot: HtmlElement[]
+    htmlHierarchyRoot: HtmlElement[],
+    selectorHierarchyService: SelectorHierarchyServiceInterface
 }
 
 const Panel = styled.div`
-  background-color: ${props => props.background-color};
-  left: ${props => props.left};
-  top: ${props => props.top};
-  width: ${props => props.width};
-  height: ${props => props.height};
+  background-color: ${(props: HtmlElement) => props.background_color};
+  left: ${(props: HtmlElement) => props.left};
+  top: ${(props: HtmlElement) => props.top};
+  width: ${(props: HtmlElement) => props.width};
+  height: ${(props: HtmlElement) => props.height};
 `
 
 type TC = {
@@ -87,7 +93,7 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
     const [someDafadilTypeShiz] = ['#eea']
 
     useEffect(() => {
-        setDimmedPanels(selectorHierarchyService.getDimmedPanelSelectors(htmlHierarchy, activeSelectorPanel));
+        setDimmedPanels(selectorHierarchyService.getDimmedPanelSelectors(htmlHierarchy, activeSelectorPanel).htmlSelectors.values().flatMap(c => c));
         setActiveSelectorPanel(ForThoustPanel(activeSelectorPanel.htmlSelectors.keys(),
             (htmlElements, i) => { const colors = htmlElements.length / 3 ?
                 tinycolor.triad(someDafadilTypeShiz) : tinycolor.quad(someDafadilTypeShiz);
