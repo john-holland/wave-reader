@@ -47,7 +47,7 @@ const enum SelectorEvent {
  * 4 value color representation of the same color + hex with alpha
  * todo: back with tiny color
  */
-type Color = tinycolor.Constructor
+type Color = tinycolor.Instance
 
 // todo: use tiny color to generate color triads, quads, split complements
 export interface ColorGeneratorServiceInterface {
@@ -92,15 +92,8 @@ const ArrayReferenceEquals = <T> (array1: T[], array2: T[]) => {
     return !array1.find(el => !array2.includes(el))
 }
 
-export const ForThoustPanel = (document: HtmlDocument, panel: HtmlElement, selectorHierarchyService: SelectorHierarchyServiceInterface): HtmlSelection => {
+export const ForThoustPanel = (document: Document, panel: HtmlElement, selectorHierarchyService: SelectorHierarchyServiceInterface): HtmlSelection => {
     // figure out change of basis for screen pixels if necessary etc
-    const mask = new SvgElement({ style: { pointerEvents: 'none' }, height: panel.height, width: panel.width, x: panel.left, y: panel.top })
-    const cover = new SvgElement({ style: { pointerEvents: 'none' }, height: '100%', width: '100%', x: '0', y: '0' })
-
-    // todo: insert mask svg css here
-
-    cover.addElement(mask);
-    document.addElement(cover);
 
     const colors = [...panel.children];
 
