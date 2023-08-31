@@ -94,8 +94,12 @@ export type ColorSelection = {
     color: Color
 }
 
-export type HtmlSelection = {
+export class HtmlSelection {
     htmlSelectors: Map<Selector, ColorSelection>
+
+    constructor(htmlSelectors: Map<Selector, ColorSelection>) {
+        this.htmlSelectors = htmlSelectors
+    }
 }
 
 // transparency is supported universally but there's a speed difference between adjusting
@@ -146,15 +150,22 @@ const calcSize = (element: HtmlElement | undefined, size: string, property: Size
         case SizeProperties.WIDTH:
             return element.clientHeight;
         default:
-            if (!size || size.trim() === "") return 0;
+            if (!size || size.trim() === "") {
+                return 0;
+            }
             const { size: sizeValue, sizeType } = getSizeValuesRegex(size)
 
             if (size === "0" || !sizeType || sizeType.trim() === "") return 0;
 
             // for rem, we reference document.querySelector("html").style.fontSize
             const remSize = Number(getSizeValuesRegex(fontSizeRemDefaultAccessor()).size)
-            const emSize: number = calcSize(_parent(element), _parent(element)?.style.fontSize || (remSize + "px"))
+            const emSize: number = sizeType.toLowerCase() === "px" ? 0 :
+                calcSize(_parent(element), _parent(element)?.style?.fontSize || (remSize + "px"),
+                SizeProperties.OTHER, fontSizeRemDefaultAccessor)
 
+            if (isNaN(Number(sizeValue))) {
+                console.log("foud NaN sizeValue for sizeType: " + sizeType + " with value, " + sizeValue)
+            }
             switch (sizeType.toLowerCase()) {
                 case "px":
                     return Number(sizeValue);
@@ -169,10 +180,35 @@ const calcSize = (element: HtmlElement | undefined, size: string, property: Size
     }
 }
 
-const calcLeft = (n: HtmlElement): number => calcSize(n, n.style.left) + calcSize(n, n.style.marginLeft) + (calcSize(_parent(n), _parent(n)?.style.paddingLeft || "0") || 0) + (_parent(n) ? calcLeft(_parent(n)!!) : 0);
-const calcRight = (n: HtmlElement): number => calcSize(n, n.style.left) + calcSize(n, n.style.marginLeft) + (calcSize(_parent(n), _parent(n)?.style.paddingLeft || "0")) + (_parent(n) ? calcLeft(_parent(n)!!) : 0) + calcSize(n, n.style.width, SizeProperties.WIDTH) + calcSize(n, n.style.marginRight);
-const calcTop = (n: HtmlElement): number => calcSize(n, n.style.top) + calcSize(n, n.style.marginTop) + calcSize(_parent(n),_parent(n)?.style.paddingTop || "0") + (_parent(n) ? calcTop(_parent(n)!!) : 0);
-const calcBottom = (n: HtmlElement): number => calcSize(n, n.style.top) + calcSize(n, n.style.marginTop) + calcSize(_parent(n), _parent(n)?.style.paddingTop || "0") + (_parent(n) ? calcTop(_parent(n)!!) : 0) + calcSize(n, n.style.height);
+const calcLeft = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSizeREM): number => {
+    const cs = (property: string) => calcSize(n, property, SizeProperties.OTHER, fontSizeRemDefaultAccessor)
+    return cs(n.style?.left) +
+        cs(n.style?.marginLeft) +
+        calcSize(_parent(n), _parent(n)?.style?.paddingLeft || "0", SizeProperties.OTHER, fontSizeRemDefaultAccessor) +
+        (_parent(n) ? calcLeft(_parent(n)!!, fontSizeRemDefaultAccessor) : 0);
+}
+const calcRight = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSizeREM()): number => {
+    const cs = (property: string) => calcSize(n, property, SizeProperties.OTHER, fontSizeRemDefaultAccessor) || 0
+    return cs(n.style?.left) +
+        cs(n.style?.marginLeft) +
+        calcSize(_parent(n), _parent(n)?.style?.paddingLeft || "0", SizeProperties.OTHER, fontSizeRemDefaultAccessor) +
+        (_parent(n) ? calcLeft(_parent(n)!!, fontSizeRemDefaultAccessor) : 0) + cs(n.style?.width) +
+        cs(n.style?.marginRight);
+}
+const calcTop = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSizeREM()): number => {
+    const cs = (property: string) => calcSize(n, property, SizeProperties.OTHER, fontSizeRemDefaultAccessor)
+    return cs(n.style?.top) +
+        cs(n.style?.marginTop) +
+        calcSize(_parent(n),_parent(n)?.style?.paddingTop || "0", SizeProperties.OTHER, fontSizeRemDefaultAccessor) +
+        (_parent(n) ? calcTop(_parent(n)!!, fontSizeRemDefaultAccessor) : 0);
+}
+const calcBottom = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSizeREM()): number => {
+    const cs = (property: string) => calcSize(n, property, SizeProperties.OTHER, fontSizeRemDefaultAccessor)
+    return cs(n.style?.top) + cs(n.style?.marginTop) +
+        calcSize(_parent(n), _parent(n)?.style?.paddingTop || "0", SizeProperties.OTHER, fontSizeRemDefaultAccessor) +
+        (_parent(n) ? calcTop(_parent(n)!!, fontSizeRemDefaultAccessor) : 0) +
+        cs(n.style?.height);
+}
 
 export const SizeFunctions = {
     calcSize,
@@ -186,7 +222,8 @@ export const ForThoustPanel = (
     document: Document,
     selector: string,
     selectorHierarchyService: SelectorHierarchyServiceInterface,
-    existingSelection?: HtmlSelection
+    existingSelection?: HtmlSelection,
+    fontSizeRemDefaultAccessor = getDefaultFontSizeREM
 ): HtmlSelection => {
     // figure out change of basis for screen pixels if necessary etc
 
@@ -197,12 +234,15 @@ export const ForThoustPanel = (
     const nonSelectedHtmlElements = [...document.querySelectorAll("*")].filter(el => selectedHtmlElements.includes(el));
 
     function getNeighborIslands(elements: HtmlElement[], initialSelector: string[] = SelectorsDefaultFactory()): Map<Selector, HtmlElement[]> {
-        initialSelector = initialSelector.flatMap(selector => selector.split(`,`))
+        initialSelector = initialSelector.flatMap(selector => selector.split(`,`).map(s => s.toLowerCase()))
 
         // for each element, add an entry to the class map
         const classMap = elements.reduce<Map<string, HtmlElement[]>>((map: Map<string, HtmlElement[]>, el: HtmlElement) => {
-                            [...el.classList].filter(className => initialSelector.includes(className))
-                                        .forEach(className => map.set(className, map.get(className) || []))
+                            // kind of cludgey but we'll just let the classMap include the nodeName,
+                            // slightly flexible islands hopefully won't hurt
+                            [el.nodeName, ...el.classList].map(c => c.toLowerCase().trim())
+                                .filter(className => initialSelector.includes(className) || initialSelector.includes(el.nodeName))
+                                    .forEach(className => map.set(className, map.get(className) || [el]))
                             return map;
                         }, new Map<string, HtmlElement[]>())
 
@@ -222,11 +262,12 @@ export const ForThoustPanel = (
                 getPathSelector(possibleNeighbor).includes(getPathSelector(el)) // descendant
             )
         }
-        const neighborIslands = [...classMap.values()].flatMap<HtmlElement[]>(c => c)
+        const neighborIslands = [...classMap.values()]//.flatMap<HtmlElement[]>(c => [...c])
             .reduce<Map<string, HtmlElement[][]>>((map, elements) => {
-                for (const element of elements) {
-                    for (const className of element.classList) {
-                        const htmlElementCollections = map.get(className) || [];
+                [...elements].forEach((element) => {
+                    [element.nodeName, ...element.classList].map(c => c.toLowerCase().trim()).forEach(className => {
+                        // todo: review: lower className on list add?
+                        const htmlElementCollections = map.get(className.toLowerCase()) || [];
                         // search each collection, and if they're a neighbor then push and stop
                         // if not, add a new collection with the element
                         let foundNeighbor = false;
@@ -240,8 +281,8 @@ export const ForThoustPanel = (
                         }
 
                         map.set(className, htmlElementCollections)
-                    }
-                }
+                    })
+                })
                 return map;
             }, new Map<string, HtmlElement[][]>());
 
@@ -257,16 +298,17 @@ export const ForThoustPanel = (
         // filter out islands smaller than 20px x 20px
         const neighborMap = [...neighborIslands.keys()].reduce((map, key) => {
             const selectors = [...map.keys()]
-            const uncheckedSelectors = selectors.filter(selector => !selector.classList.includes(key))
+            // todo: investigate, null selector.elem
+            const uncheckedSelectors = selectors.filter(selector => selector.elem.find(e => e.nodeName?.toLowerCase() === key) || !selector.classList.includes(key))
             // given any selector we haven't already added a class collection
             //  (we'll have to test to assert for the assumption that islands have no overlap)
             neighborIslands.get(key)?.filter(island => {
                 const islandArray = [...island.values()];
-                const left =  Math.min(...islandArray.map(e => calcLeft(e)));
-                const right = Math.max(...islandArray.map(e => calcRight(e)));
-                const top = Math.min(...islandArray.map(e => calcTop(e)));
-                const bottom = Math.max(...islandArray.map(e => calcBottom(e)));
-                const area = right - left * bottom - top;
+                const left =  Math.min(...islandArray.map(e => calcLeft(e, fontSizeRemDefaultAccessor)));
+                const right = Math.max(...islandArray.map(e => calcRight(e, fontSizeRemDefaultAccessor)));
+                const top = Math.min(...islandArray.map(e => calcTop(e, fontSizeRemDefaultAccessor)));
+                const bottom = Math.max(...islandArray.map(e => calcBottom(e, fontSizeRemDefaultAccessor)));
+                const area = (right - left) * (bottom - top);
                 return area > (MIN_ISLAND_AREA);
             }).forEach(island => {
                 const selector = uncheckedSelectors.find(selector =>
@@ -285,28 +327,17 @@ export const ForThoustPanel = (
 
     const neighborIslands = getNeighborIslands([...nonSelectedHtmlElements, ...selectedHtmlElements] as HtmlElement[]);
 
-    const someDafadilTypeShiz = "#eea"
 
     /* eslint-disable  @typescript-eslint/no-unused-vars */
+    const someDafadilTypeShiz = "#eea" // :3
     const easterIslandsStatues = [...neighborIslands.values()].map(island => island[0]) // extremely important
     /* eslint-enable  @typescript-eslint/no-unused-vars */
 
     // maybe redesign with a color selector
     const selection = selectorHierarchyService.assignColorSelectionsForSelector(
-        [...neighborIslands.keys()],
-        (selector, i): ColorSelection => {
-                const colors = selector.elem.length / 3 ?
-                    tinycolor(someDafadilTypeShiz).triad() : tinycolor(someDafadilTypeShiz).tetrad();
+        [...neighborIslands.keys()]);
 
-                return {
-                    selector,
-                    color: colors[i % colors.length]
-                };
-            });
-
-    return {
-        htmlSelectors: selection
-    } as unknown as HtmlSelection
+    return selection;
 }
 
 export interface SelectorHierarchyServiceInterface {
@@ -316,7 +347,7 @@ export interface SelectorHierarchyServiceInterface {
      */
     defaultSelectorGenerator(selector: Selector, startingIndex: number): ColorSelection
     getDimmedPanelSelectors(htmlHierarchy: HtmlElement[], selectedElements: HtmlElement[]): HtmlSelection
-    assignColorSelectionsForSelector(selectors: Selector[], selectorColorGenerator: { (selector: Selector, i: number): ColorSelection }): HtmlSelection
+    assignColorSelectionsForSelector(selectors: Selector[], selectorColorGenerator?: { (selector: Selector, i: number): ColorSelection }): HtmlSelection
 }
 
 export const DefaultTetrad = [
@@ -361,9 +392,7 @@ export class SelectorHierarchyService implements SelectorHierarchyServiceInterfa
             return selectorsMap.set(selector, selectorsGenerator(selector, i))
         })
 
-        return {
-            htmlSelectors: selectorsMap
-        }
+        return new HtmlSelection(selectorsMap)
     }
 
     defaultSelectorGenerator(selector: Selector, i: number):  ColorSelection {
@@ -380,3 +409,7 @@ export class SelectorHierarchyService implements SelectorHierarchyServiceInterfa
     }
 
 }
+
+ // "#eeeeaa"
+ // "#aaeeee"
+ // "#eeaaee"

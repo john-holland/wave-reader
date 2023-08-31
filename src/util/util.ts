@@ -2,6 +2,8 @@
  *
  * @returns {boolean} true if lastError
  */
+import * as JSDOM from "jsdom";
+
 export const guardLastError = () => {
     if (chrome.runtime.lastError) {
         console.log(chrome.runtime.lastError);
@@ -62,4 +64,6 @@ export const getSizeValuesRegex = (sizeValue: string): SizeValue => {
         sizeType: valueType
     } as unknown as SizeValue
 }
-export const getDefaultFontSizeREM = (doc = document) => window.getComputedStyle(doc.documentElement).getPropertyValue('font-size')
+
+const windowDefault: any | undefined = (typeof window !== 'undefined' && window) || undefined
+export const getDefaultFontSizeREM = (_window: any | undefined = windowDefault) => _window.getComputedStyle(_window.document.documentElement).getPropertyValue('font-size')
