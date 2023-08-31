@@ -346,7 +346,7 @@ export interface SelectorHierarchyServiceInterface {
      * @param selector
      */
     defaultSelectorGenerator(selector: Selector, startingIndex: number): ColorSelection
-    getDimmedPanelSelectors(htmlHierarchy: HtmlElement[], selectedElements: HtmlElement[]): HtmlSelection
+    getDimmedPanelSelectors(document: Document, selectedElements: HtmlElement[]): HtmlSelection
     assignColorSelectionsForSelector(selectors: Selector[], selectorColorGenerator?: { (selector: Selector, i: number): ColorSelection }): HtmlSelection
 }
 
@@ -375,7 +375,7 @@ export class SelectorHierarchyService implements SelectorHierarchyServiceInterfa
         this.colorService = colorService;
     }
 
-    getDimmedPanelSelectors(htmlHierarchy: HtmlElement[], selectedElements: HtmlElement[]): HtmlSelection {
+    getDimmedPanelSelectors(document: Document, selectedElements: HtmlElement[]): HtmlSelection {
 
         return {
             htmlSelectors: new Map<Selector, ColorSelection>()

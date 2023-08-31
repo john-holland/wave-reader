@@ -1,15 +1,16 @@
 import {FunctionComponent, useEffect, useState} from "react";
 import {
-    ColorGeneratorServiceInterface,
+    ColorGeneratorServiceInterface, ColorSelection,
     ForThoustPanel,
     HtmlElement,
     SelectorHierarchyService,
     SelectorHierarchyServiceInterface
 } from "../services/selector-hierarchy-service";
-import styled from "styled-components";
+import styled, {StyledComponent} from "styled-components";
 import {flatMap, map} from "rxjs";
 import tinycolor from "tinycolor2"
 import SettingsService from "../services/settings";
+import React from 'react';
 
 /**
  * we may need to use 4 enclosing panels, reused
@@ -64,19 +65,36 @@ const Cover = styled.svg`
   mouse-events: none;
 `
 
-const Panel = styled.div`
-  background-color: ${(props: HtmlElement) => props.background_color};
-  left: ${(props: HtmlElement) => props.left};
-  top: ${(props: HtmlElement) => props.top};
-  width: ${(props: HtmlElement) => props.width};
-  height: ${(props: HtmlElement) => props.height};
-`
 
 export type HierarchySelectorComponentProps = {
     selectorHierarchyService: SelectorHierarchyServiceInterface,
     currentSelector: string,
     onConfirmSelector: { (selector: string): void }
 }
+
+interface ColorSelectorPanelInterface {
+    element: HtmlElement;
+    color: Hex; //color.toHexString() from tinycolor.Instance;
+}
+
+type Hex = string;
+class ColorSelectorPanel implements ColorSelectorPanelInterface {
+    element: HtmlElement;
+    color: Hex; //color.toHexString() from tinycolor.Instance;
+
+    constructor(element: HtmlElement, color: Hex) {
+        this.element = element;
+        this.color = color;
+    }
+}
+
+const Panel = styled.div<ColorSelectorPanel>`
+  background-color: ${({color}) => color};
+  left: ${(props: ColorSelectorPanel) => props.element.style.left};
+  top: ${(props: ColorSelectorPanel) => props.element.style.top};
+  width: ${(props: ColorSelectorPanel) => props.element.style.width};
+  height: ${(props: ColorSelectorPanel) => props.element.style.height};
+` as StyledComponent<"div", any, ColorSelectorPanel, never>
 
 const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentProps> = ({
     selectorHierarchyService = new SelectorHierarchyService({ } as unknown as ColorGeneratorServiceInterface),
@@ -87,41 +105,61 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
     const [selector, setSelector] = useState(currentSelector);
     const [activeSelectorColorPanels, setActiveSelectorColorPanels] = useState<ColorSelectorPanel[]>([])
     const [htmlHierarchy, setHtmlHierarchyRoot] = useState(document);
-    const [dimmedPanels, setDimmedPanels] = useState([])
+    const [dimmedPanels, setDimmedPanels] = useState<ColorSelection[]>([])
     // ;const [brambles] = useWilliamTate();
     const [someDafadilTypeShiz] = ['#eea']
 
-    type Hex = string;
-    type ColorSelectorPanel = {
-        element: HtmlElement;
-        color: Hex; //color.toHexString() from tinycolor.Instance;
-    }
     useEffect(() => {
         new SettingsService().getCurrentSettings().then(settings => {
-            const selection = ForThoustPanel(document, settings.wave.selector, selectorHierarchyService);
+            const selection = ForThoustPanel(document, settings.wave.selector || "", selectorHierarchyService);
             const activePanels = [...selection.htmlSelectors.values()].flatMap(s => {
-                return { element: s.selector.elem, color: s.color.toHexString() } as unknown as ColorSelectorPanel;
+                return s.selector.elem.map(e => new ColorSelectorPanel( e, s.color.toHexString() ));
             })
-            setDimmedPanels(selectorHierarchyService.getDimmedPanelSelectors(htmlHierarchy, activePanels.map(s => s.element)).htmlSelectors.values().flatMap(c => c));
+            setDimmedPanels([...selectorHierarchyService.getDimmedPanelSelectors(document, activePanels.map(s => s.element)).htmlSelectors.values()]);
             setActiveSelectorColorPanels(activePanels)
         })
     }, [])
 
     return (
         <div>
-            {dimmedPanels.map(panel => {
-                return <Panel props={panel}></Panel>
+            {dimmedPanels.map((panel: ColorSelection) => {
+                panel.selector.elem.forEach((element: HtmlElement) => {
+                    return <Panel color={panel.color.toHexString()} element={element}></Panel>
+                })
             })}
-            {activeSelectorPanel.map(panel => {
-                return <Panel props={panel}></Panel>
+
+            {activeSelectorColorPanels.map((panel: ColorSelectorPanel) => {
+                return <Panel color={panel.color} element={panel.element}></Panel>
             })}
-            {/* maybe maybe maybe*/}
+            {/* maybe maybe maybe
+            maaaaaayyyyybee some day we'll
+            seeee essss veee gheee
+            gheee'
+            gheee
+            ghee-e-e ...,,,---~~~````~~~~----````____`````---
+            pixels, pixels sometimes changes
+            full screen scrolling device independent pixels threw
+            many software engineers for a loop,
+            em and rem providing a bastion,
+            but for too many deviceRatio is a weird concept
+            and we struggle randomly scoping hard coded values
+            or disappearing into vaults to learn the secrets of the HTML/svg specification and how to use the viewport.
+
+            You are a lone self educator, in a loan filled wasteland of dread and pixel conversions,
+            will you embrace your change of basis? Will you end the suffering of the pixelated wastes in your mind?
+            Or will you simply set everything to pixels like i did, and hope rem works well enough?
+
+            // todo: hookup svg panels and make sure to validate deviceRatio and viewport usage for perfect screen fit,
+            // todo:   if possible
+
+            // todo: start, stop, choose, add panel, remove panel
+            */}
             <svg>
             <Cover>
                 <Mask></Mask>
             </Cover>
             </svg>
-            {/* maybe maybe maybe*/}
+            {/* [...maybe, maybe, maybe] */}
         </div>
     )
 }
