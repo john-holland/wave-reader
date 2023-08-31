@@ -41,3 +41,25 @@ const p = <T> (promiseFn: PromiseFunction<T> = (resolve = () => {}, reject = (re
 };
 
 export default p;
+
+export type SizeValue = {
+    size: string,
+    sizeType?: string
+}
+export const getSizeValuesRegex = (sizeValue: string): SizeValue => {
+    const regex = new RegExp("([0-9]+)([a-zA-Z]+|%)", "ig");
+
+    const result = regex.exec(sizeValue)
+    if (!result) return {
+        size: "0",
+        sizeType: undefined
+    };
+
+    const [s, value, valueType, ...rest] = [...result.values()];
+
+    return {
+        size: value,
+        sizeType: valueType
+    } as unknown as SizeValue
+}
+export const getDefaultFontSizeREM = (doc = document) => window.getComputedStyle(doc.documentElement).getPropertyValue('font-size')

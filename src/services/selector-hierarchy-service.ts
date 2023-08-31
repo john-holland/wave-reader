@@ -2,31 +2,33 @@ import {FunctionComponent, useState} from "react";
 import * as console from "console";
 import tinycolor, { ColorInput } from "tinycolor2";
 import {SelectorsDefaultFactory} from "../models/defaults";
+import SettingsService, {SettingsDAOInterface} from "./settings";
+import {getDefaultFontSizeREM, getSizeValuesRegex} from "../util/util";
 
 // probably use the chrome types version
-export type HtmlElement = {
-    background_color: string;
-    margin_right: number;
-    padding_top: number;
-    padding_left: number;
-    margin_left: number;
-    margin_top: number;
-    type: string
-    innerHTML: string
-    outerHTML: string
-    parent?: HtmlElement
-    children: HtmlElement[]
-    width: number
-    height: number
-    left: number
-    top: number
-    id: string
-    name: string
-    attributes: Map<string, string>
-    classList: string[]
-    style: Map<string, string>
-    addElement: { (element: HtmlElement): void }
-}
+ export type HtmlElement = HTMLElement
+//     background_color: string;
+//     margin_right: number;
+//     padding_top: number;
+//     padding_left: number;
+//     margin_left: number;
+//     margin_top: number;
+//     type: string
+//     innerHTML: string
+//     outerHTML: string
+//     parent?: HtmlElement
+//     children: HtmlElement[]
+//     width: number
+//     height: number
+//     left: number
+//     top: number
+//     id: string
+//     name: string
+//     attributes: Map<string, string>
+//     classList: string[]
+//     style: Map<string, string>
+//     addElement: { (element: HtmlElement): void }
+// }
 
 export type Selector = {
     elem: HtmlElement[]
@@ -47,13 +49,44 @@ const enum SelectorEvent {
  * 4 value color representation of the same color + hex with alpha
  * todo: back with tiny color
  */
-type Color = tinycolor.Instance
+export type Color = tinycolor.Instance
 
 // todo: use tiny color to generate color triads, quads, split complements
 export interface ColorGeneratorServiceInterface {
-    getTriad(color: Color, seed: any): Color[]
-    getSplitComponent(color: Color, seed: any): Color[]
-    getQuad(color: Color, seed: any): Color[]
+    getTriad(color: Color, spin: any): Color[]
+    getSplitComponent(color: Color, spin: any): Color[]
+    getTetrad(color: Color, spin: any): Color[]
+    getDefaultTriad(startingIndex: number, seed: any): Color[]
+    getDefaultSplitComponent(startingIndex: number, seed: any): Color[]
+    getDefaultTetrad(startingIndex: number, seed: any): Color[]
+}
+
+const collection = (collection: any[]) => (Math.floor(Math.random() * collection.length));
+
+export class ColorGeneratorService implements ColorGeneratorServiceInterface {
+    getTetrad(color: Color, spin: number = 0): Color[] {
+        return tinycolor(color.spin(spin)).tetrad();
+    }
+
+    getSplitComponent(color: Color, spin: number = 0): Color[] {
+        return tinycolor(color.spin(spin)).splitcomplement()
+    }
+
+    getTriad(color: Color, spin: number = 0): Color[] {
+        return tinycolor(color.spin(spin)).triad()
+    }
+
+    getDefaultTetrad(startingIndex: number = collection(DefaultTetrad), seed?: any): Color[] {
+        return tinycolor(DefaultTetrad[startingIndex % DefaultTetrad.length]).tetrad();
+    }
+
+    getDefaultSplitComponent(startingIndex: number = collection(DefaultSplitComplement), seed?: any): Color[] {
+        return tinycolor(DefaultSplitComplement[startingIndex % DefaultSplitComplement.length]).splitcomplement()
+    }
+
+    getDefaultTriad(startingIndex: number = collection(DefaultTetrad), seed?: any): Color[] {
+        return tinycolor(DefaultTriad[startingIndex % DefaultTriad.length]).triad()
+    }
 }
 
 export type ColorSelection = {
@@ -92,12 +125,75 @@ const ArrayReferenceEquals = <T> (array1: T[], array2: T[]) => {
     return !array1.find(el => !array2.includes(el))
 }
 
-export const ForThoustPanel = (document: Document, panel: HtmlElement, selectorHierarchyService: SelectorHierarchyServiceInterface): HtmlSelection => {
+export const enum SizeProperties {
+    OTHER = 0,
+    HEIGHT = 1,
+    WIDTH = 2
+}
+const _parent = (n: HtmlElement): HtmlElement | undefined => (n.parentNode as unknown as HtmlElement);
+/**
+ * returns all given sizes in [px], requires the html element to pop up the stack to figure out font sizes
+ * @param element [HtmlElement]
+ * @param size [string] "#px" | "#rem" | "#em"
+ * @param property [SizeProperty]
+ */
+const calcSize = (element: HtmlElement | undefined, size: string, property: SizeProperties = SizeProperties.OTHER, fontSizeRemDefaultAccessor = getDefaultFontSizeREM): number => {
+    if (!element) return 0;
+
+    switch (property) {
+        case SizeProperties.HEIGHT:
+            return element.clientHeight;
+        case SizeProperties.WIDTH:
+            return element.clientHeight;
+        default:
+            if (!size || size.trim() === "") return 0;
+            const { size: sizeValue, sizeType } = getSizeValuesRegex(size)
+
+            if (size === "0" || !sizeType || sizeType.trim() === "") return 0;
+
+            // for rem, we reference document.querySelector("html").style.fontSize
+            const remSize = Number(getSizeValuesRegex(fontSizeRemDefaultAccessor()).size)
+            const emSize: number = calcSize(_parent(element), _parent(element)?.style.fontSize || (remSize + "px"))
+
+            switch (sizeType.toLowerCase()) {
+                case "px":
+                    return Number(sizeValue);
+                case "rem":
+                    return Number(sizeValue) * remSize
+                case "em":
+                    return Number(sizeValue) * emSize
+                default:
+                    console.log(" unknown size type: " + sizeType + " returning bare, as pixels: " + sizeValue)
+                    return Number(sizeValue)
+            }
+    }
+}
+
+const calcLeft = (n: HtmlElement): number => calcSize(n, n.style.left) + calcSize(n, n.style.marginLeft) + (calcSize(_parent(n), _parent(n)?.style.paddingLeft || "0") || 0) + (_parent(n) ? calcLeft(_parent(n)!!) : 0);
+const calcRight = (n: HtmlElement): number => calcSize(n, n.style.left) + calcSize(n, n.style.marginLeft) + (calcSize(_parent(n), _parent(n)?.style.paddingLeft || "0")) + (_parent(n) ? calcLeft(_parent(n)!!) : 0) + calcSize(n, n.style.width, SizeProperties.WIDTH) + calcSize(n, n.style.marginRight);
+const calcTop = (n: HtmlElement): number => calcSize(n, n.style.top) + calcSize(n, n.style.marginTop) + calcSize(_parent(n),_parent(n)?.style.paddingTop || "0") + (_parent(n) ? calcTop(_parent(n)!!) : 0);
+const calcBottom = (n: HtmlElement): number => calcSize(n, n.style.top) + calcSize(n, n.style.marginTop) + calcSize(_parent(n), _parent(n)?.style.paddingTop || "0") + (_parent(n) ? calcTop(_parent(n)!!) : 0) + calcSize(n, n.style.height);
+
+export const SizeFunctions = {
+    calcSize,
+    calcLeft,
+    calcRight,
+    calcTop,
+    calcBottom
+}
+
+export const ForThoustPanel = (
+    document: Document,
+    selector: string,
+    selectorHierarchyService: SelectorHierarchyServiceInterface,
+    existingSelection?: HtmlSelection
+): HtmlSelection => {
     // figure out change of basis for screen pixels if necessary etc
 
-    const colors = [...panel.children];
-
-    const selectedHtmlElements = [...selection.keys()].flatMap(selector => selector.elem);
+    // todo: figure out where we're going here, do we want one panel specified or each panel showing?
+    const selectedHtmlElements = existingSelection !== undefined ?
+        [...existingSelection.htmlSelectors.keys()].flatMap(k => k.elem) :
+        [...(selector.trim() === "" ? document.querySelectorAll(SelectorsDefaultFactory().join(",")) : document.querySelectorAll(selector))];
     const nonSelectedHtmlElements = [...document.querySelectorAll("*")].filter(el => selectedHtmlElements.includes(el));
 
     function getNeighborIslands(elements: HtmlElement[], initialSelector: string[] = SelectorsDefaultFactory()): Map<Selector, HtmlElement[]> {
@@ -105,24 +201,23 @@ export const ForThoustPanel = (document: Document, panel: HtmlElement, selectorH
 
         // for each element, add an entry to the class map
         const classMap = elements.reduce<Map<string, HtmlElement[]>>((map: Map<string, HtmlElement[]>, el: HtmlElement) => {
-                            el.classList.filter(className => initialSelector.includes(className))
+                            [...el.classList].filter(className => initialSelector.includes(className))
                                         .forEach(className => map.set(className, map.get(className) || []))
                             return map;
                         }, new Map<string, HtmlElement[]>())
 
         const getPathSelector = (el: HtmlElement | undefined): string => {
             if (el === undefined) return ""
-            const parentNode: HtmlElement | undefined = el.parent
-            return (parentNode ? getPathSelector(parentNode) + " > " : "") + el.classList.join(",") // ternary for tail recursion
+            const parentNode: HtmlElement | undefined = el.parentNode as HtmlElement
+            return (parentNode ? getPathSelector(parentNode) + " > " : "") + Array.prototype.join.call(el.classList, ",") // ternary for tail recursion
         }
-
 
         // for each class find neighbors, and make islands
         const isNeighbor = (el: HtmlElement, possibleNeighbor: HtmlElement) => {
-            const elParent = getPathSelector(el.parent)
-            const neighborParent = getPathSelector(possibleNeighbor.parent)
+            const elParent = getPathSelector(el.parentNode as HtmlElement)
+            const neighborParent = getPathSelector(possibleNeighbor.parentNode as HtmlElement)
             return (
-                el.parent === possibleNeighbor || // sibling
+                el.parentNode === possibleNeighbor || // sibling
                 neighborParent === elParent || // parent
                 getPathSelector(possibleNeighbor).includes(getPathSelector(el)) // descendant
             )
@@ -156,10 +251,6 @@ export const ForThoustPanel = (document: Document, panel: HtmlElement, selectorH
         // there is no absolute position, so each element is dependent on parent left, and siblings + wrap
         // this being said, most text is contained in article like columns, so it may be a non issue
         //  additionally the sibling position on
-        const calcLeft = (n: HtmlElement): number => n.left + n.margin_left + (n.parent?.padding_left || 0) + (n.parent ? calcLeft(n.parent) : 0);
-        const calcRight = (n: HtmlElement): number => n.left + n.margin_left + (n.parent?.padding_left || 0) + (n.parent ? calcLeft(n.parent) : 0) + n.width + n.margin_right;
-        const calcTop = (n: HtmlElement): number => n.top + n.margin_top + (n.parent?.padding_top || 0) + (n.parent ? calcTop(n.parent) : 0);
-        const calcBottom = (n: HtmlElement): number => n.top + n.margin_top + (n.parent?.padding_top || 0) + (n.parent ? calcTop(n.parent) : 0) + n.height;
 
         const MIN_ISLAND_AREA = (20 * 20);
         // then merge islands with shared HtmlElement[] collections into Selectors
@@ -192,7 +283,7 @@ export const ForThoustPanel = (document: Document, panel: HtmlElement, selectorH
         return neighborMap;
     }
 
-    const neighborIslands = getNeighborIslands([...nonSelectedHtmlElements, ...selectedHtmlElements]);
+    const neighborIslands = getNeighborIslands([...nonSelectedHtmlElements, ...selectedHtmlElements] as HtmlElement[]);
 
     const someDafadilTypeShiz = "#eea"
 
@@ -202,9 +293,9 @@ export const ForThoustPanel = (document: Document, panel: HtmlElement, selectorH
 
     // maybe redesign with a color selector
     const selection = selectorHierarchyService.assignColorSelectionsForSelector(
-            [...neighborIslands.keys()], (selector, i): ColorSelection => {
-                // todo: ring buffer of cool starting colors
-                const colors = selector.length / 3 ?
+        [...neighborIslands.keys()],
+        (selector, i): ColorSelection => {
+                const colors = selector.elem.length / 3 ?
                     tinycolor(someDafadilTypeShiz).triad() : tinycolor(someDafadilTypeShiz).tetrad();
 
                 return {
@@ -215,7 +306,7 @@ export const ForThoustPanel = (document: Document, panel: HtmlElement, selectorH
 
     return {
         htmlSelectors: selection
-    }
+    } as unknown as HtmlSelection
 }
 
 export interface SelectorHierarchyServiceInterface {
@@ -223,10 +314,28 @@ export interface SelectorHierarchyServiceInterface {
      * You need 3 selection (3!!) and this will return a HtmlSelection with a triad selected for the colors and a generator for extras
      * @param selector
      */
-    getTriadForSelector(selector: Selector[], selectorsGenerator: { (selector: Selector): ColorSelection }): HtmlSelection
+    defaultSelectorGenerator(selector: Selector, startingIndex: number): ColorSelection
     getDimmedPanelSelectors(htmlHierarchy: HtmlElement[], selectedElements: HtmlElement[]): HtmlSelection
-    assignColorSelectionsForSelector(selectors: Selector[], selectorColorGenerator: { (selector: Selector): ColorSelection }): HtmlSelection
+    assignColorSelectionsForSelector(selectors: Selector[], selectorColorGenerator: { (selector: Selector, i: number): ColorSelection }): HtmlSelection
 }
+
+export const DefaultTetrad = [
+    tinycolor("#09488F"),
+    tinycolor("#410B95"),
+    tinycolor("#DBC400"),
+    tinycolor("#DB8500")
+]
+
+export const DefaultTriad = [
+    tinycolor("#005AE9"),
+    tinycolor("#FFCD00"),
+    tinycolor("#FF6700")
+]
+
+export const DefaultSplitComplement = [
+    tinycolor("#FFCD00"),
+    tinycolor("#2700EB")
+]
 
 export class SelectorHierarchyService implements SelectorHierarchyServiceInterface {
     colorService: ColorGeneratorServiceInterface;
@@ -242,16 +351,32 @@ export class SelectorHierarchyService implements SelectorHierarchyServiceInterfa
         }
     }
 
-    assignColorSelectionsForSelector(selector: Selector[], selectorsGenerator: { (selector: Selector): ColorSelection }): HtmlSelection {
+    assignColorSelectionsForSelector(
+        selector: Selector[],
+        selectorsGenerator: { (selector: Selector, i: number): ColorSelection } = this.defaultSelectorGenerator
+    ): HtmlSelection {
         const selectorsMap = new Map<Selector, ColorSelection>();
 
-        selector.forEach(selector => {
-            return selectorsMap.set(selector, selectorsGenerator(selector))
+        selector.forEach((selector, i) => {
+            return selectorsMap.set(selector, selectorsGenerator(selector, i))
         })
 
         return {
             htmlSelectors: selectorsMap
         }
+    }
+
+    defaultSelectorGenerator(selector: Selector, i: number):  ColorSelection {
+        const colors = selector.elem.length % 3 == 0 ?
+            tinycolor(DefaultTriad[i % DefaultTriad.length]).triad() :
+            (selector.elem.length <= 2 ?
+                tinycolor(DefaultSplitComplement[i % DefaultSplitComplement.length]).splitcomplement() :
+                tinycolor(DefaultTetrad[i % DefaultTetrad.length]).tetrad());
+
+        return {
+            selector,
+            color: colors[i % colors.length]
+        };
     }
 
 }

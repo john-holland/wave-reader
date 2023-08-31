@@ -9,6 +9,7 @@ import {
 import styled from "styled-components";
 import {flatMap, map} from "rxjs";
 import tinycolor from "tinycolor2"
+import SettingsService from "../services/settings";
 
 /**
  * we may need to use 4 enclosing panels, reused
@@ -72,19 +73,20 @@ const Panel = styled.div`
 `
 
 export type HierarchySelectorComponentProps = {
-    selectedHtmlElement: HtmlElement,
-    htmlHierarchyRoot: HtmlElement[],
-    selectorHierarchyService: SelectorHierarchyServiceInterface
+    selectorHierarchyService: SelectorHierarchyServiceInterface,
+    currentSelector: string,
+    onConfirmSelector: { (selector: string): void }
 }
 
 const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentProps> = ({
-    selectedHtmlElement,
-    htmlHierarchyRoot,
-    selectorHierarchyService = new SelectorHierarchyService({ } as unknown as ColorGeneratorServiceInterface)
+    selectorHierarchyService = new SelectorHierarchyService({ } as unknown as ColorGeneratorServiceInterface),
+    currentSelector,
+    onConfirmSelector
 }) => {
-    const [activeSelectorPanel, setActiveSelectorPanel] = useState(selectedHtmlElement);
+    const [activeSelectorPanel, setActiveSelectorPanel] = useState(undefined);
+    const [selector, setSelector] = useState(currentSelector);
     const [activeSelectorColorPanels, setActiveSelectorColorPanels] = useState<ColorSelectorPanel[]>([])
-    const [htmlHierarchy, setHtmlHierarchyRoot] = useState(htmlHierarchyRoot);
+    const [htmlHierarchy, setHtmlHierarchyRoot] = useState(document);
     const [dimmedPanels, setDimmedPanels] = useState([])
     // ;const [brambles] = useWilliamTate();
     const [someDafadilTypeShiz] = ['#eea']
@@ -95,13 +97,14 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
         color: Hex; //color.toHexString() from tinycolor.Instance;
     }
     useEffect(() => {
-
-        const selection = ForThoustPanel(document, activeSelectorPanel, selectorHierarchyService);
-        const activePanels = [...selection.htmlSelectors.values()].flatMap(s => {
-            return { element: s.selector.elem, color: s.color.toHexString() } as unknown as ColorSelectorPanel;
+        new SettingsService().getCurrentSettings().then(settings => {
+            const selection = ForThoustPanel(document, settings.wave.selector, selectorHierarchyService);
+            const activePanels = [...selection.htmlSelectors.values()].flatMap(s => {
+                return { element: s.selector.elem, color: s.color.toHexString() } as unknown as ColorSelectorPanel;
+            })
+            setDimmedPanels(selectorHierarchyService.getDimmedPanelSelectors(htmlHierarchy, activePanels.map(s => s.element)).htmlSelectors.values().flatMap(c => c));
+            setActiveSelectorColorPanels(activePanels)
         })
-        setDimmedPanels(selectorHierarchyService.getDimmedPanelSelectors(htmlHierarchy, activePanels.map(s => s.element)).htmlSelectors.values().flatMap(c => c));
-        setActiveSelectorColorPanels(activePanels)
     }, [])
 
     return (
