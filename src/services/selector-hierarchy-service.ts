@@ -61,7 +61,7 @@ export interface ColorGeneratorServiceInterface {
     getDefaultTetrad(startingIndex: number, seed: any): Color[]
 }
 
-const collection = (collection: any[]) => (Math.floor(Math.random() * collection.length));
+const randomCollectionIndex = (collection: any[]) => (Math.floor(Math.random() * collection.length));
 
 export class ColorGeneratorService implements ColorGeneratorServiceInterface {
     getTetrad(color: Color, spin: number = 0): Color[] {
@@ -76,15 +76,15 @@ export class ColorGeneratorService implements ColorGeneratorServiceInterface {
         return tinycolor(color.spin(spin)).triad()
     }
 
-    getDefaultTetrad(startingIndex: number = collection(DefaultTetrad), seed?: any): Color[] {
+    getDefaultTetrad(startingIndex: number = randomCollectionIndex(DefaultTetrad), seed?: any): Color[] {
         return tinycolor(DefaultTetrad[startingIndex % DefaultTetrad.length]).tetrad();
     }
 
-    getDefaultSplitComponent(startingIndex: number = collection(DefaultSplitComplement), seed?: any): Color[] {
+    getDefaultSplitComponent(startingIndex: number = randomCollectionIndex(DefaultSplitComplement), seed?: any): Color[] {
         return tinycolor(DefaultSplitComplement[startingIndex % DefaultSplitComplement.length]).splitcomplement()
     }
 
-    getDefaultTriad(startingIndex: number = collection(DefaultTetrad), seed?: any): Color[] {
+    getDefaultTriad(startingIndex: number = randomCollectionIndex(DefaultTetrad), seed?: any): Color[] {
         return tinycolor(DefaultTriad[startingIndex % DefaultTriad.length]).triad()
     }
 }

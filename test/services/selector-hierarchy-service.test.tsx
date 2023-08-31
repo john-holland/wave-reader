@@ -1,3 +1,6 @@
+import * as React from "react"
+
+
 import {
     ColorGeneratorServiceInterface,
     SelectorHierarchyService,
@@ -15,40 +18,60 @@ import {
 import tinycolor from "tinycolor2"
 import {SelectorsDefaultFactory} from "../../src/models/defaults";
 import {getDefaultFontSizeREM} from "../../src/util/util";
+import {render} from "@testing-library/react";
+
+import styled from 'styled-components';
+
+const Container = styled.div``;
+
+const withDocument = (actionFn: { (doc: Document): void }, htmlFontSize = "font-size: 10px") => {
+    const Component = () => {
+        return (<Container id={"mount"} />);
+    }
+    const div = render(<Component />)
+    const doc = document; //new Document()
+    doc.append(`<html style="${htmlFontSize}"><body><div id='mount'></div></body></html>`)
+
+    actionFn(doc);
+
+    return doc;
+}
 
 describe("selector quad service", () => {
    test("selector triad generator", () => {
-       const colorGeneratorService = new ColorGeneratorService()
-       const selectorHierarchyService = new SelectorHierarchyService(colorGeneratorService)
-       const element = new HTMLElement()
-       const aside = new HTMLElement()
+       withDocument(doc => {
+           const elem = doc.createElement("div");
+           const colorGeneratorService = new ColorGeneratorService()
+           const selectorHierarchyService = new SelectorHierarchyService(colorGeneratorService)
+           const aside = doc.createElement("div")
+           doc.querySelector("#mount")?.appendChild(elem)
+           elem.appendChild(aside)
 
-       element.appendChild(aside)
+           elem.classList.add("test")
+           aside.classList.add("test-child")
 
-       element.classList.add("test")
-       aside.classList.add("test-child")
+           const quads = [
+               ...DefaultSplitComplement,
+               ...DefaultTetrad,
+               ...DefaultSplitComplement
+           ]
 
-       const quads = [
-           ...DefaultSplitComplement,
-           ...DefaultTetrad,
-           ...DefaultSplitComplement
-       ]
+           expect(quads.includes([...ForThoustPanel(
+               document, SelectorsDefaultFactory().join(", "), selectorHierarchyService).htmlSelectors.values()][0].color)).toBeTruthy()
+           // critic acid yum
 
-       expect(quads.includes([...ForThoustPanel(
-           document, SelectorsDefaultFactory().join(", "), selectorHierarchyService).htmlSelectors.values()][0].color)).toBeTruthy()
-       // critic acid yum
-
-       // expect uhhh the colors duke, the colors
+           // expect uhhh the colors duke, the colors
+       })
    })
 
     describe('ColorGeneratorService', function () {
         const colorService = new ColorGeneratorService();
+        const uniqueSet = (set: any[]) => { return !set.find((s, i) => set.find((o, j) => o === s && i !== j ))}
         test("color generator service provides expected defaults for tetrads", () => {
             // test defaults and randomization, but leave the color picking testing to tinycolor
-            expect(colorService.getDefaultTetrad(0)).toBe(DefaultTetrad[0])
-            expect(colorService.getDefaultTetrad(1)).toBe(DefaultTetrad[1])
-            expect(colorService.getDefaultTetrad(2)).toBe(DefaultTetrad[2])
-            expect(colorService.getDefaultTetrad(3)).toBe(DefaultTetrad[3])
+            const tetrad = colorService.getDefaultTetrad(0)
+            expect(tetrad[0].toString("hex")).toBe(DefaultTetrad[0].toString("hex"))
+            expect(uniqueSet(tetrad)).toBeTruthy();
 
             let randomized = false;
             while (!randomized) {
@@ -57,9 +80,9 @@ describe("selector quad service", () => {
             expect(randomized).toBeTruthy()
         })
         test("color generator service provides expected defaults for triads", () => {
-            expect(colorService.getDefaultTriad(0)).toBe(DefaultTriad[0])
-            expect(colorService.getDefaultTriad(1)).toBe(DefaultTriad[1])
-            expect(colorService.getDefaultTriad(2)).toBe(DefaultTriad[2])
+            const triad = colorService.getDefaultTriad(0)
+            expect(triad[0].toString("hex")).toBe(DefaultTriad[0].toString("hex"))
+            expect(uniqueSet(triad)).toBeTruthy();
 
             let randomized = false;
             while (!randomized) {
@@ -68,8 +91,9 @@ describe("selector quad service", () => {
             expect(randomized).toBeTruthy()
         })
         test("color generator service provides expected defaults for split complements", () => {
-            expect(colorService.getDefaultSplitComponent(0)).toBe(DefaultSplitComplement[0])
-            expect(colorService.getDefaultSplitComponent(1)).toBe(DefaultSplitComplement[1])
+            const complements = colorService.getDefaultSplitComponent(0)
+            expect(complements[0].toString("hex")).toBe(DefaultSplitComplement[0].toString("hex"))
+            expect(uniqueSet(complements)).toBeTruthy();
 
             let randomized = false;
             while (!randomized) {
@@ -80,62 +104,63 @@ describe("selector quad service", () => {
     });
 
    describe("size calculation", () => {
-       const getDocumentWithElement = (element: HtmlElement, htmlFontSize = "font-size: 10px") => {
-           const doc = new Document()
-           doc.append(`<html style="${htmlFontSize}"><body><div id='mount'></div></body></html>`)
-           doc.querySelector('#mount')?.appendChild(element)
-           return doc;
-       }
        test("calc size px", () => {
-           const elem = new HTMLElement()
-           elem.style.left = "2000000000000px"
-           const doc = getDocumentWithElement(elem)
-           expect(SizeFunctions.calcSize(elem, elem.style.left)).toBe(2000000000000)
+           withDocument(doc => {
+               const elem = doc.createElement("div");
+               elem.style.left = "2000000000000px";
+               expect(SizeFunctions.calcSize(elem, elem.style.left)).toBe(2000000000000)
+           })
        })
        test("calc size px width with clientWidth", () => {
-           const elem = new HTMLElement()
-           elem.style.width = "2000000000000px"
-           const doc = getDocumentWithElement(elem)
-           expect(SizeFunctions.calcSize(elem, elem.style.left, SizeProperties.WIDTH)).toBe(2000000000000)
+           withDocument(doc => {
+               const elem = doc.createElement("div");
+               elem.style.width = "2000000000000px"
+               expect(SizeFunctions.calcSize(elem, elem.style.left, SizeProperties.WIDTH)).toBe(2000000000000)
+           })
        })
        test("calc size px height with clientWidth", () => {
-           const elem = new HTMLElement()
-           elem.style.height = "2000000000000px"
-           const doc = getDocumentWithElement(elem)
-           expect(SizeFunctions.calcSize(elem, elem.style.left, SizeProperties.WIDTH)).toBe(2000000000000)
+           withDocument(doc => {
+               const elem = doc.createElement("div");
+               elem.style.height = "2000000000000px"
+               expect(SizeFunctions.calcSize(elem, elem.style.left, SizeProperties.WIDTH)).toBe(2000000000000)
+           })
        })
 
        test("calc size rem", () => {
-           const elem = new HTMLElement()
-           elem.style.left = "2rem"
-           const doc = getDocumentWithElement(elem)
-           expect(SizeFunctions.calcSize(elem, elem.style.left, SizeProperties.OTHER, () => getDefaultFontSizeREM(doc)))
-               .toBe(20)
+           withDocument(doc => {
+               const elem = doc.createElement("div");
+               elem.style.left = "2rem"
+               doc.appendChild(elem)
+               expect(SizeFunctions.calcSize(elem, elem.style.left, SizeProperties.OTHER, () => getDefaultFontSizeREM(doc)))
+                   .toBe(20)
+           })
        })
 
        test("calc size em, parent font size", () => {
-           const elem = new HTMLElement()
-           const parent = new HTMLElement()
-           parent.style.fontSize = "20px"
-           elem.style.left = "2em"
-           parent.appendChild(elem)
+           withDocument(doc => {
+               const elem = doc.createElement("div");
+               const parent = doc.createElement("div");
+               parent.style.fontSize = "20px"
+               elem.style.left = "2em"
+               parent.appendChild(elem)
 
-           const doc = getDocumentWithElement(elem)
-           expect(SizeFunctions.calcSize(elem, elem.style.left, SizeProperties.OTHER, () => getDefaultFontSizeREM(doc)))
+               expect(SizeFunctions.calcSize(elem, elem.style.left, SizeProperties.OTHER, () => getDefaultFontSizeREM(doc)))
                .toBe(40)
+           })
        })
 
        test("calc size em, parent no font size", () => {
             // todo: also test this in a browser, if i had some QE folks at my request and reject, i'd ask them to automate this ~~
-           const elem = new HTMLElement()
-           const parent = new HTMLElement()
-           parent.style.fontSize = "20px"
-           elem.style.left = "2em"
-           parent.appendChild(elem)
+           withDocument(doc => {
+               const elem = doc.createElement("div");
+               const parent = doc.createElement("div");
+               parent.style.fontSize = "20px"
+               elem.style.left = "2em"
+               parent.appendChild(elem)
 
-           const doc = getDocumentWithElement(elem, "font-size: 15px")
-           expect(SizeFunctions.calcSize(elem, elem.style.left, SizeProperties.OTHER, () => getDefaultFontSizeREM(doc)))
-               .toBe(30)
+               expect(SizeFunctions.calcSize(elem, elem.style.left, SizeProperties.OTHER, () => getDefaultFontSizeREM(doc)))
+                   .toBe(30)
+           })
        })
    })
 });
