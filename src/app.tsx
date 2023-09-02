@@ -24,6 +24,7 @@ import StateMachine from "./util/state-machine";
 
 import SettingsService from "./services/settings";
 import SelectorService from "./services/selector";
+import {Observer} from "rxjs";
 
 //todo:
 // * Material UI
@@ -124,7 +125,8 @@ type AppStatesProps = {
     setOptions: { (options: Options): void },
     bootstrapCondition: { (going: boolean): void },
     onRunTimeInstalledListener: { (details: InstalledDetails): void },
-    onMessageListener: { (message: any): boolean}
+    onMessageListener: { (message: any): boolean},
+    optionsObserver: Observer<Options>
 }
 
 const chromeRunTimeInstalledListener = (callback: {(details: InstalledDetails): void}) => {
@@ -151,11 +153,13 @@ export const AppStates = ({
     setOptions,
     bootstrapCondition,
     onRunTimeInstalledListener = chromeRunTimeInstalledListener,
-    onMessageListener = chromeOnMessageListener
+    onMessageListener = chromeOnMessageListener,
+    optionsObserver
 }: AppStatesProps): NameAccessMapInterface => {
     /* eslint-disable  @typescript-eslint/no-unused-vars */
     const states: StateNames = {
         "base": CState("base", ["base", "bootstrap", "settings updated"], true, () => {
+            return states.get("base")
         }),
         "bootstrap": CState("bootstrap", ["base"], true, async (message, state, previousState) => {
             if (getGoingLocal === undefined) {
@@ -195,59 +199,68 @@ export const AppStates = ({
             LoadSettings().then(setOptions)
             return states.get("base");
         }),
-
-        "settings updated": CState("settings updated", ["base"], true, (message, state, previousState) => {
-            // TODO: i think refactoring deferred options into an observable
+        "settings updated": CState("settings updated", ["base"], true, async (message, state, previousState) => {
             setSelector(message.selector || 'p');
-            options.wave.selector = message.selector;
-            options.wave.update();
-            deferredOptions.waitFor().then((options) => {
-                if (options) {
-                    setSyncObject('options', options);
-                } else {
-                    throw new Error("empty options");
-                }
-            });
-            deferredOptions.update();
-        }),
-        "set wave": CState("set wave", ["???"], false, (message, state, previousState) => {
+            await settingsService.updateCurrentSettings((options) => {
+                options.wave.selector = message.selector;
+                options.wave.update();
+                return options;
+            })
+            return previousState
         }),
         // selector selection mode
         "selection mode activate": CState("selection mode activate", ["selection mode active"], true, (message, state, previousState) => {
+            return states.get("selection mode active")
         }),
         "selection mode active": CState("selection mode active", ["selection made", "selection error report", "settings updated"], false, (message, state, previousState) => {
             //  (disable settings tab)
+            return states.get("selection mode active")
+
+            // return states.get("selection made (enable settings tab)")
         }),
         "selection made (enable settings tab)": CState("selection made (enable settings tab)", ["base"], false, (message, state, previousState) => {
+            return states.get("base")
         }),
         "selection error report (user error, set red selection error note, revert to previous selector)": CState("selection error report (user error, set red selection error note, revert to previous selector)", ["base"], false, (message, state, previousState) => {
+            // todo: maybe this isn't necessary -- it would be neat to have super states so the
+            //   dependent state machines could know when not to be active
+            return states.get("selection mode active")
         }),
         // selectors!
         // add
         "start add selector": CState("start add selector", ["add selector", "cancel add selector"], false, (message, state, previousState) => {
             // TODO: need a selector choose drop down component
+            return states.get("add selector")
         }),
         "add selector": CState("add selector", ["base"], false, (message, state, previousState) => {
                 // selectorUpdated(message)
+            return states.get("base")
         }),
         "cancel add selector": CState("cancel add selector", ["base"], false, (message, state, previousState) => {
+            return states.get("base")
         }),
         // remove
         "remove selector": CState("remove selector", ["confirm remove selector", "cancel remove selector"], false, (message, state, previousState) => {
+            return states.get("confirm remove selector")
         }),
         "confirm remove selector": CState("confirm remove selector", ["base"], false, (message, state, previousState) => {
+            return states.get("base")
         }),
         "cancel remove selector": CState("cancel remove selector", ["base"], false, (message, state, previousState) => {
-        }),
+            return states.get("base")}),
         // use
         "use selector": CState("use selector", ["base"], false, (message, state, previousState) => {
+            return states.get("base")
         }),
         // ~~ waves ~~
         "start waving": CState("start waving", ["base"], true, (message, state, previousState) => {
+            return states.get("waving")
         }),
         "waving": CState("start waving", ["stop wave", "settings updated"], false, (message, state, previousState) => {
+            return states.get("waving")
         }),
         "stop waving": CState("stop waving", ["base"], false, (message, state, previousState) => {
+            return states.get("base")
         }),
     };
 
