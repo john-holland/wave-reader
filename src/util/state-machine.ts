@@ -1,50 +1,6 @@
 import {State, NameAccessMapInterface, Named} from "./state"
 // import {BaseVentures} from "./venture-states";
 
-/**
- * hierarchical state machine with message bubbling
- *
- * each component requires a props bundle and a state machine
- *
- * any call up the chain from a sub-state machine must fulfill both
- *
- * A(B) -> a(B, b)
- *
- * app starts -> loads settings, user switches tabs, sets settings
- *
- * [bootstrap] -> [base]
- * [*] -> [settings updated] -> [*]
- * [switch tabs] -> [settings open] {
- *     [base] // data down
- *     [*] -> [settings changed] -> [unsaved]
- *     [unsaved] -> [save] / [revert] / [discard]
- *     [save] (onSettingsSaved) -> [base] // causes app state machine to switch and close
- *     [close]
- * } -> [settings updated] -> [base]
- * [start choose selector mode] -> [selector mode active] (message to content, start selector choose mode) {
- *   // from content.js
- *     [base] // data down
- *     [set selector] -> [unsaved] // user changes the text box
- *     [*] -> [add island selection] -> [unsaved]
- *     [*] -> [remove island selection] -> [unsaved]
- *     [unsaved] -> [save selector]
- *     [save selector] (onSelectorSaved) -> [close]
- *     [revert selector] -> [base]
- * } -> [selector updated] -> [base]
- * [selector updated] -> [base]
- *
- */
-
-interface StateMachineInterface {
-    
-}
-type StateMachineProps = {
-    superMachine: StateMachineInterface,
-    subMachines: StateMachineInterface[],
-    initialState: State,
-    errorState: { (e: any): State }
-    errors: any[]
-}
 
 class StateMachine {
     initialized: boolean = false;
