@@ -1,4 +1,4 @@
-import SettingsService, {DomainSettings, SettingsRegistry} from "../../src/services/settings";
+import SettingsService, {DomainPaths, DomainSettings, SettingsRegistry} from "../../src/services/settings";
 import SelectorService from "../../src/services/selector";
 import Options from "../../src/models/options"
 import { Tab } from "../../src/util/util";
@@ -201,6 +201,30 @@ describe("selector service", () => {
 
             await settingsService.removeSettingsForDomain("www.fart.com")
             expect(await settingsService.getSettingsRegistryForDomain("www.fart.com", false)).toBeUndefined()
+            done();
+        })
+    })
+
+    test("get domains and paths", (done: DoneCallback) => {
+        withMockSettingsService(async (settingsService: SettingsService, accessRegistry) => {
+            const fartmap = new Map<string, Options>()
+            fartmap.set("/fart", new Options({
+                selectors: ["successful", "test"]
+            }));
+            accessRegistry()["www.fart.com"] = new DomainSettings("www.fart.com", fartmap)
+            const borkmap = new Map<string, Options>()
+            borkmap.set("/BACON", new Options({
+                selectors: ["bacon", "BACON", "BAAAAAAAAACOOON", "BBAAAA... *runs into the distance, barrels into the room skidding* ... COOOONNNN "]
+            }));
+            accessRegistry()["www.bork.com"] = new DomainSettings("www.bork.com", borkmap)
+            expect((await settingsService.getCurrentSettings()).selectors.join(" ")).toBe("successful test");
+            await settingsService.addSettingsForDomain("www.bork.com", "/pizza", new Options({
+                selectors: ["thefty", "biggons", "chompers"]
+            }))
+            const domainsAndPaths = await settingsService.getDomainsAndPaths()
+            expect(domainsAndPaths.find((dp: DomainPaths) => dp.domain === "www.fart.com")).toBeTruthy();
+            expect(domainsAndPaths.find((dp: DomainPaths) => dp.paths.includes("/BACON"))).toBeTruthy();
+
             done();
         })
     })

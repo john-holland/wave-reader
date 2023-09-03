@@ -3,7 +3,7 @@ import {
     ColorGeneratorServiceInterface, ColorSelection,
     ForThoustPanel,
     HtmlElement,
-    SelectorHierarchyService,
+    SelectorHierarchy,
     SelectorHierarchyServiceInterface
 } from "../services/selector-hierarchy-service";
 import styled, {StyledComponent} from "styled-components";
@@ -65,7 +65,6 @@ const Cover = styled.svg`
   mouse-events: none;
 `
 
-
 export type HierarchySelectorComponentProps = {
     selectorHierarchyService: SelectorHierarchyServiceInterface,
     currentSelector: string,
@@ -97,7 +96,7 @@ const Panel = styled.div<ColorSelectorPanel>`
 ` as StyledComponent<"div", any, ColorSelectorPanel, never>
 
 const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentProps> = ({
-    selectorHierarchyService = new SelectorHierarchyService({ } as unknown as ColorGeneratorServiceInterface),
+    selectorHierarchyService = new SelectorHierarchy({ } as unknown as ColorGeneratorServiceInterface),
     currentSelector,
     onConfirmSelector
 }) => {

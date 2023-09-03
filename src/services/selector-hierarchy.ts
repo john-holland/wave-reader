@@ -135,13 +135,16 @@ export const enum SizeProperties {
     WIDTH = 2
 }
 const _parent = (n: HtmlElement): HtmlElement | undefined => (n.parentNode as unknown as HtmlElement);
+const getDocumentWidth = (doc: Document) => (doc.querySelector("html")?.clientWidth || 0)
 /**
  * returns all given sizes in [px], requires the html element to pop up the stack to figure out font sizes
  * @param element [HtmlElement]
  * @param size [string] "#px" | "#rem" | "#em"
  * @param property [SizeProperty]
  */
-const calcSize = (element: HtmlElement | undefined, size: string, property: SizeProperties = SizeProperties.OTHER, fontSizeRemDefaultAccessor = getDefaultFontSizeREM): number => {
+const calcSize = (element: HtmlElement | undefined, size: string, property: SizeProperties = SizeProperties.OTHER,
+                  fontSizeRemDefaultAccessor = getDefaultFontSizeREM,
+                  documentWidthAccessor = getDocumentWidth.bind(null, element?.ownerDocument!!)): number => {
     if (!element) return 0;
 
     switch (property) {
@@ -173,6 +176,14 @@ const calcSize = (element: HtmlElement | undefined, size: string, property: Size
                     return Number(sizeValue) * remSize
                 case "em":
                     return Number(sizeValue) * emSize
+                case "%":
+                    const parent = _parent(element);
+                    // todo: may have to factor html padding / body margin for realistic viewport width?
+                    const parentWidth = !parent || parent?.nodeName.toLowerCase() === "body" || parent?.nodeName.toLowerCase() === "html"
+                        ? documentWidthAccessor()
+                        : parent.clientWidth || calcSize(parent, parent?.style.width, SizeProperties.OTHER, fontSizeRemDefaultAccessor)
+
+                    return Math.floor(parentWidth / 100.0 * Number(sizeValue))
                 default:
                     console.log(" unknown size type: " + sizeType + " returning bare, as pixels: " + sizeValue)
                     return Number(sizeValue)
@@ -368,7 +379,7 @@ export const DefaultSplitComplement = [
     tinycolor("#2700EB")
 ]
 
-export class SelectorHierarchyService implements SelectorHierarchyServiceInterface {
+export class SelectorHierarchy implements SelectorHierarchyServiceInterface {
     colorService: ColorGeneratorServiceInterface;
 
     constructor(colorService: ColorGeneratorServiceInterface) {

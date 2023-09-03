@@ -1,9 +1,11 @@
 import { FunctionComponent, useEffect, useState } from "react";
-import Options, {WaveAnimationControl, WaveToggleConfig} from "../models/options";
+import { WaveAnimationControl } from "../models/default";
+import Options, {WaveToggleConfig} from "../models/options";
 import Text from "../models/text";
 
 import {getSyncObject, newSyncObject, setSyncObject} from "../util/sync";
 import {
+    Autocomplete,
     Button,
     ButtonGroup,
     Checkbox,
@@ -18,10 +20,15 @@ import * as React from "react";
 import styled from "styled-components";
 import ScanForInputField from "./scan-for-input-field";
 import {KeyChord} from "./util/user-input";
+import SettingsService, {DomainPaths, SettingsDAOInterface} from "../services/settings";
 
 type SettingsProps = {
     initialSettings: Options;
-    onUpdateSettings: {(): void}
+    onUpdateSettings: {( settings: Options ): void},
+    domain: string,
+    path: string,
+    onDomainPathChange: {(domain: string, path: string): void}
+    settingsService: SettingsDAOInterface
 }
 
 const SettingsStyleContainer = styled.div`
@@ -44,6 +51,13 @@ const SettingsStyleContainer = styled.div`
   }
 `;
 
+type AutocompleteOption = string;
+
+const DomainPathContainer = styled.div`
+  display: flex;
+  flex-flow: row;
+`
+
 const val = (fn: {(v: any): void}) => ((_: any, value: any) => fn(value));
 const eventVal = (fn: {(e: any): void}) =>
     (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => fn(e.target.value);
@@ -51,16 +65,33 @@ const eventVal = (fn: {(e: any): void}) =>
 // This may be a bit cleaner with redux or some other data store
 //  maybe it's worth while to make something like nested('property.prop.value', object)
 /**
- * TODO: this class needs to have an index on url, and maybe a search + copy / paste
+ * TODO: copy for current tab button
  *
- * todo: toggle for settings
+ * todo: toggle for settings ???
  * @param initialSettings the initial settings object, use [Option.getDefaultOptions()] for defaults
  * @param onUpdateSettings evented update callback
+ * @param domain the domain for the given initialSettings
+ * @param path the path for the given initialSettings
+ * @param onDomainPathChange domain change event
+ * @param settingsService self described
  * @constructor
  */
-export const Settings: FunctionComponent<SettingsProps> = ({ initialSettings, onUpdateSettings }: SettingsProps) => {
+export const Settings: FunctionComponent<SettingsProps> = ({
+    initialSettings,
+    onUpdateSettings,
+    domain,
+    path,
+    onDomainPathChange,
+    settingsService = new SettingsService()
+}: SettingsProps) => {
+
     const [settings, setSettings] = useState(new Options(initialSettings));
     const typedSetSettings = (deltaSettings: Partial<Options> = settings) => setSettings(new Options(deltaSettings));
+
+    const [domainPaths, setDomainPaths] = useState<DomainPaths[]>([])
+    const [currentPath, setCurrentPath] = useState(path)
+    const [currentDomain, setCurrentDomain] = useState(domain)
+    const [editingDomain, setEditingDomain] = useState(domain)
 
     const [waveAnimationControl, setWaveAnimationControl] = useState(initialSettings.waveAnimationControl)
     const [textColor, setTextColor] = useState(initialSettings.wave.text.color);
@@ -77,10 +108,8 @@ export const Settings: FunctionComponent<SettingsProps> = ({ initialSettings, on
     const [toggleKeys, setToggleKeys] = useState(initialSettings.toggleKeys)
 
     useEffect(() => {
-        newSyncObject<Options>(Options, "options", Options.getDefaultOptions(), (result: Options) => {
-            typedSetSettings(result);
-        });
-    }, []);
+        settingsService.getDomainsAndPaths().then(setDomainPaths)
+    }, [])
 
     useEffect(() => {
         typedSetSettings({
@@ -102,6 +131,7 @@ export const Settings: FunctionComponent<SettingsProps> = ({ initialSettings, on
                 axisRotationAmountYMin,
             })
         });
+        setEditingDomain(currentDomain)
      }, [
         waveAnimationControl,
         showNotifications,
@@ -145,7 +175,7 @@ export const Settings: FunctionComponent<SettingsProps> = ({ initialSettings, on
             ...deltaSettings});
 
         setSettings(settingsToSave);
-        setSyncObject("options", settingsToSave, onUpdateSettings);
+        onUpdateSettings(settingsToSave);
     }
 
     const onToggleScan = (keyChord: KeyChord) => {
@@ -159,6 +189,20 @@ export const Settings: FunctionComponent<SettingsProps> = ({ initialSettings, on
         setToggleKeys(new WaveToggleConfig({
             keyChord
         }))
+    }
+
+    const onDomainChange = (event: any, newValue: string | null) => {
+        if (newValue && newValue !== currentDomain) {
+            setCurrentDomain(newValue);
+            onDomainPathChange(newValue, currentPath);
+        }
+    }
+
+    const onPathChange = (event: any, newValue: string | null) => {
+        if (newValue && (newValue !== currentPath || (newValue === currentPath && currentDomain != domain))) {
+            setCurrentPath(newValue);
+            onDomainPathChange(currentDomain, newValue);
+        }
     }
 
     // for the css template to work, we need to switch over to replacement templates instead of runtime.
@@ -258,6 +302,29 @@ export const Settings: FunctionComponent<SettingsProps> = ({ initialSettings, on
                         shrink: true,
                     }}
                 />
+
+                <DomainPathContainer>
+                    <Autocomplete
+                        disablePortal
+                        id="domain-settings-dropdown"
+                        value={currentDomain}
+                        onChange={onDomainChange}
+                        options={domainPaths.map(dp => dp.domain)}
+                        sx={{ width: "50%" }}
+                        renderInput={(params) => <TextField {...params} label={currentDomain} />}
+                    />
+
+                    <Autocomplete
+                        disablePortal
+                        id="path-settings-dropdown"
+                        value={currentPath}
+                        onChange={onPathChange}
+                        options={domainPaths.find((dp: DomainPaths) => dp.domain === currentDomain)?.paths as string[]}
+                        sx={{ width: "50%" }}
+                        renderInput={(params) => <TextField {...params} label={currentPath} />}
+                    />
+                </DomainPathContainer>
+
             </FormControl>
             <ButtonGroup variant="text" aria-label="text button group">
                 <Button onClick={() => saveSettings()}>Save Settings</Button>
@@ -267,16 +334,14 @@ export const Settings: FunctionComponent<SettingsProps> = ({ initialSettings, on
     )
 };
 
-export const LoadSettings = () : Promise<Options> => {
-    return new Promise((resolve, reject) => {
+export const LoadSettings = (settingsService: SettingsDAOInterface) : Promise<Options> => {
         try {
-            getSyncObject("options", Options.getDefaultOptions(),
-                (partial: Partial<Options>) => {
-                resolve(new Options(partial))
-                })
+            return settingsService.getCurrentSettings()
         } catch (e) {
             console.error(`cannot load options with exception: ${e}`);
-            reject(new Error(`cannot load options with exception: ${e}`))
+            //throw(new Error(`cannot load options with exception: ${e}`))
+            const defaultSettings = Options.getDefaultOptions()
+            defaultSettings.defaultSettings = true;
+            return Promise.resolve(defaultSettings)
         }
-    });
 }

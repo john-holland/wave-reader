@@ -6,11 +6,11 @@ import {
     DefaultSplitComplement,
     DefaultTetrad,
     DefaultTriad,
-    ForThoustPanel,
-    SelectorHierarchyService,
+    ForThoustPanel, HtmlElement,
+    SelectorHierarchy,
     SizeFunctions,
     SizeProperties
-} from "../../src/services/selector-hierarchy-service";
+} from "../../src/services/selector-hierarchy";
 import {SelectorsDefaultFactory} from "../../src/models/defaults";
 import {getDefaultFontSizeREM} from "../../src/util/util";
 
@@ -44,7 +44,7 @@ describe("selector quad service", () => {
        withDocument((doc, window) => {
            const elem = doc.createElement("p");
            const colorGeneratorService = new ColorGeneratorService()
-           const selectorHierarchyService = new SelectorHierarchyService(colorGeneratorService)
+           const selectorHierarchyService = new SelectorHierarchy(colorGeneratorService)
            const aside = doc.createElement("p")
            doc.querySelector("#mount")?.appendChild(elem)
            elem.appendChild(aside)
@@ -182,6 +182,59 @@ describe("selector quad service", () => {
                expect(SizeFunctions.calcSize(elem, elem.style.left, SizeProperties.OTHER, getDefaultFontSizeREM.bind(null, window)))
                    .toBe(30)
            }, "font-size: 15px")
+       })
+
+       test("calc size %, parent has size", () => {
+           withDocument((doc, window) => {
+               const elem = doc.createElement("div");
+               elem.style.width = "50%"
+
+               const mount = (doc.querySelector("#mount")!! as HtmlElement)
+               mount.style.width = "800px"
+               mount.appendChild(elem)
+
+               expect(SizeFunctions.calcSize(elem, elem.style.width, SizeProperties.OTHER,
+                   getDefaultFontSizeREM.bind(null, window), () => 800)).toBe(400)
+               // jsdom fails setting this with define property as recommended several places, but at least it differs significantly
+               // todo: make sure these are useful, and if not, provide a clientWidth || calcSize(..., SizeProperties.OTHER, ...)
+           })
+       })
+
+       test("calc size %, parent has size", () => {
+           withDocument((doc, window) => {
+               const elem = doc.createElement("div");
+               elem.style.width = "50%" // 400
+               const elem2 = doc.createElement("div");
+               elem2.style.width = "50%" // 200
+               const elem3 = doc.createElement("div");
+               elem3.style.width = "50%" // 100
+
+               const mount = (doc.querySelector("#mount")!! as HtmlElement)
+               mount.style.width = "800px"
+
+               mount.appendChild(elem)
+               elem.appendChild(elem2)
+               elem2.appendChild(elem3)
+
+               expect(SizeFunctions.calcSize(elem3, elem.style.width, SizeProperties.OTHER,
+                   getDefaultFontSizeREM.bind(null, window), () => 800)).toBe(100) // cube roots!
+               // jsdom fails setting this with define property as recommended several places, but at least it differs significantly
+               // todo: make sure these are useful, and if not, provide a clientWidth || calcSize(..., SizeProperties.OTHER, ...)
+           })
+       })
+
+       test("calc size %, parent is document", () => {
+           withDocument((doc, window) => {
+               const elem = doc.createElement("div");
+               elem.style.width = "50%"
+
+               doc.querySelector("body")?.appendChild(elem);
+
+               expect(SizeFunctions.calcSize(elem, elem.style.width, SizeProperties.OTHER,
+                   getDefaultFontSizeREM.bind(null, window), () => 1024)).toBe(512)
+               // jsdom fails setting this with define property as recommended several places, but at least it differs significantly
+               // todo: make sure these are useful, and if not, provide a clientWidth || calcSize(..., SizeProperties.OTHER, ...)
+           }, "font-size: 10px; width: 1024")
        })
    })
 });

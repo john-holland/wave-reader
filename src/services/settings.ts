@@ -31,6 +31,19 @@ export class DomainSettings {
         this.domain = domain;
         this.pathSettings = pathSettings;
     }
+
+    getDomainPaths() {
+        return new DomainPaths(this.domain, [...this.pathSettings.keys()])
+    }
+}
+
+export class DomainPaths {
+    public paths: string[];
+    public domain: string;
+    constructor(domain: string, paths: string[]) {
+        this.domain = domain;
+        this.paths = paths;
+    }
 }
 
 /**
@@ -53,6 +66,7 @@ export interface SettingsDAOInterface {
     copySettingsFromDomain(from: DomainSettings, fromPath: string, domain: string, path: string, acceptExisting: boolean): Promise<void>;
     removeSettingsForDomain(domain: string): Promise<boolean>;
     removeSettingsForDomain(domain: string, path: string): Promise<boolean>;
+    getDomainsAndPaths(): Promise<DomainPaths[]>;
 }
 
 const getSettingsRegistry = (callback: {(settingsRegistry: SettingsRegistry): void}) => {
@@ -76,7 +90,6 @@ export default class SettingsService implements SettingsDAOInterface {
     private settingsRegistryProvider: (callback: { (settingsRegistry: SettingsRegistry): void }) => void;
     private tabUrlProvider: () => Promise<string>;
     private saveSettingsRegistryProvider: (settingsRegistry: SettingsRegistry, callback?: { (): void }) => void;
-
     constructor(settingsRegistryProvider = getSettingsRegistry, tabUrlProvider = tabUrl,
                 saveSettingsRegistryProvider = saveSettingsRegistry) {
         this.settingsRegistryProvider = settingsRegistryProvider;
@@ -86,7 +99,9 @@ export default class SettingsService implements SettingsDAOInterface {
 
     async addSettingsForDomain(domain: string, path: string, settings: Options): Promise<void> {
         return new Promise(async (resolve, reject) => {
-           const registry: SettingsRegistry = await this.getSettingsRegistryForDomain(domain, true) as unknown as SettingsRegistry;
+           const registry: SettingsRegistry = await this.getSettingsRegistryForDomain(domain, true)
+               .catch(reject) as unknown as SettingsRegistry;
+
            registry[domain]?.pathSettings?.set(path, settings);
            resolve();
         })
@@ -163,6 +178,17 @@ export default class SettingsService implements SettingsDAOInterface {
                 resolve(settingsRegistry)
             })
         });
+    }
+
+    /**
+     * Retrieves the domains and domain specific paths for which we have saved unique settings
+     */
+    async getDomainsAndPaths(): Promise<DomainPaths[]> {
+        return new Promise((resolve, reject) => {
+            return this.settingsRegistryProvider((settingsRegistry: SettingsRegistry) => {
+                resolve(Object.keys(settingsRegistry).map(settings => settingsRegistry[settings].getDomainPaths()))
+            })
+        })
     }
 
     async getSettingsForDomain(domain: string, defaultUndefined: boolean = true): Promise<DomainSettings | undefined> {

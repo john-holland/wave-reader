@@ -27,6 +27,7 @@ export class WaveToggleConfig extends AttributeConstructor<WaveToggleConfig> {
 }
 
 export default class Options extends AttributeConstructor<Options> {
+    defaultSettings: boolean = false;
     showNotifications: boolean = ShowNotificationsDefault;
     going: boolean = GoingDefault;
     waveAnimationControl: WaveAnimationControl = WaveAnimationControlDefault;
