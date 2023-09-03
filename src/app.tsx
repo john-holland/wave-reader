@@ -144,25 +144,29 @@ export const AppStates = ({
         /* eslint-disable  @typescript-eslint/no-unused-vars */
         const resultState = machine.handleState(machine.getState(state));
         // TODO: update settings with state property
-        //settingsService.updateCurrentSettings(settings => settings.state)
+        // add setting to domain
+        // const currentDomain = ""
+        // settingsService.updateCurrentDomainSettings(domainSettings => {
+        //
+        // })
+        // settingsService.updateCurrentSettings(settings => settings.state)
     },
     map = new Map<string, State>(),
     setGoing,
-    getGoingLocal,
+    getGoing,
     _getGoingAsync = getGoingAsync,
     setOptions,
     bootstrapCondition,
     onRunTimeInstalledListener = chromeRunTimeInstalledListener,
-    onMessageListener = chromeOnMessageListener,
-    optionsObserver
-}: AppStatesProps): NameAccessMapInterface => {
+    onMessageListener = chromeOnMessageListener
+}: Partial<AppStatesProps>): NameAccessMapInterface => {
     /* eslint-disable  @typescript-eslint/no-unused-vars */
     const states: StateNames = {
         "base": CState("base", ["base", "bootstrap", "settings updated"], true, () => {
             return states.get("base")
         }),
         "bootstrap": CState("bootstrap", ["base"], true, async (message, state, previousState) => {
-            if (getGoingLocal === undefined) {
+            if (getGoing === undefined) {
                 const going = await _getGoingAsync() || false;
                 setGoing(going);
                 bootstrapCondition(going);
@@ -199,9 +203,9 @@ export const AppStates = ({
             LoadSettings().then(setOptions)
             return states.get("base");
         }),
-        "settings updated": CState("settings updated", ["base"], true, async (message, state, previousState) => {
-            setSelector(message.selector || 'p');
-            await settingsService.updateCurrentSettings((options) => {
+        "settings updated": CState("settings updated", ["base"], true, (message, state, previousState) => {
+            const settingsUpdated =
+            settingsService.updateCurrentSettings((options) => {
                 options.wave.selector = message.selector;
                 options.wave.update();
                 return options;
@@ -273,7 +277,7 @@ export const AppStates = ({
     }
 }
 
-
+const AppStateMachine = new StateMachine();
 
 const App: FunctionComponent = () => {
     const [ selector, setSelector ] = useState('p');
@@ -281,8 +285,15 @@ const App: FunctionComponent = () => {
     const [ going, setGoing ] = useState(false);
     const [ options, setOptions ] = useState<Options>(Options.getDefaultOptions());
 
+    const appStateMap = AppStates({
+        machine: AppStateMachine,
+        setGoing: (going) => setGoing(going),
+        getGoing: (): boolean => { return going },
+        bootstrapCondition
+    })
+
     useEffect(() => {
-        LoadSettings().then(setOptions)
+        AppStateMachine.initialize(appStateMap, appStateMap.getState("bootstrap") as State)
     }, []);
 
     // [sm] start add selector

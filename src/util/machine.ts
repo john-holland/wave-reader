@@ -130,6 +130,8 @@ interface MachineInterface {
     getState(): State;
     setSuperState(state: State): Promise<[MachineClientConnectionStatus, State]>;
     getName(): string;
+    done(): Promise<[MachineClientConnectionStatus, State]>;
+    up(): Promise<[MachineClientConnectionStatus, State]>;
 }
 type MachineProps = {
     superMachine: MachineInterface,
@@ -228,11 +230,16 @@ const machine = Machine({
                         base: [["base"], BaseLevel, () => {}],
                         startDonate: [["donating"], BaseLevel, () => { /* open webpage */ }],
                         donated: [["easterEgg"], SubState],
-                        stopDonate: [["base"], SubState],
+                        stopDonate: [["base"], SubState, () => {
+                            machine.up();
+                        }],
                         donating: [["donated", "stopDonate"], SubState],
                         easterEgg: [["base"], SubState, ({ client, message }: MessageProps) => {
                             // show as many bunnies bouncing happily, as pennies donated or something, and unlock konami code
-                            machine.setSuperState(client.getState("BUNNIES"))
+                            const [state] = machine.setSuperState(client.getState("BUNNIES"))
+                            if (state.machine !== machine) {
+                                machine.up();
+                            }
                         }]
 
                     }
@@ -266,7 +273,9 @@ const machine = Machine({
     }
 })
 
+type TemplateProps = {}
 interface MachineComponent <TProps> { //  <T> implements FunctionalComponent<T>
     getMachine(): MachineInterface;
     render(props: TProps): FunctionComponent<TProps>
+    getTemplate(): FunctionComponent<TemplateProps>
 }
