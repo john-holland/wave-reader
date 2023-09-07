@@ -1,5 +1,11 @@
+/**
+ * @jest-environment jsdom
+ */
 import * as React from "react"
 
+import { TextEncoder, TextDecoder } from 'util';
+
+Object.assign(global, { TextDecoder, TextEncoder });
 
 import {
     ColorGeneratorService,

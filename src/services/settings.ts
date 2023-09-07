@@ -2,12 +2,12 @@ import Options from "../models/options";
 import {currentTab, Tab} from "../util/util";
 import {getSyncObject, setSyncObject} from "../util/sync";
 import {State} from "../util/state";
+import * as url from "url";
 
-
-export interface SettingsRegistry {
-    [key: string]: DomainSettings;
+const guardUrlWithProtocol = (url: string) => {
+    const colonIndex = url.indexOf(":");
+    return colonIndex > -1 && colonIndex < url.indexOf(".") ? url : "https://" + url;
 }
-
 
 const tabUrl = (): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -35,6 +35,10 @@ export class DomainSettings {
     getDomainPaths() {
         return new DomainPaths(this.domain, [...this.pathSettings.keys()])
     }
+}
+
+export interface SettingsRegistry {
+    [key: string]: DomainSettings;
 }
 
 export class DomainPaths {
@@ -67,6 +71,7 @@ export interface SettingsDAOInterface {
     removeSettingsForDomain(domain: string): Promise<boolean>;
     removeSettingsForDomain(domain: string, path: string): Promise<boolean>;
     getDomainsAndPaths(): Promise<DomainPaths[]>;
+    getCurrentDomainAndPaths(): Promise<DomainPaths>;
 }
 
 const getSettingsRegistry = (callback: {(settingsRegistry: SettingsRegistry): void}) => {
@@ -80,10 +85,35 @@ const saveSettingsRegistry = (settingsRegistry: SettingsRegistry, callback?: {()
     setSyncObject(SettingsRegistryStorageKey, settingsRegistry, callback)
 }
 
-const guardUrlWithProtocol = (url: string) => {
-    const colonIndex = url.indexOf(":");
-    return colonIndex > -1 && colonIndex < url.indexOf(".") ? url : "https://" + url;
+/*
+
+class SyncObjectDAO {
+    async createSyncObject(name: string, value: string, overwrite: boolean): Promise<void> {
+        // getSyncObject
+        // fail for overwrite = false and exists
+        // newSyncObject
+    }
+    async removeSyncObject(name: string): Promise<boolean> {
+        // (getSyncObject !== null) === removed
+        // chrome.storage.sync.remove
+        return false; // if anything was removed
+    }
+
+    async updateSyncObject(name: string, value?: string, update?: { (syncObject: string): string }): Promise<void> {
+        //getSyncObject()
+        // fail throw, unless defaulted
+        //setSyncObject()
+    }
+
+    // todo: decide on api as sync objects accept object types, but i have some weird turn around
+    //   the best / most reliable results use JSON.stringify and JSON.parse
+    async updateSyncObject<T>(name: string, value?: string, update?: { (syncObject: T): T }): Promise<void> {
+        //getSyncObject()
+        // fail throw, unless defaulted
+        //setSyncObject()
+    }
 }
+ */
 
 const SettingsRegistryStorageKey = "wave_reader__settings_registry";
 export default class SettingsService implements SettingsDAOInterface {
@@ -123,6 +153,26 @@ export default class SettingsService implements SettingsDAOInterface {
             await this.addSettingsForDomain(domain, path, from.pathSettings?.get(fromPath)!)
             resolve();
         })
+    }
+
+    /**
+     * @returns {Promise<DomainPaths>} Returns the current domain and path.
+     */
+    getCurrentDomainAndPaths(): Promise<DomainPaths> {
+        return new Promise((resolve, reject) => {
+            this.tabUrlProvider().then(value => {
+                try {
+                    return new URL(guardUrlWithProtocol(value));
+                } catch (e) {
+                    throw e
+                }
+            }).then((url: URL) => {
+                return {
+                    domain: url.hostname,
+                    paths: [url.pathname]
+                } as DomainPaths
+            }).then(resolve);
+        });
     }
 
     /**

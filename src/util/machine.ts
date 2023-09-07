@@ -1,4 +1,4 @@
-import {Named} from "./state";
+import { State, Named } from "./state";
 import {Base} from "./venture-states";
 import Message, {MessageInterface} from "../models/message";
 import {FunctionComponent} from "react";
@@ -59,16 +59,6 @@ import {FunctionComponent} from "react";
  *     [close] UP() -> [close]
  * }
  */
-
-type Named = {
-    name: string;
-}
-
-class State implements Named {
-    name: string
-    ventureStates: string[]
-    isBaseLevel: boolean
-}
 
 /**
  * The above describes states for a hierarchical state machine with asynchronous blocking measures
@@ -155,11 +145,13 @@ type MachineFactoryProps = {
     location: MachineLocation,
     name: string,
     submachines: MachineInterface[]
-    states: { (client: StateMachineClientManagerInterface, machine: MachineInterface): Partial<State> }
+    component: FunctionComponent
+    states: { (client: StateMachineClientManagerInterface, machine: MachineInterface): Partial<State>[] }
     superStates: string[] // the valid effected super states to expect from this machine
     ventureStates: string[] // the valid future states for this machine
 }
 const Machine = (props: Partial<MachineFactoryProps> = { }): MachineInterface => {
+    return null as unknown as MachineInterface;
     // return new class implements MachineInterface {
     //     getActiveSubMachines(): MachineInterface[] {
     //         return [];
@@ -207,7 +199,7 @@ const machine = Machine({
         Machine({
             location: MachineLocation.POPUP,
             name: "settings",
-            states: (client: StateMachineClientInterface, machine: MachineInterface): Partial<State>[] => {
+            states: (client: StateMachineClientManagerInterface, machine: MachineInterface): Partial<State>[] => {
                 return [
                     {
                         base: ["base", BaseLevel, () => {}],
@@ -234,10 +226,10 @@ const machine = Machine({
                             machine.up();
                         }],
                         donating: [["donated", "stopDonate"], SubState],
-                        easterEgg: [["base"], SubState, ({ client, message }: MessageProps) => {
+                        easterEgg: [["base"], SubState, async ({client, message}: MessageProps) => {
                             // show as many bunnies bouncing happily, as pennies donated or something, and unlock konami code
-                            const [state] = machine.setSuperState(client.getState("BUNNIES"))
-                            if (state.machine !== machine) {
+                            const [connectionStatus, state] = await machine.setSuperState(client.getState("BUNNIES"))
+                            if (machine.getSuperMachine().getActiveSubMachines().includes(machine)) {
                                 machine.up();
                             }
                         }]

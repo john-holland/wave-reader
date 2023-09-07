@@ -1,4 +1,5 @@
 import {State, NameAccessMapInterface, Named} from "./state"
+import {Observable} from "rxjs";
 // import {BaseVentures} from "./venture-states";
 
 
@@ -6,6 +7,8 @@ class StateMachine {
     initialized: boolean = false;
     map: NameAccessMapInterface | undefined = undefined;
     currentState: State | undefined = undefined;
+    // todo: review, this may be a useful feature, i almost didn't yagni this in a test (which sounds weird)
+    //stateObservable: Observable<State | undefined>;
 
     constructor() {
 
@@ -41,12 +44,12 @@ class StateMachine {
         return this.getState(newState.name)
     }
 
-    protected processState(message: Named, state: State | undefined, previousState: State): State | undefined {
+    protected async processState(message: Named, state: State | undefined, previousState: State): Promise<State | undefined> {
         if (!this.initialized) throw new Error("not initialized, no StateMachineMap")
         if (state === undefined) console.log("State undefined for previous state" + JSON.stringify(previousState))
 
         if (typeof state?.stateEffects === 'function') {
-            this.currentState = state.stateEffects(message, state, previousState) || this.getBaseState();
+            this.currentState = await state.stateEffects(message, state, previousState) || this.getBaseState();
             if (this.currentState?.name === "base") {
                 console.log("transitioning back to base");
             }
@@ -62,7 +65,7 @@ class StateMachine {
      * @param namedState the message from chrome.runtime to be passed through to the [State#stateeffects()]
      * @return the BaseState or state from [State#stateeffects()]
      */
-    handleState(namedState: Named): State {
+    handleState(namedState: Named): Promise<State | undefined> {
         if (!this.initialized) throw new Error("not initialized, no StateMachineMap")
 
         const state = this.validateState(namedState)

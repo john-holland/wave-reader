@@ -1,3 +1,9 @@
+/**
+ * @jest-environment jsdom
+ */
+
+import * as React from "react"
+
 import { AppStates } from "../src/app";
 import StateMachine from "../src/util/state-machine";
 import {CState, NameAccessMapInterface, Named, State, StateNames} from "../src/util/state";
@@ -7,20 +13,37 @@ import SelectorUpdated from "../src/models/messages/selector-updated";
 import {LoadSettings} from "../src/components/settings";
 import Options from "../src/models/options";
 import InstalledDetails = chrome.runtime.InstalledDetails;
+import { render, screen } from "@testing-library/react";
+import user from "@testing-library/user-event";
+import {act} from "react-test-renderer";
+
+import { TextEncoder, TextDecoder } from 'util';
+
+Object.assign(global, { TextDecoder, TextEncoder });
+
+import "@testing-library/jest-dom"
+
+
+const jsdom = require("jsdom");
+const { JSDOM } = jsdom;
 
 describe("app tests", () => {
     describe("app state machine", () => {
-        test("bootstrap", () => {
+        test("bootstrap", async () => {
             return;
             let setGoingCalled = false;
             let bootstrapConditionCalled = false;
             let going: boolean | undefined = undefined;
             let goingCalledValue: boolean | undefined = undefined;
             let state = undefined;
+            let options = new Options();
             const statemachine = new StateMachine();
             const states = AppStates({
                 machine: statemachine,
-                setState: (s): State => { state = s; return statemachine.handleState(statemachine.getState(s) as Named) },
+                setState: (s): Promise<State> => {
+                    state = s;
+                    return statemachine.handleState(s as Named || statemachine.getState(s as string) as Named).then(c => c!!)
+                },
                 map: new Map<string, State>(),
                 getGoing: (): boolean => {
                     return going!!;
@@ -30,20 +53,23 @@ describe("app tests", () => {
                     setGoingCalled = true;
                     return Promise.resolve();
                 },
-                bootstrapCondition: (value: boolean): void => {
+                bootstrapCondition: (value: boolean): Promise<Options> => {
                     goingCalledValue = value;
                     bootstrapConditionCalled = true;
+                    return Promise.resolve(options);
                 },
-                setOptions: (options) => {
-
+                setOptions: (opts) => {
+                    options = opts;
                 },
-                _getGoingAsync: () => !!going,
-                onRunTimeInstalledListener: (details: InstalledDetails) => { },
-                onMessageListener: (message) => { return true; }
+                _getGoingAsync: () => Promise.resolve(!!going),
+                onRunTimeInstalledListener: (callback: { (details: InstalledDetails): void }) => {
+                },
+                onMessageListener: (message: { (message: any): void }) => {
+                }
             })
             statemachine.initialize(states, states.getState("base") as State)
 
-            expect(statemachine.handleState(states.getState("bootstrap") as State).name).toBe("base")
+            expect((await statemachine.handleState(states.getState("bootstrap") as State))?.name).toBe("base")
         })
         test("base", () => {
         })

@@ -96,12 +96,12 @@ describe("state machine", () => {
         expect(stateMachine.getState("base")).toBeTruthy();
     })
 
-    test("validate error moves to base state", () => {
-        const { stateMachine, stateNameMap } = newStateMachine();
-        expect(stateMachine.handleState(stateNameMap.getState("error")!!).name).toBe("base");
+    test("validate error moves to base state", async () => {
+        const {stateMachine, stateNameMap} = newStateMachine();
+        expect((await stateMachine.handleState(stateNameMap.getState("error")!!))?.name).toBe("base");
     })
 
-    test("validate we receive the message passed to handleState", () => {
+    test("validate we receive the message passed to handleState", async () => {
         const message = new UpdateWaveMessage()
         message.name = "message-test"
         if (message.options) message.options.wave.text.color = "test green";
@@ -112,58 +112,58 @@ describe("state machine", () => {
                 expect(convertedMessage?.options?.wave.text.color).toBe("test green");
                 return undefined
             }))
-        const { stateMachine, stateNameMap } = newStateMachine(StateNameMap(map));
+        const {stateMachine, stateNameMap} = newStateMachine(StateNameMap(map));
 
-        expect(stateMachine.handleState(message).name).toBe("base");
+        expect((await stateMachine.handleState(message))?.name).toBe("base");
     })
 
-    test("stop moves to base state", () => {
-        const { stateMachine, stateNameMap } = newStateMachine(StateNameMap(new Map()), "waving");
-        expect(stateMachine.handleState(stateNameMap.getState("stop")!!).name).toBe("base");
+    test("stop moves to base state", async () => {
+        const {stateMachine, stateNameMap} = newStateMachine(StateNameMap(new Map()), "waving");
+        expect((await stateMachine.handleState(stateNameMap.getState("stop")!!))?.name).toBe("base");
     })
 
-    test("start moves to waving state", () => {
-        const { stateMachine, stateNameMap } = newStateMachine();
-        expect(stateMachine.handleState(stateNameMap.getState("start")!!).name).toBe("waving");
+    test("start moves to waving state", async () => {
+        const {stateMachine, stateNameMap} = newStateMachine();
+        expect((await stateMachine.handleState(stateNameMap.getState("start")!!))?.name).toBe("waving");
     })
 
-    test("stop toggle moves to base state", () => {
-        const { stateMachine, stateNameMap } = newStateMachine(StateNameMap(new Map()), "waving");
-        expect(stateMachine.handleState(stateNameMap.getState("toggle stop")!!).name).toBe("base");
+    test("stop toggle moves to base state", async () => {
+        const {stateMachine, stateNameMap} = newStateMachine(StateNameMap(new Map()), "waving");
+        expect((await stateMachine.handleState(stateNameMap.getState("toggle stop")!!))?.name).toBe("base");
     })
 
-    test("start toggle moves to waving state", () => {
-        const { stateMachine, stateNameMap } = newStateMachine();
-        expect(stateMachine.handleState(stateNameMap.getState("toggle start")!!).name).toBe("waving");
+    test("start toggle moves to waving state", async () => {
+        const {stateMachine, stateNameMap} = newStateMachine();
+        expect((await stateMachine.handleState(stateNameMap.getState("toggle start")!!))?.name).toBe("waving");
     })
 
-    test("stop mouse moves to base state", () => {
-        const { stateMachine, stateNameMap } = newStateMachine(StateNameMap(new Map()), "waving");
-        expect(stateMachine.handleState(stateNameMap.getState("stop mouse")!!).name).toBe("base");
+    test("stop mouse moves to base state", async () => {
+        const {stateMachine, stateNameMap} = newStateMachine(StateNameMap(new Map()), "waving");
+        expect((await stateMachine.handleState(stateNameMap.getState("stop mouse")!!))?.name).toBe("base");
     })
 
-    test("start mouse moves to waving state", () => {
-        const { stateMachine, stateNameMap } = newStateMachine();
-        expect(stateMachine.handleState(stateNameMap.getState("start mouse")!!).name).toBe("waving");
+    test("start mouse moves to waving state", async () => {
+        const {stateMachine, stateNameMap} = newStateMachine();
+        expect((await stateMachine.handleState(stateNameMap.getState("start mouse")!!))?.name).toBe("waving");
     })
 
-    test("selection mode activate moves to selection mode state", () => {
-        const { stateMachine, stateNameMap } = newStateMachine();
-        expect(stateMachine.handleState(stateNameMap.getState("selection mode activate")!!).name).toBe("selection mode");
+    test("selection mode activate moves to selection mode state", async () => {
+        const {stateMachine, stateNameMap} = newStateMachine();
+        expect((await stateMachine.handleState(stateNameMap.getState("selection mode activate")!!))?.name).toBe("selection mode");
     })
 
-    test("selection mode moves to base state", () => {
-        const { stateMachine, stateNameMap } = newStateMachine(StateNameMap(new Map()), "selection mode");
-        expect(stateMachine.handleState(stateNameMap.getState("selection mode")!!).name).toBe("base");
+    test("selection mode moves to base state", async () => {
+        const {stateMachine, stateNameMap} = newStateMachine(StateNameMap(new Map()), "selection mode");
+        expect((await stateMachine.handleState(stateNameMap.getState("selection mode")!!))?.name).toBe("base");
     })
 
-    test("selection made moves to base state", () => {
-        const { stateMachine, stateNameMap } = newStateMachine(StateNameMap(new Map()), "selection mode");
-        expect(stateMachine.handleState(stateNameMap.getState("selection made")!!).name).toBe("base");
+    test("selection made moves to base state", async () => {
+        const {stateMachine, stateNameMap} = newStateMachine(StateNameMap(new Map()), "selection mode");
+        expect((await stateMachine.handleState(stateNameMap.getState("selection made")!!))?.name).toBe("base");
     })
 
-    test("selection mode deactivate moves to base state", () => {
-        const { stateMachine, stateNameMap } = newStateMachine(StateNameMap(new Map()), "selection mode");
-        expect(stateMachine.handleState(stateNameMap.getState("selection mode deactivate")!!).name).toBe("base");
+    test("selection mode deactivate moves to base state", async () => {
+        const {stateMachine, stateNameMap} = newStateMachine(StateNameMap(new Map()), "selection mode");
+        expect((await stateMachine.handleState(stateNameMap.getState("selection mode deactivate")!!))?.name).toBe("base");
     })
 })

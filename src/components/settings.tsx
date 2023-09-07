@@ -1,5 +1,5 @@
 import { FunctionComponent, useEffect, useState } from "react";
-import { WaveAnimationControl } from "../models/default";
+import { WaveAnimationControl } from "../models/defaults";
 import Options, {WaveToggleConfig} from "../models/options";
 import Text from "../models/text";
 

@@ -14,7 +14,7 @@ export const getSyncObject = <T extends object>(key: string, defaultValue: T, ca
         }
     }));
 }
-
+// ??
 export const newSyncObject = <T extends AttributeConstructor<T>>(objectType: { new(attributes?: AttributeAccessor & Partial<T>, requireAllAssigned?: boolean): T },
                                                                  key: string, defaultValue: T, callback: (result: T) => void) => {
     chrome.storage.sync.get(key, ( (items: { [key: string]: any }) => {

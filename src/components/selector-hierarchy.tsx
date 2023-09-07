@@ -5,7 +5,7 @@ import {
     HtmlElement,
     SelectorHierarchy,
     SelectorHierarchyServiceInterface
-} from "../services/selector-hierarchy-service";
+} from "../services/selector-hierarchy";
 import styled, {StyledComponent} from "styled-components";
 import {flatMap, map} from "rxjs";
 import tinycolor from "tinycolor2"

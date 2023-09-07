@@ -1,8 +1,18 @@
+/**
+ * @jest-environment jsdom
+ */
+
 import 'jest';
 import React from 'react';
+
+import { TextEncoder, TextDecoder } from 'util';
+
+Object.assign(global, { TextDecoder, TextEncoder });
+
 import {FindByText, render, screen, waitFor} from "@testing-library/react";
 // import user from "@testing-library/user-event";
 // import {act} from "react-test-renderer";
+import "@testing-library/react";
 import ScanForInputField, {
     ActionType,
     assignKeyChord,
@@ -12,6 +22,11 @@ import {KeyChord} from "../../src/components/util/user-input";
 import {Named, State} from "../../src/util/state";
 import StateMachine from "../../src/util/state-machine";
 import {Observable, Subscriber} from "rxjs";
+import "@testing-library/jest-dom"
+
+
+const jsdom = require("jsdom");
+const { JSDOM } = jsdom;
 
 const MockWindowKeyObserver = (eventListener: {(event: KeyboardEvent): void} = () => {},
                                listenerReturn: {(eventListener: {(event: KeyboardEvent): void}): void},
@@ -56,25 +71,34 @@ describe('Scan for input', () => {
     })
 
     describe("ScanForInputField component", () => {
-        test("state machine clears listener and scanning maps and asserts base state", () => {
+        test("state machine clears listener and scanning maps and asserts base state", async () => {
             const map = new Map<string, State>();
             const listenerMap = new Map<ActionType, EventListener>();
             const scanningMap = new Map<ActionType, KeyChord>();
             const stateMachineMap = new Map<ActionType, StateMachine>();
 
+
             let setChord: KeyChord | undefined = undefined;
             let savedChord: KeyChord | undefined = undefined;
             let cancelledChord: KeyChord | undefined = undefined;
             let setScan: boolean;
-            let el: {(event: KeyboardEvent): void} | undefined = undefined;
+            let el: { (event: KeyboardEvent): void } | undefined = undefined;
 
-            listenerMap.set("test", (e) => { throw new Error("should not call event") })
-            scanningMap.set("test", ["1","2","3"])
+            listenerMap.set("test", (e) => {
+                throw new Error("should not call event")
+            })
+            scanningMap.set("test", ["1", "2", "3"])
             const machine = new StateMachine();
             stateMachineMap.set("test", machine)
 
             let nameAccessMap = ScanForInputStates({
-                map, stateMachineMap, listenerMap, scanningMap, actionType: "test",keyLimit: 4, shortcut: ["W", "Shift"],
+                map,
+                stateMachineMap,
+                listenerMap,
+                scanningMap,
+                actionType: "test",
+                keyLimit: 4,
+                shortcut: ["W", "Shift"],
                 setScanning: (scanning: boolean): void => {
                     setScan = scanning
                 },
@@ -90,15 +114,18 @@ describe('Scan for input', () => {
                 windowKeyDownObserver: MockWindowKeyObserver(
                     (e) => console.log(e),
                     eventListener => el = eventListener,
-                    s => {}
+                    s => {
+                    }
                 ),
-                shouldPreventDefault: true
+                shouldPreventDefault: true,
+                window: new JSDOM().window
             });
 
             machine.initialize(nameAccessMap, nameAccessMap.getState("base") as State);
-            expect(machine.handleState({ name: "base" } as Named).name).toBe("base");
+            expect((await machine.handleState({name: "base"} as Named))?.name).toBe("base");
             expect(listenerMap.size).toBe(0);
             expect(scanningMap.size).toBe(0);
+            return Promise.resolve();
         });
         test("state machine calls onScan when save state", async () => {
             const map = new Map<string, State>();
@@ -137,28 +164,30 @@ describe('Scan for input', () => {
                     eventListener => el = eventListener,
                     s => subscriber = s
                 ),
-                shouldPreventDefault: true
+                shouldPreventDefault: true,
+                window: new JSDOM().window
             });
 
             machine.initialize(nameAccessMap, nameAccessMap.getState("base") as State);
 
-            expect(machine.handleState({ name: "start scanning" } as Named).name).toBe("scanning");
+            expect((await machine.handleState({ name: "start scanning" } as Named))?.name).toBe("scanning");
             const sub = subscriber as unknown as Subscriber<string>;
             sub.next("t")
             sub.next("e")
             sub.next("s")
             sub.next("t")
 
-            expect(machine.handleState({name: "save"} as Named).name).toBe("base");
+            expect((await machine.handleState({name: "save"} as Named))?.name).toBe("base");
 
             expect(setChord).toStrictEqual(["t", "e", "s", "t"].reverse())
             expect(savedChord).toStrictEqual(["t", "e", "s", "t"].reverse())
 
             expect(listenerMap.size).toBe(0);
             expect(scanningMap.size).toBe(0);
+            return Promise.resolve();
         });
 
-        test("calls escape when user presses escape when scanning is active", () => {
+        test("calls escape when user presses escape when scanning is active", async () => {
             const map = new Map<string, State>();
             const listenerMap = new Map<ActionType, EventListener>();
             const scanningMap = new Map<ActionType, KeyChord>();
@@ -168,16 +197,24 @@ describe('Scan for input', () => {
             let savedChord: KeyChord | undefined = undefined;
             let cancelledChord: KeyChord | undefined = undefined;
             let setScan: boolean;
-            let el: {(event: KeyboardEvent): void} | undefined = undefined;
+            let el: { (event: KeyboardEvent): void } | undefined = undefined;
             let subscriber: Subscriber<string> | undefined = undefined;
 
-            listenerMap.set("test", (e) => { throw new Error("should not call event") })
-            scanningMap.set("test", ["1","2","3"])
+            listenerMap.set("test", (e) => {
+                throw new Error("should not call event")
+            })
+            scanningMap.set("test", ["1", "2", "3"])
             const machine = new StateMachine();
             stateMachineMap.set("test", machine)
 
             let nameAccessMap = ScanForInputStates({
-                map, stateMachineMap, listenerMap, scanningMap, actionType: "test",keyLimit: 4, shortcut: cancelledChord as unknown as KeyChord,
+                map,
+                stateMachineMap,
+                listenerMap,
+                scanningMap,
+                actionType: "test",
+                keyLimit: 4,
+                shortcut: cancelledChord as unknown as KeyChord,
                 setScanning: (scanning: boolean): void => {
                     setScan = scanning
                 },
@@ -195,23 +232,30 @@ describe('Scan for input', () => {
                     eventListener => el = eventListener,
                     s => subscriber = s
                 ),
-                shouldPreventDefault: true
+                shouldPreventDefault: true,
+                window: new JSDOM().window
             });
 
             machine.initialize(nameAccessMap, nameAccessMap.getState("base") as State);
 
-            expect(machine.handleState({ name: "start scanning" } as Named).name).toBe("scanning");
+            expect((await machine.handleState({name: "start scanning"} as Named))?.name).toBe("scanning");
 
             (subscriber as unknown as Subscriber<string>).next("Escape")
 
-            expect(machine.currentState?.name).toBe("base");
-            expect(cancelledChord).toBe(cancelledChord)
+            return new Promise((resolve, reject) => {
+                waitFor(() => {
+                    expect(machine.currentState?.name).toBe("base");
+                    expect(cancelledChord).toBe(cancelledChord)
 
-            expect(listenerMap.size).toBe(0);
-            expect(scanningMap.size).toBe(0);
+                    expect(listenerMap.size).toBe(0);
+                    expect(scanningMap.size).toBe(0);
+                    resolve(undefined);
+                }, { timeout: 3000 })
+            })
+
         })
 
-        test("reverts to shortcut when state transition is \"stop scanning\" and scanning is active", () => {
+        test("reverts to shortcut when state transition is \"stop scanning\" and scanning is active", async () => {
             const map = new Map<string, State>();
             const listenerMap = new Map<ActionType, EventListener>();
             const scanningMap = new Map<ActionType, KeyChord>();
@@ -221,16 +265,24 @@ describe('Scan for input', () => {
             let savedChord: KeyChord | undefined = undefined;
             let cancelledChord: KeyChord | undefined = undefined;
             let setScan: boolean;
-            let el: {(event: KeyboardEvent): void} | undefined = undefined;
+            let el: { (event: KeyboardEvent): void } | undefined = undefined;
             let subscriber: Subscriber<string> | undefined = undefined;
 
-            listenerMap.set("test", (e) => { throw new Error("should not call event") })
-            scanningMap.set("test", ["1","2","3"])
+            listenerMap.set("test", (e) => {
+                throw new Error("should not call event")
+            })
+            scanningMap.set("test", ["1", "2", "3"])
             const machine = new StateMachine();
             stateMachineMap.set("test", machine)
 
             let nameAccessMap = ScanForInputStates({
-                map, stateMachineMap, listenerMap, scanningMap, actionType: "test",keyLimit: 4, shortcut: cancelledChord as unknown as KeyChord,
+                map,
+                stateMachineMap,
+                listenerMap,
+                scanningMap,
+                actionType: "test",
+                keyLimit: 4,
+                shortcut: cancelledChord as unknown as KeyChord,
                 setScanning: (scanning: boolean): void => {
                     setScan = scanning
                 },
@@ -248,12 +300,13 @@ describe('Scan for input', () => {
                     eventListener => el = eventListener,
                     s => subscriber = s
                 ),
-                shouldPreventDefault: true
+                shouldPreventDefault: true,
+                window: new JSDOM().window
             });
 
             machine.initialize(nameAccessMap, nameAccessMap.getState("base") as State);
 
-            expect(machine.handleState({ name: "start scanning" } as Named).name).toBe("scanning");
+            expect((await machine.handleState({name: "start scanning"} as Named))?.name).toBe("scanning");
 
             const sub = subscriber as unknown as Subscriber<string>
             sub.next("l")
@@ -261,16 +314,17 @@ describe('Scan for input', () => {
             sub.next("m")
             sub.next("e")
 
-            expect(machine.handleState({ name: "revert" } as Named).name).toBe("scanning");
-            expect(machine.handleState({ name: "stop scanning" } as Named).name).toBe("base");
+            expect((await machine.handleState({name: "revert"} as Named))?.name).toBe("scanning");
+            expect((await machine.handleState({name: "stop scanning"} as Named))?.name).toBe("base");
             expect(cancelledChord).toBe(cancelledChord)
 
             expect(listenerMap.size).toBe(0);
             expect(scanningMap.size).toBe(0);
+            return Promise.resolve()
         })
 
 
-        test("reverts to shortcut when state transition is \"stop scanning\" and scanning is active", () => {
+        test("reverts to shortcut when state transition is \"stop scanning\" and scanning is active", async () => {
             const map = new Map<string, State>();
             const listenerMap = new Map<ActionType, EventListener>();
             const scanningMap = new Map<ActionType, KeyChord>();
@@ -278,18 +332,26 @@ describe('Scan for input', () => {
 
             let setChord: KeyChord | undefined = undefined;
             let savedChord: KeyChord | undefined = undefined;
-            let shortcut: KeyChord | undefined = ["1","2","3"];
+            let shortcut: KeyChord | undefined = ["1", "2", "3"];
             let setScan: boolean;
-            let el: {(event: KeyboardEvent): void} | undefined = undefined;
+            let el: { (event: KeyboardEvent): void } | undefined = undefined;
             let subscriber: Subscriber<string> | undefined = undefined;
 
-            listenerMap.set("test", (e) => { throw new Error("should not call event") })
-            scanningMap.set("test", ["1","2","3"])
+            listenerMap.set("test", (e) => {
+                throw new Error("should not call event")
+            })
+            scanningMap.set("test", ["1", "2", "3"])
             const machine = new StateMachine();
             stateMachineMap.set("test", machine)
 
             let nameAccessMap = ScanForInputStates({
-                map, stateMachineMap, listenerMap, scanningMap, actionType: "test",keyLimit: 4, shortcut: shortcut as unknown as KeyChord,
+                map,
+                stateMachineMap,
+                listenerMap,
+                scanningMap,
+                actionType: "test",
+                keyLimit: 4,
+                shortcut: shortcut as unknown as KeyChord,
                 setScanning: (scanning: boolean): void => {
                     setScan = scanning
                 },
@@ -307,12 +369,13 @@ describe('Scan for input', () => {
                     eventListener => el = eventListener,
                     s => subscriber = s
                 ),
-                shouldPreventDefault: true
+                shouldPreventDefault: true,
+                window: new JSDOM().window
             });
 
             machine.initialize(nameAccessMap, nameAccessMap.getState("base") as State);
 
-            expect(machine.handleState({ name: "start scanning" } as Named).name).toBe("scanning");
+            expect((await machine.handleState({name: "start scanning"} as Named))?.name).toBe("scanning");
 
             const sub = subscriber as unknown as Subscriber<string>
             sub.next("l")
@@ -320,20 +383,22 @@ describe('Scan for input', () => {
             sub.next("m")
             sub.next("e")
 
-            expect(machine.handleState({ name: "revert" } as Named).name).toBe("scanning");
+            expect((await machine.handleState({name: "revert"} as Named))?.name).toBe("scanning");
 
             sub.next("3")
             sub.next("2")
             sub.next("1")
 
-            expect(machine.handleState({ name: "save" } as Named).name).toBe("base");
+            expect((await machine.handleState({name: "save"} as Named))?.name).toBe("base");
             expect(savedChord).toStrictEqual(shortcut)
 
             expect(listenerMap.size).toBe(0);
             expect(scanningMap.size).toBe(0);
+
+            return Promise.resolve()
         })
 
-        test("clears when clear state entered", () => {
+        test("clears when clear state entered", async () => {
             const map = new Map<string, State>();
             const listenerMap = new Map<ActionType, EventListener>();
             const scanningMap = new Map<ActionType, KeyChord>();
@@ -343,16 +408,18 @@ describe('Scan for input', () => {
             let savedChord: KeyChord | undefined = undefined;
             let cancelledChord: KeyChord | undefined = undefined;
             let setScan: boolean;
-            let el: {(event: KeyboardEvent): void} | undefined = undefined;
+            let el: { (event: KeyboardEvent): void } | undefined = undefined;
             let subscriber: Subscriber<string> | undefined = undefined;
 
-            listenerMap.set("test", (e) => { throw new Error("should not call event") })
-            scanningMap.set("test", ["1","2","3"])
+            listenerMap.set("test", (e) => {
+                throw new Error("should not call event")
+            })
+            scanningMap.set("test", ["1", "2", "3"])
             const machine = new StateMachine();
             stateMachineMap.set("test", machine)
 
             let nameAccessMap = ScanForInputStates({
-                map, stateMachineMap, listenerMap, scanningMap, actionType: "test",keyLimit: 4, shortcut: ["1", "2"],
+                map, stateMachineMap, listenerMap, scanningMap, actionType: "test", keyLimit: 4, shortcut: ["1", "2"],
                 setScanning: (scanning: boolean): void => {
                     setScan = scanning
                 },
@@ -370,23 +437,26 @@ describe('Scan for input', () => {
                     eventListener => el = eventListener,
                     s => subscriber = s
                 ),
-                shouldPreventDefault: true
+                shouldPreventDefault: true,
+                window: new JSDOM().window
             });
 
             machine.initialize(nameAccessMap, nameAccessMap.getState("base") as State);
 
-            expect(machine.handleState(machine.getState("start scanning")!).name).toBe("scanning");
+            expect((await machine.handleState(machine.getState("start scanning")!))?.name).toBe("scanning");
 
-            expect(machine.handleState(machine.getState("clear")!).name).toBe("scanning");
+            expect((await machine.handleState(machine.getState("clear")!))?.name).toBe("scanning");
 
             (subscriber as unknown as Subscriber<string>).next("o")
 
-            expect(machine.handleState(machine.getState("save")!).name).toBe("base");
+            expect((await machine.handleState(machine.getState("save")!))?.name).toBe("base");
 
             expect(savedChord).toStrictEqual(["o"]);
 
             expect(listenerMap.size).toBe(0);
             expect(scanningMap.size).toBe(0);
+
+            return Promise.resolve()
         })
     })
 })
