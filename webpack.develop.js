@@ -5,9 +5,9 @@ const path = require("path");
 const config = merge(common, {
     mode: "development",
     devtool: "cheap-module-source-map",
-    entry: {
-        config: path.join(__dirname, "./src/config/config.develop.js")
-    },
+    // entry: {
+    //     config: path.join(__dirname, "./src/config/config.develop.js")
+    // },
     resolve: {
         alias: {
             config: path.join(__dirname, "./src/config/config.develop.js")

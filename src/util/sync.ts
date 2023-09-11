@@ -1,5 +1,6 @@
 import AttributeConstructor, {AttributeAccessor} from "./attribute-constructor";
 
+export type GetSyncObjectFunction<T extends object> = (key: string, defaultValue: T, callback: (result: T) => void) => void;
 export const getSyncObject = <T extends object>(key: string, defaultValue: T, callback: (result: T) => void) => {
     chrome.storage.sync.get(key, ( (items: { [key: string]: any }) => {
         if (key in items) {

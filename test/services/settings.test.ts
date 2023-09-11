@@ -3,22 +3,10 @@ import SelectorService from "../../src/services/selector";
 import Options from "../../src/models/options"
 import { Tab } from "../../src/util/util";
 import DoneCallback = jest.DoneCallback;
+import {withMockSettingsService} from "../components/util/mock-settings-service";
+import {SelectorsDefaultFactory} from "../../src/models/defaults";
 
 
-const withMockSettingsService = async (context: {(settingsService: SettingsService, accessRegistry: {(): SettingsRegistry}): void}): Promise<void> => {
-    let proxy = { settingsRegistry: {} };
-    const settings = new SettingsService(
-        (callback: { (settingsRegistry: SettingsRegistry): void }): void => callback(proxy.settingsRegistry),
-        () => Promise.resolve("http://www.fart.com/fart"),
-        (newSettingsRegistry, callback?: {(): void}) => {
-            proxy.settingsRegistry = newSettingsRegistry;
-            if (callback) callback();
-        })
-    return new Promise(async (resolve) => {
-        context(settings, () => proxy.settingsRegistry);
-        resolve();
-    });
-}
 
 describe("selector service", () => {
     test("assigns protocol and path heavy url to hostname", () => {
@@ -35,6 +23,14 @@ describe("selector service", () => {
             expect(successfulTest).toBe("successful test");
             done();
         })
+    })
+
+    test("get current settings with no defaulted map", (done: DoneCallback) => {
+        withMockSettingsService(async (settingsService: SettingsService, accessRegistry) => {
+            const selectors = (await settingsService.getCurrentSettings())?.selectors;
+            expect(selectors).toStrictEqual(SelectorsDefaultFactory());
+            done();
+        }, "http://fart.fart.com/fart")
     })
 
     test("update current settings", (done: DoneCallback) => {

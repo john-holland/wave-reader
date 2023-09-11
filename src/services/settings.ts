@@ -191,20 +191,20 @@ export default class SettingsService implements SettingsDAOInterface {
                 }
 
                 this.settingsRegistryProvider(settingsRegistry => {
-                    if (urlobj.hostname in settingsRegistry) {
-                        const domainSettings = settingsRegistry[urlobj.hostname];
-                        if (!domainSettings.pathSettings.has(urlobj.pathname)) {
-                            const availableOptions: Options = domainSettings.pathSettings.values().next()?.value || Options.getDefaultOptions();
-
-                            console.log(`defaulting options for ${urlobj.hostname} with path: ${urlobj.pathname}`)
-                            domainSettings.pathSettings.set(urlobj.pathname, availableOptions)
-                        }
-
-                        resolve(domainSettings.pathSettings.get(urlobj.pathname)!)
-                    } else {
-                        // value mismatch
-                        reject([urlobj.hostname, Object.keys(settingsRegistry)])
+                    if (!(urlobj.hostname in settingsRegistry)) {
+                        settingsRegistry[urlobj.hostname] = new DomainSettings(urlobj.hostname, new Map<string, Options>());
                     }
+
+                    const domainSettings = settingsRegistry[urlobj.hostname];
+
+                    if (!domainSettings.pathSettings.has(urlobj.pathname)) {
+                        const availableOptions: Options = domainSettings.pathSettings.values().next()?.value || Options.getDefaultOptions();
+
+                        console.log(`defaulting options for ${urlobj.hostname} with path: ${urlobj.pathname}`)
+                        domainSettings.pathSettings.set(urlobj.pathname, availableOptions)
+                    }
+
+                    resolve(domainSettings.pathSettings.get(urlobj.pathname)!)
                 })
             });
         });

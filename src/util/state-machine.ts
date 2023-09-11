@@ -1,5 +1,5 @@
 import {State, NameAccessMapInterface, Named} from "./state"
-import {Observable} from "rxjs";
+import {Observable, Subscriber} from "rxjs";
 // import {BaseVentures} from "./venture-states";
 
 
@@ -8,12 +8,17 @@ class StateMachine {
     map: NameAccessMapInterface | undefined = undefined;
     currentState: State | undefined = undefined;
     // todo: review, this may be a useful feature, i almost didn't yagni this in a test (which sounds weird)
-    //stateObservable: Observable<State | undefined>;
+    private stateObservable?: Observable<State | undefined>
+    private stateSubscriber?: Subscriber<State | undefined>;
 
     constructor() {
-
     }
 
+    /**
+     * @remarks Please note, the stateObservable does not report the originState
+     * @param stateMachineMap [NameAccessMapInterface] a map of state-machine states by name
+     * @param originState [State] a starting state (often "base")
+     */
     initialize(stateMachineMap: NameAccessMapInterface, originState: State) {
         // TODO: guard for env?
         if (this.map !== undefined) console.log("initialize called with predefined map outside of test conditions: " + JSON.stringify(this.map));
@@ -21,6 +26,15 @@ class StateMachine {
         this.map = stateMachineMap;
         this.currentState = originState;
         if (this.map !== undefined && this.currentState !== undefined) this.initialized = true;
+
+        const setStateSubscriber = (stateSubscriber: Subscriber<State | undefined>) => this.stateSubscriber = stateSubscriber;
+        this.stateObservable = new Observable<State | undefined>((subscriber) => {
+            setStateSubscriber(subscriber)
+        });
+    }
+
+    getObservable(): Observable<State | undefined> | null {
+        return this.stateObservable || null;
     }
 
     getBaseState(): State | undefined {
@@ -48,6 +62,8 @@ class StateMachine {
         if (!this.initialized) throw new Error("not initialized, no StateMachineMap")
         if (state === undefined) console.log("State undefined for previous state" + JSON.stringify(previousState))
 
+        this.stateSubscriber?.next(state);
+
         if (typeof state?.stateEffects === 'function') {
             this.currentState = await state.stateEffects(message, state, previousState) || this.getBaseState();
             if (this.currentState?.name === "base") {
@@ -57,6 +73,9 @@ class StateMachine {
             console.log(`no stateEffects defined for ${state?.name}, transitioning back to base`)
             this.currentState = this.getBaseState();
         }
+        const cs = this.currentState;
+        //this.stateObservable.subscribe((next?: { (value: State | undefined): void }, error?: {(error: any): void} | null, complete?: {(): void}) => { next(cs) })
+        this.stateSubscriber?.next(this.currentState);
         return this.currentState;
     }
 

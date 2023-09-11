@@ -6,7 +6,7 @@ import GoButton from "./components/go-button";
 import StartMessage from "./models/messages/start";
 import Wave from "./models/wave";
 import Options from "./models/options";
-import {getSyncObject, newSyncObject, setSyncObject} from './util/sync';
+import {getSyncObject, GetSyncObjectFunction, newSyncObject, setSyncObject} from './util/sync';
 import StopMessage from "./models/messages/stop";
 import {fromMessage} from "./util/messages";
 import {Deferred} from "./util/deferred";
@@ -132,6 +132,7 @@ const getGoingAsync = async (): Promise<boolean> => new Promise((resolve) => get
 
 type AppStatesProps = {
     machine: StateMachine,
+    settingsService: SettingsService
     originState: string,
     map: Map<string, State>,
     setState: { (state: string | Named): Promise<State> }
@@ -143,6 +144,8 @@ type AppStatesProps = {
     onRunTimeInstalledListener: { (callback: {(details: InstalledDetails): void }): void },
     onMessageListener: { (callback: {(message: any): boolean}): void },
     optionsObserver: Observer<Options>
+    getSyncObject_Going: GetSyncObjectFunction<GoingStorageProxy>
+    bootstrapLock: SetReset
 }
 
 const chromeRunTimeInstalledListener = (callback: {(details: InstalledDetails): void}) => {
@@ -154,9 +157,47 @@ const chromeOnMessageListener = (callback: { (message: any): boolean }) => {
     chrome.runtime.onMessage.addListener(callback);
 }
 
+export type GoingStorageProxy = {
+    going: boolean
+}
+
+export class SetReset {
+    private _set: boolean
+    private name: string
+
+    private constructor(name: string = "unnamed lock", set: boolean = false) {
+        this.name = name;
+        this._set = set
+    }
+
+    reset() {
+        console.log(`set called for ${this.name}`)
+        this._set = false;
+    }
+
+    set() {
+        console.log(`set called for ${this.name}`)
+        this._set = true;
+    }
+
+    getSet() {
+        return this._set;
+    }
+
+    static set(name: string) {
+        console.log(`created set for ${this.name}`)
+        return new SetReset(name, true);
+    }
+    static unset(name: string) {
+        console.log(`created unset for ${this.name}`)
+        return new SetReset(name, false);
+    }
+}
+
 //todo chrome.runtime.onSuspend() handle this method and save state
 export const AppStates = ({
     machine = new StateMachine(),
+    settingsService,
     originState = "base",
     setState = async (state): Promise<State> => {
         /* eslint-disable  @typescript-eslint/no-unused-vars */
@@ -164,7 +205,7 @@ export const AppStates = ({
 
         if (!resultState) console.error("resultState empty or undefined, resolving to base, see log, previous state: " +
         (state as Named) ? JSON.stringify(state) : state)
-        await settingsService.updateCurrentSettings(settings => {
+        await settingsService?.updateCurrentSettings(settings => {
             settings.state = resultState;
             return settings;
         })
@@ -175,10 +216,12 @@ export const AppStates = ({
     setGoing = (going) => { console.error("unset setGoing method in AppStates, goiing: ", going); },
     getGoing = () => { console.error("unset setGoing method in AppStates"); return false; },
     _getGoingAsync = getGoingAsync,
-    setOptions = (options) => { settingsService.updateCurrentSettings(_ => options)},
+    setOptions = (options) => { settingsService?.updateCurrentSettings(_ => options)},
     bootstrapCondition = bootstrapConditionSettingsSetState,
     onRunTimeInstalledListener = chromeRunTimeInstalledListener,
-    onMessageListener = chromeOnMessageListener
+    onMessageListener = chromeOnMessageListener,
+    getSyncObject_Going = getSyncObject,
+    bootstrapLock = SetReset.unset("bootstrap-lock")
 }: Partial<AppStatesProps>): NameAccessMapInterface => {
     /* eslint-disable  @typescript-eslint/no-unused-vars */
     const states: StateNames = {
@@ -186,48 +229,52 @@ export const AppStates = ({
             return machine?.getState("base")
         }),
         "bootstrap": CState("bootstrap", ["base"], true, async (message, state, previousState): Promise<State> => {
-            if (getGoing === undefined) {
+            if (!bootstrapLock.getSet()) {
                 const going = (await _getGoingAsync()) || false;
                 setGoing(going);
                 bootstrapCondition(going).then(options => {
                     machine?.handleState(options.state || machine?.getState("base") as State).then(state => {
-                        settingsService.updateCurrentSettings(update => {
+                        settingsService?.updateCurrentSettings(update => {
                             // check sub state? or let it error, and design better???
                             update.state = state;
                             return update;
                         });
                     });
                 });
+                bootstrapLock.set()
             }
 
             onRunTimeInstalledListener((details: InstalledDetails) => {
                 console.log(`install details: ${details}`);
                 // upon first load, get a default value for 'going'
-                getSyncObject("going", {going: false}, (result) => {
+                getSyncObject_Going("going", {going: false}, (result) => {
                     onMessageListener((message: any) => {
                         const typedMessage = fromMessage(message);
 
-                        switch (typeof typedMessage) {
-                            // case typeof BootstrapMessage:
-                            //     bootstrapCondition();
-                            //     break;
-                            case typeof SelectorUpdated:
-                                machine?.handleState(message);
-                                break;
-                            default:
-                                console.log(`${typeof typedMessage} unhandled typed message from content script`)
-                        }
+                        machine?.handleState(typedMessage);
+
+                        // switch (typeof typedMessage) {
+                        //     // case typeof BootstrapMessage:
+                        //     //     bootstrapCondition();
+                        //     //     break;
+                        //     case typeof SelectorUpdated:
+                        //         machine?.handleState(message);
+                        //         break;
+                        //     default:
+                        //         console.log(`${typeof typedMessage} unhandled typed message from content script`)
+                        // }
 
                         return true;
                     });
                 });
 
             });
+
             return machine?.getState("base") as State;
         }),
-        "settings updated": CState("settings updated", ["base"], true, (message, state, previousState) => {
+        "update": CState("update", ["base"], true, async (message, state, previousState) => {
             const settingsUpdated = message as UpdateWaveMessage;
-            settingsService.updateCurrentSettings((options) => {
+            await settingsService?.updateCurrentSettings((options) => {
                 (settingsUpdated.options!!).wave.selector = settingsUpdated?.options?.wave.selector;
                 (settingsUpdated.options!!).wave.update();
                 return settingsUpdated.options!!;

@@ -166,4 +166,18 @@ describe("state machine", () => {
         const {stateMachine, stateNameMap} = newStateMachine(StateNameMap(new Map()), "selection mode");
         expect((await stateMachine.handleState(stateNameMap.getState("selection mode deactivate")!!))?.name).toBe("base");
     })
+
+    test("observe state change", async () => {
+        const {stateMachine, stateNameMap} = newStateMachine(StateNameMap(new Map()), "selection mode");
+        let changeCount = 0;
+        let changedToState: (State | undefined)[] = [];
+        stateMachine.getObservable()?.subscribe((state) => {
+            changedToState.push(state);
+            changeCount++;
+        })
+        expect((await stateMachine.handleState(stateNameMap.getState("selection mode deactivate")!!))?.name).toBe("base");
+        expect(changedToState[0]!!.name).toBe("selection mode deactivate")
+        expect(changedToState[1]!!.name).toBe("base")
+        expect(changeCount).toBe(2)
+    })
 })
