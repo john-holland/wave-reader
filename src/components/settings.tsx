@@ -3,7 +3,6 @@ import { WaveAnimationControl } from "../models/defaults";
 import Options, {WaveToggleConfig} from "../models/options";
 import Text from "../models/text";
 
-import {getSyncObject, newSyncObject, setSyncObject} from "../util/sync";
 import {
     Autocomplete,
     Button,
@@ -51,7 +50,7 @@ const SettingsStyleContainer = styled.div`
   }
 `;
 
-type AutocompleteOption = string;
+// type AutocompleteOption = string;
 
 const DomainPathContainer = styled.div`
   display: flex;
@@ -132,6 +131,7 @@ export const Settings: FunctionComponent<SettingsProps> = ({
             })
         });
         setEditingDomain(currentDomain)
+        console.log(`editingDomain ${editingDomain}`)
      }, [
         waveAnimationControl,
         showNotifications,

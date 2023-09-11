@@ -9,24 +9,22 @@ import Options from "./models/options";
 import {getSyncObject, GetSyncObjectFunction, newSyncObject, setSyncObject} from './util/sync';
 import StopMessage from "./models/messages/stop";
 import {fromMessage} from "./util/messages";
-import {Deferred} from "./util/deferred";
 import SelectorUpdated from "./models/messages/selector-updated";
 // todo: this should work, but jest returns a config is not defined
 //import configured from './config/config';
 // todo: slightly less data driven shim
 const isDevelopment = process.env.NODE_ENV !== 'production';
-import {currentTab, guardLastError} from "./util/util";
+import { guardLastError } from "./util/util";
 import UpdateWaveMessage from "./models/messages/update-wave";
-import {Settings, LoadSettings} from "./components/settings";
+import { Settings } from "./components/settings";
 
 import WaveTabs from './components/wave-tabs';
 import InstalledDetails = chrome.runtime.InstalledDetails;
 import {CState, NameAccessMapInterface, Named, State, StateNames} from "./util/state";
-import {WindowKeyDownKey} from "./components/util/user-input";
 import StateMachine from "./util/state-machine";
 
 import SettingsService from "./services/settings";
-import SelectorService from "./services/selector";
+//import SelectorService from "./services/selector";
 import {Observer} from "rxjs";
 
 //todo:
@@ -62,7 +60,7 @@ const WaveReader = styled.div`
 `;
 
 const settingsService = new SettingsService();
-const selectorService = new SelectorService(settingsService);
+//const selectorService = new SelectorService(settingsService);
 
 const startPageCss = (wave: Wave) => {
     newSyncObject<Options>(Options,'options', Options.getDefaultOptions(), (options) => {
@@ -91,21 +89,9 @@ const stopPageCss = () => {
     setSyncObject("going", { going: false });
 }
 
-const deferredOptions = new Deferred<Options>(() => {
-    return new Promise((resolve, reject) => {
-        try {
-            newSyncObject<Options>(Options,'options', Options.getDefaultOptions(), (result) => {
-                resolve(result);
-            });
-        } catch (e) {
-            reject(e);
-        }
-    });
-})
-
 const bootstrapConditionSettingsSetState = (going: boolean): Promise<Options> => {
     return settingsService.getCurrentSettings().then((options) => {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             options = new Options(options);
             setTimeout(() => {
                 if (going && options) {
@@ -149,7 +135,7 @@ type AppStatesProps = {
 }
 
 const chromeRunTimeInstalledListener = (callback: {(details: InstalledDetails): void}) => {
-    // maybe direct assignment would be prettier but i'm not sure if ts binds [tbis] for class method dispatch
+    // maybe direct assignment would be prettier but i'm not sure if ts binds [this] for class method dispatch
     chrome.runtime.onInstalled.addListener(callback);
 }
 
@@ -196,32 +182,24 @@ export class SetReset {
 
 //todo chrome.runtime.onSuspend() handle this method and save state
 export const AppStates = ({
+  /* eslint-disable: typescript-eslint/no-unused-vars */
     machine = new StateMachine(),
     settingsService,
     originState = "base",
-    setState = async (state): Promise<State> => {
-        /* eslint-disable  @typescript-eslint/no-unused-vars */
-        const resultState = await machine?.handleState(state as Named || machine?.getState(state as string) as Named);
-
-        if (!resultState) console.error("resultState empty or undefined, resolving to base, see log, previous state: " +
-        (state as Named) ? JSON.stringify(state) : state)
-        await settingsService?.updateCurrentSettings(settings => {
-            settings.state = resultState;
-            return settings;
-        })
-
-        return resultState || machine?.getState("base")!!;
-    },
+    // setState = async (state): Promise<State> => {
+    // todo: we should use state machine observable to support state tracking and auto saving
+    // },
     map = new Map<string, State>(),
     setGoing = (going) => { console.error("unset setGoing method in AppStates, goiing: ", going); },
-    getGoing = () => { console.error("unset setGoing method in AppStates"); return false; },
+    //getGoing = () => { console.error("unset setGoing method in AppStates"); return false; },
     _getGoingAsync = getGoingAsync,
-    setOptions = (options) => { settingsService?.updateCurrentSettings(_ => options)},
+    //setOptions = (options) => { settingsService?.updateCurrentSettings(_ => options)},
     bootstrapCondition = bootstrapConditionSettingsSetState,
     onRunTimeInstalledListener = chromeRunTimeInstalledListener,
     onMessageListener = chromeOnMessageListener,
     getSyncObject_Going = getSyncObject,
     bootstrapLock = SetReset.unset("bootstrap-lock")
+/* eslint-enable: typescript-eslint/no-unused-vars */
 }: Partial<AppStatesProps>): NameAccessMapInterface => {
     /* eslint-disable  @typescript-eslint/no-unused-vars */
     const states: StateNames = {
@@ -233,7 +211,7 @@ export const AppStates = ({
                 const going = (await _getGoingAsync()) || false;
                 setGoing(going);
                 bootstrapCondition(going).then(options => {
-                    machine?.handleState(options.state || machine?.getState("base") as State).then(state => {
+                    machine?.handleState(options.state || machine?.getState(originState) as State).then(state => {
                         settingsService?.updateCurrentSettings(update => {
                             // check sub state? or let it error, and design better???
                             update.state = state;
@@ -275,9 +253,9 @@ export const AppStates = ({
         "update": CState("update", ["base"], true, async (message, state, previousState) => {
             const settingsUpdated = message as UpdateWaveMessage;
             await settingsService?.updateCurrentSettings((options) => {
-                (settingsUpdated.options!!).wave.selector = settingsUpdated?.options?.wave.selector;
-                (settingsUpdated.options!!).wave.update();
-                return settingsUpdated.options!!;
+                (settingsUpdated.options as Options).wave.selector = settingsUpdated?.options?.wave.selector;
+                (settingsUpdated.options as Options).wave.update();
+                return settingsUpdated.options as Options;
             })
             return previousState
         }),

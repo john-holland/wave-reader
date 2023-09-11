@@ -73,8 +73,7 @@ class StateMachine {
             console.log(`no stateEffects defined for ${state?.name}, transitioning back to base`)
             this.currentState = this.getBaseState();
         }
-        const cs = this.currentState;
-        //this.stateObservable.subscribe((next?: { (value: State | undefined): void }, error?: {(error: any): void} | null, complete?: {(): void}) => { next(cs) })
+
         this.stateSubscriber?.next(this.currentState);
         return this.currentState;
     }

@@ -1,8 +1,6 @@
 import Options from "../models/options";
 import {currentTab, Tab} from "../util/util";
 import {getSyncObject, setSyncObject} from "../util/sync";
-import {State} from "../util/state";
-import * as url from "url";
 
 const guardUrlWithProtocol = (url: string) => {
     const colonIndex = url.indexOf(":");
@@ -15,7 +13,7 @@ const tabUrl = (): Promise<string> => {
             if (tabs.length === 0) {
                 reject(0)
             } else {
-                resolve(tabs[0]?.url!!)
+                resolve(tabs[0]?.url as string)
             }
         });
     })
@@ -146,11 +144,12 @@ export default class SettingsService implements SettingsDAOInterface {
      */
     async copySettingsFromDomain(from: DomainSettings, fromPath: string, domain: string, path: string, acceptExisting: boolean = true): Promise<void> {
         return new Promise(async (resolve, reject) => {
-            if (!from.pathSettings.has(fromPath)) {
+            if (!from.pathSettings.has(fromPath) && (!acceptExisting || from.pathSettings.size === 0)) {
                 reject(fromPath)
                 return;
             }
-            await this.addSettingsForDomain(domain, path, from.pathSettings?.get(fromPath)!)
+            await this.addSettingsForDomain(domain, path,
+                from.pathSettings?.get(fromPath) || [...from.pathSettings?.values()][0])
             resolve();
         })
     }
@@ -159,7 +158,7 @@ export default class SettingsService implements SettingsDAOInterface {
      * @returns {Promise<DomainPaths>} Returns the current domain and path.
      */
     getCurrentDomainAndPaths(): Promise<DomainPaths> {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             this.tabUrlProvider().then(value => {
                 try {
                     return new URL(guardUrlWithProtocol(value));
@@ -212,7 +211,7 @@ export default class SettingsService implements SettingsDAOInterface {
 
     async getSettingsRegistryForDomain(domain: string, defaultUndefined: boolean = true): Promise<SettingsRegistry | undefined> {
         const hostname = new URL(guardUrlWithProtocol(domain)).hostname;
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             this.settingsRegistryProvider(settingsRegistry => {
                 if (!(hostname in settingsRegistry)) {
                     if (defaultUndefined) {
@@ -234,7 +233,7 @@ export default class SettingsService implements SettingsDAOInterface {
      * Retrieves the domains and domain specific paths for which we have saved unique settings
      */
     async getDomainsAndPaths(): Promise<DomainPaths[]> {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             return this.settingsRegistryProvider((settingsRegistry: SettingsRegistry) => {
                 resolve(Object.keys(settingsRegistry).map(settings => settingsRegistry[settings].getDomainPaths()))
             })
@@ -243,7 +242,7 @@ export default class SettingsService implements SettingsDAOInterface {
 
     async getSettingsForDomain(domain: string, defaultUndefined: boolean = true): Promise<DomainSettings | undefined> {
         const hostname = new URL(guardUrlWithProtocol(domain)).hostname;
-        const settingsRegistry: SettingsRegistry = (await this.getSettingsRegistryForDomain(hostname, defaultUndefined))!!
+        const settingsRegistry: SettingsRegistry = (await this.getSettingsRegistryForDomain(hostname, defaultUndefined)) as SettingsRegistry
 
         if (!defaultUndefined && settingsRegistry && !(hostname in settingsRegistry)) {
             return Promise.resolve(undefined)
@@ -284,7 +283,7 @@ export default class SettingsService implements SettingsDAOInterface {
      */
     async removeSettingsForDomain(domain: string): Promise<boolean> {
         const hostname = new URL(guardUrlWithProtocol(domain)).hostname;
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             this.settingsRegistryProvider(settingsRegistry => {
                 if (hostname in settingsRegistry) {
                     delete settingsRegistry[hostname];
@@ -300,7 +299,7 @@ export default class SettingsService implements SettingsDAOInterface {
 
     async removeSettingsForDomainPath(domain: string, path: string, deleteDomainIfEmpty: boolean = true): Promise<boolean> {
         const hostname = new URL(guardUrlWithProtocol(domain)).hostname;
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             this.settingsRegistryProvider(settingsRegistry => {
                 if (hostname in settingsRegistry) {
                     const domainSettings = settingsRegistry[hostname];

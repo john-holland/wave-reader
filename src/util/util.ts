@@ -2,7 +2,6 @@
  *
  * @returns {boolean} true if lastError
  */
-import * as JSDOM from "jsdom";
 
 export const guardLastError = () => {
     if (chrome.runtime.lastError) {
