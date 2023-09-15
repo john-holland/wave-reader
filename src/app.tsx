@@ -11,9 +11,9 @@ import StopMessage from "./models/messages/stop";
 import {fromMessage} from "./util/messages";
 import SelectorUpdated from "./models/messages/selector-updated";
 // todo: this should work, but jest returns a config is not defined
-//import configured from './config/config';
+import configured from './config/config';
 // todo: slightly less data driven shim
-const isDevelopment = process.env.NODE_ENV !== 'production';
+const isDevelopment = configured.mode !== 'production'; //process.env.NODE_ENV !== 'production';
 import { guardLastError } from "./util/util";
 import UpdateWaveMessage from "./models/messages/update-wave";
 import { Settings } from "./components/settings";

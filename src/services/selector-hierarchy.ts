@@ -1,5 +1,5 @@
 import {FunctionComponent, useState} from "react";
-import * as console from "console";
+// import * as console from "console";
 import tinycolor, { ColorInput } from "tinycolor2";
 import {SelectorsDefaultFactory} from "../models/defaults";
 import SettingsService, {SettingsDAOInterface} from "./settings";
