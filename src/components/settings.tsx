@@ -36,13 +36,20 @@ const SettingsStyleContainer = styled.div`
   .form-control {
     display: flex!important;
     height: 600px;
-    width: 100%;
-    align-items: baseline;
+    width: 800px;
+    //align-items: baseline;
     flex-wrap: wrap!important;
-    justify-content: space-evenly;
-    align-content: space-between;
-    flex-flow: column;
-    flex-direction: column;
+    //justify-content: space-evenly;
+    //align-content: space-between;
+    //flex-flow: column;
+    //flex-direction: column;
+    .item { flex-grow: 1; }
+    .item-wide { flex-grow: 3; }
+    
+    .flex-break {
+      flex-basis: 100%;
+      height: 0;
+    }
     
     & > * {
       margin: 1em!important;
@@ -50,12 +57,18 @@ const SettingsStyleContainer = styled.div`
   }
 `;
 
+// thank you: https://tobiasahlin.com/blog/flexbox-break-to-new-row/
+const Flexbreakboard = styled.div`
+  flex-basis: 100%;
+  height: 0;
+`;
+
 // type AutocompleteOption = string;
 
-const DomainPathContainer = styled.div`
-  display: flex;
-  flex-flow: row;
-`
+// const DomainPathContainer = styled.div`
+//   display: flex;
+//   flex-flow: row;
+// `
 
 const val = (fn: {(v: any): void}) => ((_: any, value: any) => fn(value));
 const eventVal = (fn: {(e: any): void}) =>
@@ -209,121 +222,135 @@ export const Settings: FunctionComponent<SettingsProps> = ({
     return (
         <SettingsStyleContainer>
             <FormControl className={"form-control"}>
-                <FormLabel id={"notifications-checkbox-label"}>Show Notifications</FormLabel>
-                <Checkbox aria-labelledby="notifications-checkbox-label" checked={showNotifications} onChange={val(setShowNotifications)} />
+
+                <span className={"item"}>
+                    <FormLabel id={"notifications-checkbox-label"}>Show Notifications</FormLabel>
+                </span>
+                <Checkbox aria-labelledby="notifications-checkbox-label" checked={showNotifications}
+                          onChange={val(setShowNotifications)}  className={"item"} />
                 <ScanForInputField actionType={"Wave Toggle"}
                                    keyLimit={4}
                                    shortcut={toggleKeys.keyChord}
                                    onScan={onToggleScan}
                                    onCancelScan={onCancelToggleScan} />
 
-                <FormLabel id="wave-control-radio-buttons-group-label">Wave Control</FormLabel>
+                <span className={"item"}>
+                    <FormLabel id="wave-control-radio-buttons-group-label">Wave Control</FormLabel>
+                </span>
                 <RadioGroup
                     aria-labelledby="wave-control-radio-buttons-group-label"
                     defaultValue={WaveAnimationControl.CSS}
                     name="radio-buttons-group"
                     value={waveAnimationControl}
                     onChange={val(setWaveAnimationControl)}
+                    className={"item"}
                 >
                     <FormControlLabel value={WaveAnimationControl.CSS} control={<Radio />} label="CSS Animation" />
                     <FormControlLabel value={WaveAnimationControl.MOUSE} control={<Radio />} label="Mouse" />
                 </RadioGroup>
 
-                <TextField id="settings__text-color" value={textColor} onChange={eventVal(setTextColor)} placeholder={"initial"} label="Text Color" variant="outlined" />
-                <TextField id="settings__text-size" value={textSize} onChange={eventVal(setTextSize)} placeholder={"initial"} label="Text Size" variant="outlined" />
-                <TextField id="settings__selector" value={selector} onChange={eventVal(setSelector)} placeholder={"initial"} label="Text CSS Selector" variant="outlined" />
-                <TextField
-                    id="settings__css-template"
+                <TextField id="settings__text-color"
+                           className={"item"}
+                           value={textColor}
+                           onChange={eventVal(setTextColor)}
+                           placeholder={"initial"}
+                           label="Text Color"
+                           variant="outlined"/>
+                <TextField id="settings__text-size"
+                           className={"item"}
+                           value={textSize}
+                           onChange={eventVal(setTextSize)}
+                           placeholder={"initial"}
+                           label="Text Size"
+                           variant="outlined"/>
+                <TextField id="settings__selector"
+                           className={"item"}
+                           value={selector}
+                           onChange={eventVal(setSelector)}
+                           placeholder={"initial"}
+                           label="Text CSS Selector"
+                           variant="outlined"/>
+                <TextField id="settings__css-template"
+                    className={"item"}
                     value={cssTemplate}
                     onChange={eventVal(setCssTemplate)}
                     multiline
                     rows={10}
                     placeholder={"initial"}
                     label="Text CSS Selector"
-                    variant="outlined"
-                />
-                <TextField
-                    id="settings__css-template"
+                    variant="outlined" />
+                <TextField id="settings__css-template"
+                    className={"item"}
                     value={cssMouseTemplate}
                     onChange={eventVal(setCssMouseTemplate)}
                     multiline
                     rows={10}
                     placeholder={"initial"}
                     label="Text CSS Selector"
-                    variant="outlined"
-                />
-                <TextField
-                    id="settings__wave-speed"
+                    variant="outlined" />
+                <TextField id="settings__wave-speed"
+                    className={"item"}
                     label="Wave Speed"
                     type="number"
                     value={waveSpeed}
                     onChange={eventVal(setWaveSpeed)}
                     InputLabelProps={{
                         shrink: true,
-                    }}
-                />
-                <TextField
-                    id="settings__wave-translate-x-max"
+                    }} />
+                <TextField id="settings__wave-translate-x-max"
+                    className={"item"}
                     label="Axis Translation Amount X Max"
                     type="number"
                     value={axisTranslateAmountXMax}
                     onChange={eventVal(setAxisTranslateAmountXMax)}
                     InputLabelProps={{
                         shrink: true,
-                    }}
-                />
-                <TextField
-                    id="settings__wave-translate-x-min"
+                    }} />
+                <TextField id="settings__wave-translate-x-min"
+                    className={"item"}
                     label="Axis Translation Amount X Min"
                     type="number"
                     value={axisTranslateAmountXMin}
                     onChange={eventVal(setAxisTranslateAmountXMin)}
                     InputLabelProps={{
                         shrink: true,
-                    }}
-                />
-                <TextField
-                    id="settings__wave-rotation-y-max"
+                    }} />
+                <TextField id="settings__wave-rotation-y-max"
+                    className={"item"}
                     label="Axis Rotation Amount Y Max"
                     type="number"
                     value={axisRotationAmountYMax}
                     onChange={eventVal(setAxisRotationAmountYMax)}
                     InputLabelProps={{
                         shrink: true,
-                    }}
-                />
-                <TextField
-                    id="settings__wave-rotation-y-min"
+                    }} />
+                <TextField id="settings__wave-rotation-y-min"
+                    className={"item"}
                     label="Axis Rotation Amount Y Min"
                     type="number"
                     value={axisRotationAmountYMin}
                     onChange={eventVal(setAxisRotationAmountYMin)}
                     InputLabelProps={{
                         shrink: true,
-                    }}
-                />
+                    }} />
+            <Flexbreakboard className={"flex-break"} />
+                <Autocomplete id="domain-settings-dropdown"
+                    className={"item"}
+                    disablePortal
+                    value={currentDomain}
+                    onChange={onDomainChange}
+                    options={(domainPaths && domainPaths.map(dp => dp.domain)) || []}
+                    sx={{ width: "50%" }}
+                    renderInput={(params) => <TextField {...params} label={currentDomain} />} />
 
-                <DomainPathContainer>
-                    <Autocomplete
-                        disablePortal
-                        id="domain-settings-dropdown"
-                        value={currentDomain}
-                        onChange={onDomainChange}
-                        options={domainPaths.map(dp => dp.domain)}
-                        sx={{ width: "50%" }}
-                        renderInput={(params) => <TextField {...params} label={currentDomain} />}
-                    />
-
-                    <Autocomplete
-                        disablePortal
-                        id="path-settings-dropdown"
-                        value={currentPath}
-                        onChange={onPathChange}
-                        options={domainPaths.find((dp: DomainPaths) => dp.domain === currentDomain)?.paths as string[]}
-                        sx={{ width: "50%" }}
-                        renderInput={(params) => <TextField {...params} label={currentPath} />}
-                    />
-                </DomainPathContainer>
+                <Autocomplete id="path-settings-dropdown"
+                    className={"item"}
+                    disablePortal
+                    value={currentPath}
+                    onChange={onPathChange}
+                    options={(domainPaths && domainPaths.find((dp: DomainPaths) => dp.domain === currentDomain)?.paths as string[]) || []}
+                    sx={{ width: "50%" }}
+                    renderInput={(params) => <TextField {...params} label={currentPath} />} />
 
             </FormControl>
             <ButtonGroup variant="text" aria-label="text button group">

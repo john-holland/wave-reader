@@ -74,5 +74,10 @@
   "description": "A motion reader to help eye tracking while reading.",
   "main": "webpack.develop.js",
   "author": "John Holland",
-  "license": "MIT"
+  "license": "MIT",
+  "credits": {
+    "tobias": "https://tobiasahlin.com/blog/flexbox-break-to-new-row/",
+    "...": "....",
+    "sparticus": "sparticus"
+  }
 }
