@@ -4,15 +4,14 @@
 
 import 'jest';
 import React from 'react';
+import "@testing-library/react";
+import {FindByText, render, screen, waitFor} from "@testing-library/react";
 
 import { TextEncoder, TextDecoder } from 'util';
 
 Object.assign(global, { TextDecoder, TextEncoder });
-
-import {FindByText, render, screen, waitFor} from "@testing-library/react";
 // import user from "@testing-library/user-event";
 // import {act} from "react-test-renderer";
-import "@testing-library/react";
 import ScanForInputField, {
     ActionType,
     assignKeyChord,
@@ -24,7 +23,6 @@ import StateMachine from "../../src/util/state-machine";
 import {Observable, Subscriber} from "rxjs";
 import "@testing-library/jest-dom"
 
-
 const jsdom = require("jsdom");
 const { JSDOM } = jsdom;
 
@@ -33,6 +31,7 @@ const MockWindowKeyObserver = (eventListener: {(event: KeyboardEvent): void} = (
                                subscriberAccess: {(subscriber: Subscriber<string>): void}) => {
     return (listenerReturn: {(eventListener: {(event: KeyboardEvent): void}): void}, preventDefault: boolean = true): Observable<string> => {
         listenerReturn(eventListener);
+        // todo: document why ignored
         preventDefault = (preventDefault) || true
         return new Observable((subscriber) => {
             subscriberAccess(subscriber);

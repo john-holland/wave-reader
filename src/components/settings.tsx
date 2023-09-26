@@ -1,5 +1,5 @@
 import { FunctionComponent, useEffect, useState } from "react";
-import { WaveAnimationControl } from "../models/defaults";
+import {WaveAnimationControl, WindowDocumentWidth} from "../models/defaults";
 import Options, {WaveToggleConfig} from "../models/options";
 import Text from "../models/text";
 
@@ -32,19 +32,34 @@ type SettingsProps = {
 
 const SettingsStyleContainer = styled.div`
   width: 100%;
+  padding: 0;
+  margin: 0;
   
   .form-control {
     display: flex!important;
-    height: 600px;
-    width: 800px;
-    //align-items: baseline;
+    width: ${WindowDocumentWidth}px;
+    max-width: ${WindowDocumentWidth}px;
+    // use https://css-tricks.com/dont-overthink-flexbox-grids/ but with his
+    //  method nested a couple times
+    flex-basis: 100%;
     flex-wrap: wrap!important;
+    flex-direction: row;
+    //align-items: baseline;
+    justify-content: space-between;
     //justify-content: space-evenly;
     //align-content: space-between;
     //flex-flow: column;
     //flex-direction: column;
-    .item { flex-grow: 1; }
-    .item-wide { flex-grow: 3; }
+    .item {
+      flex-grow: 1;
+      
+      width: 200px;
+      margin: 5px;
+    }
+    .item-wide { 
+      flex-grow: 3;
+      width: 800px;
+    }
     
     .flex-break {
       flex-basis: 100%;
@@ -52,7 +67,8 @@ const SettingsStyleContainer = styled.div`
     }
     
     & > * {
-      margin: 1em!important;
+      margin-top: 1em!important;
+      margin-bottom: 1em!important;
     }
   }
 `;
@@ -99,6 +115,7 @@ export const Settings: FunctionComponent<SettingsProps> = ({
 
     const [settings, setSettings] = useState(new Options(initialSettings));
     const typedSetSettings = (deltaSettings: Partial<Options> = settings) => setSettings(new Options(deltaSettings));
+    const [saved, setSaved] = useState(true);
 
     const [domainPaths, setDomainPaths] = useState<DomainPaths[]>([])
     const [currentPath, setCurrentPath] = useState(path)
@@ -118,13 +135,17 @@ export const Settings: FunctionComponent<SettingsProps> = ({
     const [axisRotationAmountYMin, setAxisRotationAmountYMin] = useState(initialSettings.wave.axisRotationAmountYMin);
     const [showNotifications, setShowNotifications] = useState(initialSettings.showNotifications);
     const [toggleKeys, setToggleKeys] = useState(initialSettings.toggleKeys)
+    const [folley, setFolley] = useState(initialSettings.showNotifications)
 
     useEffect(() => {
         settingsService.getDomainsAndPaths().then(setDomainPaths)
     }, [])
 
     useEffect(() => {
-        typedSetSettings({
+        if (domainPaths.length == 0) {
+            return;
+        }
+        const s: any = {
             showNotifications,
             going: settings.going,
             waveAnimationControl,
@@ -142,7 +163,13 @@ export const Settings: FunctionComponent<SettingsProps> = ({
                 axisRotationAmountYMax,
                 axisRotationAmountYMin,
             })
-        });
+        }
+
+        if (Options.OptionsEqual(new Options(s), initialSettings)) {
+            typedSetSettings(s);
+            setSaved(false);
+        }
+
         setEditingDomain(currentDomain)
         console.log(`editingDomain ${editingDomain}`)
      }, [
@@ -156,7 +183,8 @@ export const Settings: FunctionComponent<SettingsProps> = ({
         axisTranslateAmountXMin,
         axisRotationAmountYMax,
         axisRotationAmountYMin,
-        toggleKeys
+        toggleKeys,
+        domainPaths
     ]);
 
     const resetSettings = () => {
@@ -189,6 +217,7 @@ export const Settings: FunctionComponent<SettingsProps> = ({
 
         setSettings(settingsToSave);
         onUpdateSettings(settingsToSave);
+        setSaved(true);
     }
 
     const onToggleScan = (keyChord: KeyChord) => {
@@ -221,6 +250,7 @@ export const Settings: FunctionComponent<SettingsProps> = ({
     // for the css template to work, we need to switch over to replacement templates instead of runtime.
     return (
         <SettingsStyleContainer>
+            { saved ? <span>✅</span> : <span>🌊</span> }
             <FormControl className={"form-control"}>
 
                 <span className={"item"}>
@@ -333,7 +363,7 @@ export const Settings: FunctionComponent<SettingsProps> = ({
                     InputLabelProps={{
                         shrink: true,
                     }} />
-            <Flexbreakboard className={"flex-break"} />
+            {/*<Flexbreakboard className={"item"} />*/}
                 <Autocomplete id="domain-settings-dropdown"
                     className={"item"}
                     disablePortal

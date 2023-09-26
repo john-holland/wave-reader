@@ -78,17 +78,43 @@ class StateMachine {
         return this.currentState;
     }
 
+    processing = false;
+    queue: Named[] = [];
+
     /**
      * Validates and processes the message, returning the state due to the [State#stateeffects()] or BaseState
      * @param namedState the message from chrome.runtime to be passed through to the [State#stateeffects()]
      * @return the BaseState or state from [State#stateeffects()]
      */
-    handleState(namedState: Named): Promise<State | undefined> {
+    async handleState(namedState: Named): Promise<State | undefined> {
         if (!this.initialized) throw new Error("not initialized, no StateMachineMap")
 
         const state = this.validateState(namedState)
         /* eslint-disable  @typescript-eslint/no-extra-non-null-assertion */
         return this.processState(namedState, state, this.currentState!!)!!;
+        if (this.processing) {
+            this.queue.unshift(namedState)
+            let returnState = undefined;
+            await this.stateObservable?.forEach(state => returnState = state)
+            return Promise.resolve(returnState);
+        } else {
+            // loop through available states, processing any state that does not return as "base"
+            let state: State | undefined;
+            while (this.queue.length) {
+                state = this.validateState(this.queue.pop()!!);
+
+                state = await this.processState(namedState, state, this.currentState!!);
+                if (state?.name !== "base") {
+                    this.queue.unshift(state as Named)
+                }
+            }
+            try {
+                return state ? Promise.resolve(state) : Promise.reject(state);
+            }
+            finally {
+                this.processing = false;
+            }
+        }
     }
 
     getState(name: string): State | undefined {

@@ -12,6 +12,7 @@ describe("selector service", () => {
     test("assigns protocol and path heavy url to hostname", () => {
         // TODO: write
     })
+
     test("get current settings", (done: DoneCallback) => {
         withMockSettingsService(async (settingsService: SettingsService, accessRegistry) => {
             const fartmap = new Map<string, Options>()
@@ -48,6 +49,14 @@ describe("selector service", () => {
             })
 
             expect((await settingsService.getCurrentSettings()).selectors.join(" ")).toBe("successful test , this be"); // mmmmhhmmmmm!
+            done();
+        })
+    })
+
+    test("test equals for Options", (done: DoneCallback) => {
+        withMockSettingsService(async (settingsService: SettingsService, accessRegistry) => {
+            expect(Options.OptionsEqual(await settingsService.getCurrentSettings(),
+                JSON.parse(JSON.stringify(await settingsService.getCurrentSettings())))).toBe(true)
             done();
         })
     })

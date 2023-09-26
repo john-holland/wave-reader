@@ -1,21 +1,17 @@
 /**
- * @jest-environment jsdom
+ * @jest-environment node
  */
 
-import * as React from "react"
+import 'jest';
+import React from "react"
 
 import {AppStates, GoingStorageProxy, SetReset} from "../src/app";
 import StateMachine from "../src/util/state-machine";
 import {CState, NameAccessMapInterface, Named, State, StateNames} from "../src/util/state";
-import {getSyncObject} from "../src/util/sync";
-import {fromMessage} from "../src/util/messages";
-import SelectorUpdated from "../src/models/messages/selector-updated";
-import {LoadSettings} from "../src/components/settings";
 import Options from "../src/models/options";
 import InstalledDetails = chrome.runtime.InstalledDetails;
 import {render, screen, waitFor} from "@testing-library/react";
-import user from "@testing-library/user-event";
-import {act} from "react-test-renderer";
+import "@testing-library/react";
 
 import { TextEncoder, TextDecoder } from 'util';
 
@@ -25,7 +21,6 @@ import "@testing-library/jest-dom"
 import UpdateWaveMessage from "../src/models/messages/update-wave";
 import {withMockSettingsService} from "./components/util/mock-settings-service";
 import SettingsService, {SettingsDAOInterface} from "../src/services/settings";
-
 
 const jsdom = require("jsdom");
 const { JSDOM } = jsdom;

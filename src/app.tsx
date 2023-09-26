@@ -26,6 +26,7 @@ import StateMachine from "./util/state-machine";
 import SettingsService from "./services/settings";
 //import SelectorService from "./services/selector";
 import {Observer} from "rxjs";
+import RemoveSelectorMessage from "./models/messages/remove-selector";
 
 //todo:
 // * Material UI
@@ -45,6 +46,9 @@ import {Observer} from "rxjs";
 //     or possibly add a F-shaped layer cake swirl that would 3d swirl each layer cake section as a hybrid?
 //         https://www.nngroup.com/articles/layer-cake-pattern-scanning/
 // * add an "advanced settings" option (that saves), to show the css, and default false
+// * think about the implications of your brain recognizing what it's holding by motion of your hands?
+//   * camera input ML (machine learning) for holding your hands in front of the screen, and interpreting the motion of the ocean
+//      and possibly scrolling the page by pawing or turning the page
 //
 //todo,ne:
 // * NOTE: popup, chrome.runtime.sendMessage -> background, chrome.tabs.query...sendMessage -> content
@@ -118,10 +122,10 @@ const getGoingAsync = async (): Promise<boolean> => new Promise((resolve) => get
 
 type AppStatesProps = {
     machine: StateMachine,
-    settingsService: SettingsService
+    settingsService: SettingsService,
     originState: string,
     map: Map<string, State>,
-    setState: { (state: string | Named): Promise<State> }
+    setState: { (state: string | Named): Promise<State> },
     setGoing: { (going: boolean): void },
     getGoing: { (): boolean },
     _getGoingAsync: { (): Promise<boolean> },
@@ -129,8 +133,8 @@ type AppStatesProps = {
     bootstrapCondition: { (going: boolean): Promise<Options> },
     onRunTimeInstalledListener: { (callback: {(details: InstalledDetails): void }): void },
     onMessageListener: { (callback: {(message: any): boolean}): void },
-    optionsObserver: Observer<Options>
-    getSyncObject_Going: GetSyncObjectFunction<GoingStorageProxy>
+    optionsObserver: Observer<Options>,
+    getSyncObject_Going: GetSyncObjectFunction<GoingStorageProxy>,
     bootstrapLock: SetReset
 }
 
@@ -231,17 +235,6 @@ export const AppStates = ({
 
                         machine?.handleState(typedMessage);
 
-                        // switch (typeof typedMessage) {
-                        //     // case typeof BootstrapMessage:
-                        //     //     bootstrapCondition();
-                        //     //     break;
-                        //     case typeof SelectorUpdated:
-                        //         machine?.handleState(message);
-                        //         break;
-                        //     default:
-                        //         console.log(`${typeof typedMessage} unhandled typed message from content script`)
-                        // }
-
                         return true;
                     });
                 });
@@ -295,6 +288,13 @@ export const AppStates = ({
             return machine?.getState("confirm remove selector")
         }),
         "confirm remove selector": CState("confirm remove selector", ["base"], false, (message, state, previousState) => {
+            if (window.confirm("Are you sure you wish to remove this selector?")) {
+                settingsService?.updateCurrentSettings(options => {
+                    const remove = (message as RemoveSelectorMessage).selector || '';
+                    options.selectors.splice(options.selectors.indexOf(remove, 0), 1);
+                    return options;
+                })
+            }
             return machine?.getState("base")
         }),
         "cancel remove selector": CState("cancel remove selector", ["base"], false, (message, state, previousState) => {

@@ -26,6 +26,39 @@ export class WaveToggleConfig extends AttributeConstructor<WaveToggleConfig> {
     }
 }
 
+const DeepEquals = (a: Object, b: Object): boolean => {
+    if (typeof a !== 'object' && a === b) {
+        return true;
+    }
+
+    const aString = JSON.stringify(a);
+    const bString = JSON.stringify(b);
+
+    const aObj = JSON.parse(aString);
+    const bObj = JSON.parse(bString);
+
+    if (Object.keys(aObj).find(prop => !(prop in bObj)) || Object.keys(bObj).find(prop => !(prop in aObj))) {
+        console.log("array mismatch for property: aString: " + aString + ", bString: " + bString);
+        return false;
+    }
+
+    for (let prop in aObj) {
+        if (Array.isArray(aObj[prop]) || Array.isArray(bObj[prop])) {
+            if (aObj[prop].find((ap: any, i: number) => Array.isArray(bObj[prop]) && !Object.is(ap, bObj[prop][i]))) {
+                console.log(" array mismatch for property: " + prop);
+                return false;
+            }
+        } else {
+            if (!DeepEquals(aObj[prop], bObj[prop])) {
+                console.log(" array mismatch for property: " + prop);
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 export default class Options extends AttributeConstructor<Options> {
     defaultSettings: boolean = false;
     state: State | undefined = undefined;
@@ -46,5 +79,9 @@ export default class Options extends AttributeConstructor<Options> {
 
     public static getDefaultOptions(): Options {
         return new Options();
+    }
+
+    public static OptionsEqual(a: Options, b: Options) {
+        return DeepEquals(a, b);
     }
 }
