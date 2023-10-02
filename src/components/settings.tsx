@@ -146,6 +146,7 @@ export const Settings: FunctionComponent<SettingsProps> = ({
             return;
         }
         const s: any = {
+            ...initialSettings,
             showNotifications,
             going: settings.going,
             waveAnimationControl,
@@ -165,7 +166,7 @@ export const Settings: FunctionComponent<SettingsProps> = ({
             })
         }
 
-        if (Options.OptionsEqual(new Options(s), initialSettings)) {
+        if (!Options.OptionsEqual(new Options(s), initialSettings)) {
             typedSetSettings(s);
             setSaved(false);
         }

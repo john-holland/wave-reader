@@ -1,6 +1,6 @@
 import SettingsService, {DomainPaths, DomainSettings, SettingsRegistry} from "../../src/services/settings";
 import SelectorService from "../../src/services/selector";
-import Options from "../../src/models/options"
+import Options, {DeepEquals} from "../../src/models/options"
 import { Tab } from "../../src/util/util";
 import DoneCallback = jest.DoneCallback;
 import {withMockSettingsService} from "../components/util/mock-settings-service";
@@ -232,5 +232,16 @@ describe("selector service", () => {
 
             done();
         })
+    })
+
+    test("options", () => {
+        expect(DeepEquals(true, false)).toBe(false);
+        expect(DeepEquals(false, false)).toBe(true)
+        expect(DeepEquals("expect", "not")).toBe(false)
+        expect(DeepEquals({ prop: "test" }, { prop: "test" })).toBe(true)
+        expect(DeepEquals({ prop: "test1" }, { prop: "test2" })).toBe(false)
+        expect(DeepEquals([1,2,3], [1,2,3])).toBe(true)
+        expect(DeepEquals([1,2,3], [1,2,"3"])).toBe(false)
+        expect(DeepEquals([1,2,3], 0)).toBe(false)
     })
 })

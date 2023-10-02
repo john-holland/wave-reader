@@ -27,6 +27,7 @@ import SettingsService from "./services/settings";
 //import SelectorService from "./services/selector";
 import {Observer} from "rxjs";
 import RemoveSelectorMessage from "./models/messages/remove-selector";
+import stateMachine from "./util/state-machine";
 
 //todo:
 // * Material UI
@@ -246,6 +247,7 @@ export const AppStates = ({
         "update": CState("update", ["base"], true, async (message, state, previousState) => {
             const settingsUpdated = message as UpdateWaveMessage;
             await settingsService?.updateCurrentSettings((options) => {
+                // todo: not updating as expected!
                 (settingsUpdated.options as Options).wave.selector = settingsUpdated?.options?.wave.selector;
                 (settingsUpdated.options as Options).wave.update();
                 return settingsUpdated.options as Options;
@@ -339,6 +341,7 @@ const App: FunctionComponent = () => {
         setGoing: (going) => setGoing(going),
         getGoing: (): boolean => { return going },
         bootstrapCondition: bootstrapConditionSettingsSetState,
+        settingsService
     })
 
     useEffect(() => {
@@ -356,14 +359,13 @@ const App: FunctionComponent = () => {
     };
 
     // [sm] add selector
-    const onSaved = (selector: string) => {
-        setSelector(selector);
+    const onSaved = async (settings: Options) => {
+        setSelector(settings.wave.selector as string);
         setSaved(true);
-        selectorUpdated(new SelectorUpdated({ selector })).then(() => {
-            chrome.runtime.sendMessage(new UpdateWaveMessage({
-                options: options
-            }))
-        });
+        selectorUpdated(new SelectorUpdated({ selector: settings.wave.selector }))
+        await AppStateMachine.handleState(new UpdateWaveMessage({
+            options: settings
+        }))
     };
 
     // [sm] start waving
@@ -385,25 +387,9 @@ const App: FunctionComponent = () => {
     }
 
     // [sm] use selector / add selector
-    const selectorUpdated = async (message: SelectorUpdated) => {
-        setSelector(message.selector || 'p');
-        options.wave.selector = message.selector;
+    const selectorUpdated = (message: SelectorUpdated) => {
         options.wave.update();
-        return settingsService.updateCurrentSettings((_) => {
-            return options;
-        });
-    }
-
-    // [sm] settings updated
-    // TODO: when we can't reach the tab, we want to instruct the user to try refreshing the tab, then the browser
-    const settingsUpdated = () => {
-        newSyncObject<Options>(Options, "options", Options.getDefaultOptions(), (result: Options) => {
-            result.wave = result.wave.update();
-            setOptions(result);
-            chrome.runtime.sendMessage(new UpdateWaveMessage({
-                options: result
-            }));
-        });
+        setSelector(message.selector || 'p');
     }
 
     // [sm] settings update / bootstrap
@@ -434,12 +420,12 @@ const App: FunctionComponent = () => {
                     selector={selector}
                     saved={saved}
                     selectorClicked={selectorClicked}
-                    onSave={onSaved}>
+                    onSave={async (selector) => selectorUpdated(new SelectorUpdated({ selector }))}>
                 </SelectorInput>
                 <Settings
                     tab-name={"Settings"}
                     initialSettings={options}
-                    onUpdateSettings={settingsUpdated}
+                    onUpdateSettings={onSaved}
                     domain={domain} path={path}
                     settingsService={settingsService}
                     onDomainPathChange={onDomainPathChange}>
