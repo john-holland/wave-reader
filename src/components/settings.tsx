@@ -73,19 +73,6 @@ const SettingsStyleContainer = styled.div`
   }
 `;
 
-// thank you: https://tobiasahlin.com/blog/flexbox-break-to-new-row/
-const Flexbreakboard = styled.div`
-  flex-basis: 100%;
-  height: 0;
-`;
-
-// type AutocompleteOption = string;
-
-// const DomainPathContainer = styled.div`
-//   display: flex;
-//   flex-flow: row;
-// `
-
 const val = (fn: {(v: any): void}) => ((_: any, value: any) => fn(value));
 const eventVal = (fn: {(e: any): void}) =>
     (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => fn(e.target.value);
@@ -135,7 +122,6 @@ export const Settings: FunctionComponent<SettingsProps> = ({
     const [axisRotationAmountYMin, setAxisRotationAmountYMin] = useState(initialSettings.wave.axisRotationAmountYMin);
     const [showNotifications, setShowNotifications] = useState(initialSettings.showNotifications);
     const [toggleKeys, setToggleKeys] = useState(initialSettings.toggleKeys)
-    const [folley, setFolley] = useState(initialSettings.showNotifications)
 
     useEffect(() => {
         settingsService.getDomainsAndPaths().then(setDomainPaths)
@@ -364,7 +350,6 @@ export const Settings: FunctionComponent<SettingsProps> = ({
                     InputLabelProps={{
                         shrink: true,
                     }} />
-            {/*<Flexbreakboard className={"item"} />*/}
                 <Autocomplete id="domain-settings-dropdown"
                     className={"item"}
                     disablePortal

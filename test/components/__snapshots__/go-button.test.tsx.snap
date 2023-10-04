@@ -2,7 +2,7 @@
 
 exports[`Link changes the class when hovered 1`] = `
 <button
-  class="MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeMedium MuiButton-outlinedSizeMedium MuiButtonBase-root sc-bczRLJ iiilXZ css-1rwt2y5-MuiButtonBase-root-MuiButton-root"
+  class="MuiButtonBase-root MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeMedium MuiButton-outlinedSizeMedium MuiButton-root MuiButton-outlined MuiButton-outlinedPrimary MuiButton-sizeMedium MuiButton-outlinedSizeMedium sc-aXZVg lkZRBZ css-1rwt2y5-MuiButtonBase-root-MuiButton-root"
   tabindex="0"
   type="button"
 >
@@ -10,7 +10,7 @@ exports[`Link changes the class when hovered 1`] = `
     class="MuiButton-startIcon MuiButton-iconSizeMedium css-1d6wzja-MuiButton-startIcon"
   >
     <h2
-      class="sc-gsnTZi llLRgE"
+      class="sc-gEvEer cvnYBm"
     >
       <span
         class="wave shrink"

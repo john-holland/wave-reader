@@ -26,7 +26,7 @@ export class WaveToggleConfig extends AttributeConstructor<WaveToggleConfig> {
     }
 }
 
-export const DeepEquals = (a: Object, b: Object): boolean => {
+export const DeepEquals = (a: unknown, b: unknown): boolean => {
     if (typeof a !== 'object' && a === b) {
         return true;
     }
@@ -54,7 +54,7 @@ export const DeepEquals = (a: Object, b: Object): boolean => {
         return false;
     }
 
-    for (let prop in aObj) {
+    for (const prop in aObj) {
         if (Array.isArray(aObj[prop]) || Array.isArray(bObj[prop])) {
             if (aObj[prop].find((ap: any, i: number) => Array.isArray(bObj[prop]) && !Object.is(ap, bObj[prop][i]))) {
                 console.log(" array mismatch for property: " + prop);

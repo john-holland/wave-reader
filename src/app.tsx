@@ -27,7 +27,6 @@ import SettingsService from "./services/settings";
 //import SelectorService from "./services/selector";
 import {Observer} from "rxjs";
 import RemoveSelectorMessage from "./models/messages/remove-selector";
-import stateMachine from "./util/state-machine";
 
 //todo:
 // * Material UI
@@ -203,7 +202,10 @@ export const AppStates = ({
     onRunTimeInstalledListener = chromeRunTimeInstalledListener,
     onMessageListener = chromeOnMessageListener,
     getSyncObject_Going = getSyncObject,
-    bootstrapLock = SetReset.unset("bootstrap-lock")
+    bootstrapLock = SetReset.unset("bootstrap-lock"),
+    setOptions = (options: Options) => {
+        throw new Error("unset setOptions method" + JSON.stringify(options))
+    }
 /* eslint-enable: typescript-eslint/no-unused-vars */
 }: Partial<AppStatesProps>): NameAccessMapInterface => {
     /* eslint-disable  @typescript-eslint/no-unused-vars */
@@ -250,6 +252,7 @@ export const AppStates = ({
                 // todo: not updating as expected!
                 (settingsUpdated.options as Options).wave.selector = settingsUpdated?.options?.wave.selector;
                 (settingsUpdated.options as Options).wave.update();
+                setOptions(settingsUpdated.options as Options);
                 return settingsUpdated.options as Options;
             })
             return previousState
@@ -341,7 +344,8 @@ const App: FunctionComponent = () => {
         setGoing: (going) => setGoing(going),
         getGoing: (): boolean => { return going },
         bootstrapCondition: bootstrapConditionSettingsSetState,
-        settingsService
+        settingsService,
+        setOptions
     })
 
     useEffect(() => {

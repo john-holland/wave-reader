@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import * as React from "react"
+import "jest";
 
 import { TextEncoder, TextDecoder } from 'util';
 
@@ -21,6 +22,7 @@ import {SelectorsDefaultFactory} from "../../src/models/defaults";
 import {getDefaultFontSizeREM} from "../../src/util/util";
 
 import styled from 'styled-components';
+//
 import "@testing-library/jest-dom"
 
 const jsdom = require("jsdom");
