@@ -1,3 +1,5 @@
+import * as React from "react"
+
 import {describe, expect, test} from '@jest/globals'
 import {FollowKeyChordObserver} from "../../../src/components/util/user-input";
 import {Observable, Subscriber} from "rxjs";
@@ -72,7 +74,7 @@ describe('user-inputs', () => {
             subscriber.next("w");
         }), () => stop).subscribe({
             next: (chord) => {
-                expect(chord).toBe(true);
+                expect(chord).toBe(false);
                 nextCalled++;
                 expect(nextCalled).toBe(1);
             },

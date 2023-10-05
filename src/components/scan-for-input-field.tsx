@@ -115,7 +115,21 @@ type ScanForInputStatesProps = {
     onCancelScan: { (keyChord: KeyChord): void }
     windowKeyDownObserver: WindowKeyDownKeyObserverDefinition
     shouldPreventDefault: boolean
+    window: Window & typeof globalThis;
 }
+
+// type WindowMethods = {
+//     addEventListener: { (eventName: string, listener: EventListener): void }
+//     removeEventListener: { (eventName: string, listener: EventListener): void }
+// }
+type WindowLike = Window & typeof globalThis;
+// type WindowMock = WindowLike & WindowMethods;
+
+    //typeof window !== undefined ? window as (Window & typeof globalThis) : {
+//     addEventListener: (eventName: string, listener: EventListener) => { console.error("window mock was instantiated during runtime"); },
+//     removeEventListener: (eventName: string, listener: EventListener) => { console.error("window mock was instantiated during runtime"); }
+// } as unknown as WindowMock;
+const _window = window as unknown as WindowLike
 export const ScanForInputStates = ({
        map,
        stateMachineMap,
@@ -129,7 +143,8 @@ export const ScanForInputStates = ({
        onScan,
        onCancelScan,
        windowKeyDownObserver = WindowKeyDownKey,
-       shouldPreventDefault = true
+       shouldPreventDefault = true,
+       window = _window
     }: ScanForInputStatesProps): NameAccessMapInterface =>  {
     // TODO: shortcut is still getting passed in from settings as the previous value:
     //   after a "click", "start scanning" "save", save settings -> "click", "save" ...
@@ -149,6 +164,10 @@ export const ScanForInputStates = ({
         }),
         "start scanning": CState("start scanning", ["scanning", "stop scanning"], false, (message, state, previousState) => {
             setScanning(true);
+            // maybe add a useState "started editing" variable, and keep the scanningMap defaulted to shortcut
+            //  then when we get any events from subscribe, clear it and accept the new input
+            //   - or -
+            //  alternatively, we may want to change the value type for scanningMap to include a "started editing" property
             scanningMap.set(actionType, []);
 
             windowKeyDownObserver((e: {(event: KeyboardEvent): void}) => {
@@ -247,14 +266,15 @@ const ScanForInputField: FunctionComponent<ScanForInputProps> = ({
         onScan,
         onCancelScan,
         windowKeyDownObserver: WindowKeyDownKey,
-        shouldPreventDefault: true
+        shouldPreventDefault: true,
+        window: _window
     });
 
     const stateMachine = () => { return StateMachineMap.get(actionType); }
-    const handleState = (name: string): State | undefined => {
+    const handleState = async (name: string): Promise<State | undefined> => {
         const machine = stateMachine();
 
-        return machine?.handleState(machine.getState(name) as Named)
+        return machine?.handleState(machine.getState(name) as State)
     }
 
     useEffect(() => {

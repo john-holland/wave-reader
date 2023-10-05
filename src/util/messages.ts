@@ -15,6 +15,7 @@ export const fromMessage = (message: Message<any>) => {
         case 'stop': return message as StopMessage;
         case 'start-selection-choose': return message as StartSelectorChooseMessage;
         case 'update-selector': return message as UpdateSelectorMessage;
-        case 'update-wave': return message as UpdateWaveMessage;
+        case 'update': return message as UpdateWaveMessage;
+        default: throw new Error(`unknown message type: ${message.name}`)
     }
 }

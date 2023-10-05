@@ -6,18 +6,27 @@ import GoButton from "./components/go-button";
 import StartMessage from "./models/messages/start";
 import Wave from "./models/wave";
 import Options from "./models/options";
-import {getSyncObject, newSyncObject, setSyncObject} from './util/sync';
+import {getSyncObject, GetSyncObjectFunction, newSyncObject, setSyncObject} from './util/sync';
 import StopMessage from "./models/messages/stop";
 import {fromMessage} from "./util/messages";
-import {Deferred} from "./util/deferred";
 import SelectorUpdated from "./models/messages/selector-updated";
+// todo: this should work, but jest returns a config is not defined
 import configured from './config/config';
-import {guardLastError} from "./util/util";
+// todo: slightly less data driven shim
+const isDevelopment = configured.mode !== 'production'; //process.env.NODE_ENV !== 'production';
+import { guardLastError } from "./util/util";
 import UpdateWaveMessage from "./models/messages/update-wave";
-import {Settings, LoadSettings} from "./components/settings";
+import { Settings } from "./components/settings";
 
 import WaveTabs from './components/wave-tabs';
 import InstalledDetails = chrome.runtime.InstalledDetails;
+import {CState, NameAccessMapInterface, Named, State, StateNames} from "./util/state";
+import StateMachine from "./util/state-machine";
+
+import SettingsService from "./services/settings";
+//import SelectorService from "./services/selector";
+import {Observer} from "rxjs";
+import RemoveSelectorMessage from "./models/messages/remove-selector";
 
 //todo:
 // * Material UI
@@ -26,6 +35,20 @@ import InstalledDetails = chrome.runtime.InstalledDetails;
 // * keyboard shortcut toggle
 // * mouse movement
 // * audio from the ocean or the highway, coffee shop, or white or brown noise
+// * education ([Orton Gillingham](https://en.wikipedia.org/wiki/Orton-Gillingham) &
+//              [Phonics](https://en.wikipedia.org/wiki/Phonics)) & about page
+// * support for right to left, top to bottom etc, perhaps a "direction" option as a toggle switch in the settings menu?
+// * maybe a 3d swirl wave for the F-shaped pattern readers?
+//      https://www.nngroup.com/articles/f-shaped-pattern-reading-web-content/
+//      https://en.wikipedia.org/wiki/Screen_reading
+// * a css animation stop per row on the active viewport could be cool and would support the layer cake pattern if
+//     we added stops at each horizontal
+//     or possibly add a F-shaped layer cake swirl that would 3d swirl each layer cake section as a hybrid?
+//         https://www.nngroup.com/articles/layer-cake-pattern-scanning/
+// * add an "advanced settings" option (that saves), to show the css, and default false
+// * think about the implications of your brain recognizing what it's holding by motion of your hands?
+//   * camera input ML (machine learning) for holding your hands in front of the screen, and interpreting the motion of the ocean
+//      and possibly scrolling the page by pawing or turning the page
 //
 //todo,ne:
 // * NOTE: popup, chrome.runtime.sendMessage -> background, chrome.tabs.query...sendMessage -> content
@@ -39,6 +62,9 @@ import InstalledDetails = chrome.runtime.InstalledDetails;
 const WaveReader = styled.div`
   width: 800px;
 `;
+
+const settingsService = new SettingsService();
+//const selectorService = new SelectorService(settingsService);
 
 const startPageCss = (wave: Wave) => {
     newSyncObject<Options>(Options,'options', Options.getDefaultOptions(), (options) => {
@@ -67,60 +93,286 @@ const stopPageCss = () => {
     setSyncObject("going", { going: false });
 }
 
-const deferredOptions = new Deferred<Options>(() => {
-    return new Promise((resolve, reject) => {
-        try {
-            newSyncObject<Options>(Options,'options', Options.getDefaultOptions(), (result) => {
-                resolve(result);
-            });
-        } catch (e) {
-            reject(e);
-        }
-    });
-})
-
-const bootstrapCondition = (going: boolean) => {
-    deferredOptions.waitFor().then((options) => {
-        options = new Options(options);
-        setTimeout(() => {
-            if (going && options) {
-                options.wave = options.wave.update();
-                chrome.runtime.sendMessage(new StartMessage({
-                    options: options
-                }));
-            } else if (!going && options) {
-                chrome.runtime.sendMessage(new UpdateWaveMessage({ options }))
-            } else {
-                chrome.runtime.sendMessage(new StopMessage())
-            }
-        }, 3000);
+const bootstrapConditionSettingsSetState = (going: boolean): Promise<Options> => {
+    return settingsService.getCurrentSettings().then((options) => {
+        return new Promise((resolve) => {
+            options = new Options(options);
+            setTimeout(() => {
+                if (going && options) {
+                    options.wave = options.wave.update();
+                    chrome.runtime.sendMessage(new StartMessage({
+                        options: options
+                    }));
+                } else if (!going && options) {
+                    chrome.runtime.sendMessage(new UpdateWaveMessage({ options }))
+                } else {
+                    chrome.runtime.sendMessage(new StopMessage())
+                }
+                resolve(options);
+            }, 100);
+        });
     });
 }
+type GoingBox = {
+    going: boolean
+}
+const getGoingChromeStorage = (callback: { (going: boolean): void }) => getSyncObject("going", { going: false }, (result: GoingBox) => callback(result.going));
+
+const getGoingAsync = async (): Promise<boolean> => new Promise((resolve) => getGoingChromeStorage(resolve));
+
+type AppStatesProps = {
+    machine: StateMachine,
+    settingsService: SettingsService,
+    originState: string,
+    map: Map<string, State>,
+    setState: { (state: string | Named): Promise<State> },
+    setGoing: { (going: boolean): void },
+    getGoing: { (): boolean },
+    _getGoingAsync: { (): Promise<boolean> },
+    setOptions: { (options: Options): void },
+    bootstrapCondition: { (going: boolean): Promise<Options> },
+    onRunTimeInstalledListener: { (callback: {(details: InstalledDetails): void }): void },
+    onMessageListener: { (callback: {(message: any): boolean}): void },
+    optionsObserver: Observer<Options>,
+    getSyncObject_Going: GetSyncObjectFunction<GoingStorageProxy>,
+    bootstrapLock: SetReset
+}
+
+const chromeRunTimeInstalledListener = (callback: {(details: InstalledDetails): void}) => {
+    // maybe direct assignment would be prettier but i'm not sure if ts binds [this] for class method dispatch
+    chrome.runtime.onInstalled.addListener(callback);
+}
+
+const chromeOnMessageListener = (callback: { (message: any): boolean }) => {
+    chrome.runtime.onMessage.addListener(callback);
+}
+
+export type GoingStorageProxy = {
+    going: boolean
+}
+
+export class SetReset {
+    private _set: boolean
+    private name: string
+
+    private constructor(name: string = "unnamed lock", set: boolean = false) {
+        this.name = name;
+        this._set = set
+    }
+
+    reset() {
+        console.log(`set called for ${this.name}`)
+        this._set = false;
+    }
+
+    set() {
+        console.log(`set called for ${this.name}`)
+        this._set = true;
+    }
+
+    getSet() {
+        return this._set;
+    }
+
+    static set(name: string) {
+        console.log(`created set for ${this.name}`)
+        return new SetReset(name, true);
+    }
+    static unset(name: string) {
+        console.log(`created unset for ${this.name}`)
+        return new SetReset(name, false);
+    }
+}
+
+//todo chrome.runtime.onSuspend() handle this method and save state
+export const AppStates = ({
+  /* eslint-disable: typescript-eslint/no-unused-vars */
+    machine = new StateMachine(),
+    settingsService,
+    originState = "base",
+    // setState = async (state): Promise<State> => {
+    // todo: we should use state machine observable to support state tracking and auto saving
+    // },
+    map = new Map<string, State>(),
+    setGoing = (going) => { console.error("unset setGoing method in AppStates, goiing: ", going); },
+    //getGoing = () => { console.error("unset setGoing method in AppStates"); return false; },
+    _getGoingAsync = getGoingAsync,
+    //setOptions = (options) => { settingsService?.updateCurrentSettings(_ => options)},
+    bootstrapCondition = bootstrapConditionSettingsSetState,
+    onRunTimeInstalledListener = chromeRunTimeInstalledListener,
+    onMessageListener = chromeOnMessageListener,
+    getSyncObject_Going = getSyncObject,
+    bootstrapLock = SetReset.unset("bootstrap-lock"),
+    setOptions = (options: Options) => {
+        throw new Error("unset setOptions method" + JSON.stringify(options))
+    }
+/* eslint-enable: typescript-eslint/no-unused-vars */
+}: Partial<AppStatesProps>): NameAccessMapInterface => {
+    /* eslint-disable  @typescript-eslint/no-unused-vars */
+    const states: StateNames = {
+        "base": CState("base", ["base", "bootstrap", "settings updated"], true, () => {
+            return machine?.getState("base")
+        }),
+        "bootstrap": CState("bootstrap", ["base"], true, async (message, state, previousState): Promise<State> => {
+            if (!bootstrapLock.getSet()) {
+                const going = (await _getGoingAsync()) || false;
+                setGoing(going);
+                bootstrapCondition(going).then(options => {
+                    machine?.handleState(options.state || machine?.getState(originState) as State).then(state => {
+                        settingsService?.updateCurrentSettings(update => {
+                            // check sub state? or let it error, and design better???
+                            update.state = state;
+                            return update;
+                        });
+                    });
+                });
+                bootstrapLock.set()
+            }
+
+            onRunTimeInstalledListener((details: InstalledDetails) => {
+                console.log(`install details: ${details}`);
+                // upon first load, get a default value for 'going'
+                getSyncObject_Going("going", {going: false}, (result) => {
+                    onMessageListener((message: any) => {
+                        const typedMessage = fromMessage(message);
+
+                        machine?.handleState(typedMessage);
+
+                        return true;
+                    });
+                });
+
+            });
+
+            return machine?.getState("base") as State;
+        }),
+        "update": CState("update", ["base"], true, async (message, state, previousState) => {
+            const settingsUpdated = message as UpdateWaveMessage;
+            await settingsService?.updateCurrentSettings((options) => {
+                // todo: not updating as expected!
+                (settingsUpdated.options as Options).wave.selector = settingsUpdated?.options?.wave.selector;
+                (settingsUpdated.options as Options).wave.update();
+                setOptions(settingsUpdated.options as Options);
+                return settingsUpdated.options as Options;
+            })
+            return previousState
+        }),
+        // selector selection mode
+        "selection mode activate": CState("selection mode activate", ["selection mode active"], true, (message, state, previousState) => {
+            return machine?.getState("selection mode active")
+        }),
+        "selection mode active": CState("selection mode active", ["selection made", "selection error report", "settings updated"], false, (message, state, previousState) => {
+            //  (disable settings tab)
+            return machine?.getState("selection mode active")
+
+            // return states.get("selection made (enable settings tab)")
+        }),
+        "selection made (enable settings tab)": CState("selection made (enable settings tab)", ["base"], false, (message, state, previousState) => {
+            return machine?.getState("base")
+        }),
+        "selection error report (user error, set red selection error note, revert to previous selector)": CState("selection error report (user error, set red selection error note, revert to previous selector)", ["base"], false, (message, state, previousState) => {
+            // todo: maybe this isn't necessary -- it would be neat to have super states so the
+            //   dependent state machines could know when not to be active
+            return machine?.getState("selection mode active")
+        }),
+        // selectors!
+        // add
+        "start add selector": CState("start add selector", ["add selector", "cancel add selector"], false, (message, state, previousState) => {
+            // TODO✅(see settings-hierarchy.tsx): need a selector choose drop down component
+            return machine?.getState("add selector")
+        }),
+        "add selector": CState("add selector", ["base"], false, (message, state, previousState) => {
+                // selectorUpdated(message)
+            return machine?.getState("base")
+        }),
+        "cancel add selector": CState("cancel add selector", ["base"], false, (message, state, previousState) => {
+            return machine?.getState("base")
+        }),
+        // remove
+        "remove selector": CState("remove selector", ["confirm remove selector", "cancel remove selector"], false, (message, state, previousState) => {
+            return machine?.getState("confirm remove selector")
+        }),
+        "confirm remove selector": CState("confirm remove selector", ["base"], false, (message, state, previousState) => {
+            if (window.confirm("Are you sure you wish to remove this selector?")) {
+                settingsService?.updateCurrentSettings(options => {
+                    const remove = (message as RemoveSelectorMessage).selector || '';
+                    options.selectors.splice(options.selectors.indexOf(remove, 0), 1);
+                    return options;
+                })
+            }
+            return machine?.getState("base")
+        }),
+        "cancel remove selector": CState("cancel remove selector", ["base"], false, (message, state, previousState) => {
+            return machine?.getState("base")}),
+        // use
+        "use selector": CState("use selector", ["base"], false, (message, state, previousState) => {
+            return machine?.getState("base")
+        }),
+        // ~~ waves ~~
+        "start waving": CState("start waving", ["base"], true, (message, state, previousState) => {
+            return machine?.getState("waving")
+        }),
+        "waving": CState("start waving", ["stop wave", "settings updated"], false, (message, state, previousState) => {
+            return machine?.getState("waving")
+        }),
+        "stop waving": CState("stop waving", ["base"], false, (message, state, previousState) => {
+            return machine?.getState("base")
+        }),
+    };
+
+    Object.keys(states).forEach(state => map.set(state, states[state]))
+
+    return new class implements NameAccessMapInterface {
+        getState(name: string): State | undefined {
+            return map.get(name);
+        }
+    }
+}
+
+const AppStateMachine = new StateMachine();
 
 const App: FunctionComponent = () => {
     const [ selector, setSelector ] = useState('p');
     const [ saved, setSaved ] = useState(true);
     const [ going, setGoing ] = useState(false);
     const [ options, setOptions ] = useState<Options>(Options.getDefaultOptions());
+    const [ domain, setDomain ] = useState<string>("");
+    const [ path, setPath ] = useState<string>("");
+
+    const appStateMap = AppStates({
+        machine: AppStateMachine,
+        setGoing: (going) => setGoing(going),
+        getGoing: (): boolean => { return going },
+        bootstrapCondition: bootstrapConditionSettingsSetState,
+        settingsService,
+        setOptions
+    })
 
     useEffect(() => {
-        LoadSettings().then(setOptions)
+        AppStateMachine.initialize(appStateMap, appStateMap.getState("bootstrap") as State)
+
+        settingsService.getCurrentDomainAndPaths().then(domainAndPath => {
+            setDomain(domainAndPath.domain);
+            setPath(domainAndPath.paths[0])
+        })
     }, []);
 
+    // [sm] start add selector
     const selectorClicked = () => {
         setSaved(false);
     };
 
-    const onSaved = (selector: string) => {
-        setSelector(selector);
+    // [sm] add selector
+    const onSaved = async (settings: Options) => {
+        setSelector(settings.wave.selector as string);
         setSaved(true);
-        selectorUpdated(new SelectorUpdated({ selector })).then(() => {
-            chrome.runtime.sendMessage(new UpdateWaveMessage({
-                options: options
-            }))
-        });
+        selectorUpdated(new SelectorUpdated({ selector: settings.wave.selector }))
+        await AppStateMachine.handleState(new UpdateWaveMessage({
+            options: settings
+        }))
     };
 
+    // [sm] start waving
     const onGo = () => {
         setGoing(true);
 
@@ -132,84 +384,36 @@ const App: FunctionComponent = () => {
         });
     }
 
+    // [sm] stop waving
     const onStop = () => {
         setGoing(false);
         stopPageCss();
     }
 
-    const selectorUpdated = async (message: SelectorUpdated) => {
-        setSelector(message.selector || 'p');
-        options.wave.selector = message.selector;
+    // [sm] use selector / add selector
+    const selectorUpdated = (message: SelectorUpdated) => {
         options.wave.update();
-        deferredOptions.waitFor().then((options) => {
-            if (options) {
-                setSyncObject('options', options);
-            } else {
-                throw new Error("empty options");
-            }
-        });
-        deferredOptions.update();
+        setSelector(message.selector || 'p');
     }
 
-    // TODO: when we can't reach the tab, we want to instruct the user to try refreshing the tab, then the browser
-    const settingsUpdated = () => {
-        newSyncObject<Options>(Options, "options", Options.getDefaultOptions(), (result: Options) => {
-            result.wave = result.wave.update();
-            setOptions(result);
-            chrome.runtime.sendMessage(new UpdateWaveMessage({
-                options: result
-            }));
-        });
-    }
-
+    // [sm] settings update / bootstrap
     useEffect(() => {
-        // TODO: this needs a revision to send a start or update message depending on the state of "going" in google sync
-        deferredOptions.subscribe((options: Options = Options.getDefaultOptions(), error?: any) => {
-            if (error) {
-                console.log(error);
-                if (!options) return;
-            }
-            setOptions(options);
-            setSelector(options?.wave?.selector || 'p');
-        });
+        // TODO✅: this needs a revision to send a start or update message depending on the state of "going" in google sync
+        //          bootstrap condition now sets the state to the last setState or base, and delivers the start stop or update
+        //          per "going" which should provide nice backup measures, however we need to store the last message as a State
 
-        if (configured.mode === "production") {
+        //if (configured.mode === "production") {
+        if (!isDevelopment) {
             window.onblur = () => {
                 window.close();
             }
         }
-        getSyncObject("going", { going: false }, (result) => {
-            setGoing(result.going);
-        });
-
-        chrome.runtime.onInstalled.addListener((details: InstalledDetails) => {
-            console.log(`install details: ${details}`);
-            // upon first load, get a default value for 'going'
-            getSyncObject("going", { going: false }, (result) => {
-                setGoing(result.going);
-
-                // use result.going as useState is an async call
-                bootstrapCondition(result.going);
-
-                chrome.runtime.onMessage.addListener((message: any) => {
-                    const typedMessage = fromMessage(message);
-
-                    switch (typeof typedMessage) {
-                        // case typeof BootstrapMessage:
-                        //     bootstrapCondition();
-                        //     break;
-                        case typeof SelectorUpdated:
-                            selectorUpdated(message);
-                            break;
-                        default:
-                            console.log(`${typeof typedMessage} unhandled typed message from content script`)
-                    }
-
-                    return true;
-                });
-            });
-        });
     }, []);
+
+    const onDomainPathChange = (domain: string, path: string) => {
+        setDomain(domain);
+        setPath(path);
+    }
 
     return (
         <WaveReader>
@@ -220,12 +424,15 @@ const App: FunctionComponent = () => {
                     selector={selector}
                     saved={saved}
                     selectorClicked={selectorClicked}
-                    onSave={onSaved}>
+                    onSave={async (selector) => selectorUpdated(new SelectorUpdated({ selector }))}>
                 </SelectorInput>
                 <Settings
                     tab-name={"Settings"}
                     initialSettings={options}
-                    onUpdateSettings={settingsUpdated}>
+                    onUpdateSettings={onSaved}
+                    domain={domain} path={path}
+                    settingsService={settingsService}
+                    onDomainPathChange={onDomainPathChange}>
                 </Settings>
             </WaveTabs>
         </WaveReader>

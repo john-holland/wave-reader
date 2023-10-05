@@ -1,36 +1,87 @@
 import AttributeConstructor from "../util/attribute-constructor";
 import Wave from "./wave";
 import { KeyChord } from "../components/util/user-input";
-
-export enum WaveAnimationControl {
-    CSS,
-    MOUSE
-}
+import {
+    WaveAnimationControlDefault,
+    ShowNotificationsDefault,
+    GoingDefault,
+    WaveAnimationControl,
+    WaveDefaultFactory,
+    KeyChordDefaultFactory,
+    SelectorsDefaultFactory
+} from "./defaults"
+import {State} from "../util/state";
 
 export class WaveToggleConfig extends AttributeConstructor<WaveToggleConfig> {
     // a 1-4ish length array of keys
-    keyChord: KeyChord = []
+    keyChord: KeyChord = KeyChordDefaultFactory()
 
-    public constructor(attributes: Partial<WaveToggleConfig> = WaveToggleConfig.getDefaultConfig()) {
+    public constructor(attributes: Partial<WaveToggleConfig> = {}) {
         super(attributes);
         this.keyChord = attributes.keyChord || []
     }
 
     static getDefaultConfig(): WaveToggleConfig {
-        return new WaveToggleConfig({
-            keyChord: ["w", "Shift"]
-        })
+        return new WaveToggleConfig()
     }
 }
 
-export default class Options extends AttributeConstructor<Options> {
-    showNotifications: boolean = true;
-    going: boolean = false;
-    waveAnimationControl: WaveAnimationControl = WaveAnimationControl.CSS;
-    wave: Wave = Wave.getDefaultWave();
-    toggleKeys: WaveToggleConfig = WaveToggleConfig.getDefaultConfig();
+export const DeepEquals = (a: unknown, b: unknown): boolean => {
+    if (typeof a !== 'object' && a === b) {
+        return true;
+    }
 
-    constructor(props: Partial<Options> = Options.getDefaultOptions()) {
+    const aString = JSON.stringify(a);
+    const bString = JSON.stringify(b);
+
+    const aObj = JSON.parse(aString);
+    const bObj = JSON.parse(bString);
+
+    if (typeof a !== typeof b) {
+        console.log("array mismatch for property: aString: " + aString + ", bString: " + bString);
+        return false;
+    }
+
+    if ((typeof a === "boolean" || typeof a === "number" || typeof a === "string") && a !== b) {
+        console.log("array mismatch for property: aString: " + aString + ", bString: " + bString);
+        return false;
+    }
+
+    if (Array.isArray(aObj) && ((Array.isArray(aObj) != Array.isArray(bObj))
+        || Object.keys(aObj).find(prop => !(prop in bObj)) ||
+           Object.keys(bObj).find(prop => !(prop in aObj)))) {
+        console.log("array mismatch for property: aString: " + aString + ", bString: " + bString);
+        return false;
+    }
+
+    for (const prop in aObj) {
+        if (Array.isArray(aObj[prop]) || Array.isArray(bObj[prop])) {
+            if (aObj[prop].find((ap: any, i: number) => Array.isArray(bObj[prop]) && !Object.is(ap, bObj[prop][i]))) {
+                console.log(" array mismatch for property: " + prop);
+                return false;
+            }
+        } else {
+            if (!DeepEquals(aObj[prop], bObj[prop])) {
+                console.log(" array mismatch for property: " + prop);
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+export default class Options extends AttributeConstructor<Options> {
+    defaultSettings: boolean = false;
+    state: State | undefined = undefined;
+    showNotifications: boolean = ShowNotificationsDefault;
+    going: boolean = GoingDefault;
+    waveAnimationControl: WaveAnimationControl = WaveAnimationControlDefault;
+    wave: Wave = WaveDefaultFactory();
+    toggleKeys: WaveToggleConfig = WaveToggleConfig.getDefaultConfig();
+    selectors: string[] = SelectorsDefaultFactory();
+
+    constructor(props: Partial<Options> = {}) {
         super(undefined);
         // typescript auto-fills defaults here, if this is the desired behavior
         super.assign(props);
@@ -39,10 +90,10 @@ export default class Options extends AttributeConstructor<Options> {
     }
 
     public static getDefaultOptions(): Options {
-        return new Options({
-            showNotifications: true,
-            going: false,
-            wave: Wave.getDefaultWave()
-        });
+        return new Options();
+    }
+
+    public static OptionsEqual(a: Options, b: Options) {
+        return DeepEquals(a, b);
     }
 }

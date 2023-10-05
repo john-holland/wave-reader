@@ -1,6 +1,11 @@
 import AttributeConstructor from "../util/attribute-constructor";
 
-export default abstract class Message<T> extends AttributeConstructor<T> {
+export interface MessageInterface {
+    getName(): string;
+    getFrom(): string;
+}
+
+export default abstract class Message<T> extends AttributeConstructor<T> implements MessageInterface {
     name: string;
     from: string;
 
@@ -9,5 +14,13 @@ export default abstract class Message<T> extends AttributeConstructor<T> {
 
         this.name = name;
         this.from = from;
+    }
+
+    getFrom(): string {
+        return this.name;
+    }
+
+    getName(): string {
+        return this.from;
     }
 }

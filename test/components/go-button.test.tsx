@@ -1,3 +1,7 @@
+/**
+ * @jest-environment jsdom
+ */
+
 import 'jest';
 import React from 'react';
 import GoButton from '../../src/components/go-button';

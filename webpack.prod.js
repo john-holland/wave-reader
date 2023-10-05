@@ -10,6 +10,7 @@ const config = merge(common, {
     // },
     resolve: {
         alias: {
+            extensions: [".tsx", ".ts", ".js", ".jsx", "*"],
             config: path.join(__dirname, "./src/config/config.production.js")
         }
     }
