@@ -14,10 +14,13 @@ import {
 } from "../src/util/venture-states";
 
 // if a promised resolved state is a future, then a potential state maybe nicely referred to as a venture?
-
+import SettingsService from "../src/services/settings"
+import UpdateWaveMessage from "../src/models/messages/update-wave";
 
 const stateMachineMap = new Map();
 stateMachineMap.set("base", Base);
+
+const settingsService = new SettingsService();
 
 const stateMachine = new StateMachine()
 
@@ -70,7 +73,7 @@ const initializeOrUpdateToggleObserver = (message) => {
         stopKeyChordEventListenerPredicate();
     }
 
-    //TODO: debounce
+    //TODO: debounce?
     keychordObserver = FollowKeyChordObserver(
         message.options.toggleKeys.keyChord,
         WindowKeyDownKey((e/*{(event: KeyboardEvent): void}*/) => {
@@ -201,6 +204,10 @@ function StateNameMap(map = new Map()) {
 let going = false;
 
 stateMachine.initialize(new StateNameMap(stateMachineMap), Base);
+
+settingsService.getCurrentSettings().then(settings => {
+    stateMachine.handleState(new UpdateWaveMessage({ options: settings }))
+})
 
 chrome.runtime.onMessage.addListener( (message, sender, sendResponse) => {
         console.log(`message: ${JSON.stringify(message)}`)

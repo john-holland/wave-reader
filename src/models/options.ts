@@ -18,7 +18,7 @@ export class WaveToggleConfig extends AttributeConstructor<WaveToggleConfig> {
 
     public constructor(attributes: Partial<WaveToggleConfig> = {}) {
         super(attributes);
-        this.keyChord = attributes.keyChord || []
+        this.keyChord = attributes.keyChord || this.keyChord
     }
 
     static getDefaultConfig(): WaveToggleConfig {
