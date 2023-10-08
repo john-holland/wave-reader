@@ -55,7 +55,8 @@ export const FollowKeyChordObserver = (shortcut: KeyChord,
                                        stop: {(): boolean}): Observable<boolean> => {
     return new Observable((subscriber: Subscriber<boolean>) => {
         let typed: KeyChord = []
-        const joined = shortcut.join(', ').toLowerCase();
+        const join = (shortcut: string[]) => shortcut.join(', ').toLowerCase()
+        const joined = join(shortcut)
         let complete = false;
         keysObservable.subscribe((key: string) => {
             if (stop()) {
@@ -66,10 +67,12 @@ export const FollowKeyChordObserver = (shortcut: KeyChord,
                 return;
             }
 
-            typed.unshift(key);
-            typed = typed.slice(0, shortcut.length);
+            // typed.unshift(key);
+            // todo: review: should shift, meta, and control reduce to 1 and stick until keyup?
+            //        so you can hold shift, and toggle with 'w'
+            typed = [key].concat(typed).slice(0, shortcut.length)
 
-            if (typed.join(', ').toLowerCase() === joined) {
+            if (join(typed) === joined) {
                 subscriber.next(true);
             } else {
                 subscriber.next(false);
