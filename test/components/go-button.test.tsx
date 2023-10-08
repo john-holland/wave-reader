@@ -25,7 +25,6 @@ test('Link changes the class when hovered', async () => {
     );
 
     const goButtonUnClicked = screen.getByText('go!')
-    expect(goButtonUnClicked).toMatchSnapshot();
     expect(goButtonUnClicked).toBeTruthy();
 
     await act(async () => {
@@ -43,5 +42,6 @@ test('Link changes the class when hovered', async () => {
     //  to render with the updated information, so idk.
 
     // in the meantime...
-    //
+    // todo: Matrial-UI seems like it suddenly wanted to start fighting with snapshot due to polluting classnames non-deterministically
+    expect(goButtonUnClicked).toMatchSnapshot();
 });
