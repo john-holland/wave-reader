@@ -17,6 +17,9 @@ import {
 import SettingsService from "../src/services/settings"
 import UpdateWaveMessage from "../src/models/messages/update-wave";
 import SelectionModeMessage from "../src/models/messages/selection-mode";
+import {MountOrFindSelectorHierarchyComponent} from "../src/components/selector-hierarchy";
+import {ColorGeneratorService, SelectorHierarchy} from "../src/services/selector-hierarchy";
+import SelectionMadeMessage from "../src/models/messages/selection-made";
 
 const stateMachineMap = new Map();
 stateMachineMap.set("base", Base);
@@ -105,6 +108,10 @@ const initializeOrUpdateToggleObserver = (message) => {
     * [isBaseLevel] whether or not this is requires validation using possible states
  */
 
+let hierarchySelectorMount = undefined;
+const hierarchySelectorService = new SelectorHierarchy(new ColorGeneratorService())
+let setHierarchySelector = undefined;
+
 function StateNameMap(map = new Map()) {
     /* eslint-disable  @typescript-eslint/no-unused-vars */
     const states = {
@@ -176,18 +183,39 @@ function StateNameMap(map = new Map()) {
                 selector
             }))
 
+            hierarchySelectorMount = MountOrFindSelectorHierarchyComponent({
+                service: hierarchySelectorService,
+                settingsService,
+                selector,
+                passSetSelector: (modifier) => { setHierarchySelector = modifier; },
+                onConfirmSelector: (selector) => {
+                    stateMachine.handleState(new SelectionMadeMessage({
+                        selector
+                    }))
+                },
+                doc: document
+            })
+
             return map.get('selection mode')
         }, false),
         "selection mode": CState("selection mode", ["selection mode activate", "selection mode", "selection made", "selection mode deactivate"], (message, state, previousState) => {
             // todo: make component mount and render HierarchySelectorComponent
 
 
-            return map.get('base')
+            return map.get('selection mode')
         }, false),
-        "selection made": CState("selection made", BaseVentures, false, (message, state, previousState) => {
-            return map.get('base')
+        "selection made": CState("selection made", ["selection mode deactivate"], false, async (message, state, previousState) => {
+            await settingsService.updateCurrentSettings((options) => {
+                options.selectors.push(message?.selector)
+                options.wave.selector = message?.selector;
+                return options;
+            })
+            return Promise.resolve(map.get('selection mode deactivate'))
         }, false),
-        "selection mode deactivate": CState("selection mode deactivate", [], false, (message, state, previousState) => {
+        "selection mode deactivate": CState("selection mode deactivate", BaseVentures, false, (message, state, previousState) => {
+            hierarchySelectorMount.remove()
+            setHierarchySelector = undefined;
+
             return map.get('base')
         }, false)
     }

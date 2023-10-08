@@ -1,11 +1,12 @@
 import AttributeConstructor from "../util/attribute-constructor";
+import {Named} from "../util/state";
 
 export interface MessageInterface {
     getName(): string;
     getFrom(): string;
 }
 
-export default abstract class Message<T> extends AttributeConstructor<T> implements MessageInterface {
+export default abstract class Message<T> extends AttributeConstructor<T> implements MessageInterface, Named {
     name: string;
     from: string;
 

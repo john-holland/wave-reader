@@ -10,6 +10,8 @@ Object.assign(global, { TextDecoder, TextEncoder });
 
 import {render, screen, waitFor} from "@testing-library/react";
 
+import { screen as domScreen } from "@testing-library/dom";
+
 import {
     ColorGeneratorService,
     DefaultSplitComplement,
@@ -32,6 +34,7 @@ import {
 } from "../../src/components/selector-hierarchy";
 import {FunctionComponent, ReactElement} from "react";
 import {withMockSettingsService} from "../components/util/mock-settings-service";
+import {act} from "react-dom/test-utils";
 
 const jsdom = require("jsdom");
 const { JSDOM } = jsdom;
@@ -41,7 +44,7 @@ const Container = styled.div``;
 type JSDOMLike = {
     window: any
 }
-const withDocument = (actionFn: { (doc: Document, window: Window): void }, htmlFontSize = "font-size: 10px"): JSDOMLike => {
+const withDocument = (actionFn: { (doc: Document, window: Window, dom: any): void }, htmlFontSize = "font-size: 10px"): JSDOMLike => {
     // const Component = () => {
     //     return (<Container id={"mount"} />);
     // }
@@ -50,7 +53,7 @@ const withDocument = (actionFn: { (doc: Document, window: Window): void }, htmlF
     Object.defineProperty(dom.window.HTMLHtmlElement.prototype, 'clientHeight', { value: 768 });
     Object.defineProperty(dom.window.HTMLHtmlElement.prototype, 'clientWidth', { value: 1024 });
 
-    actionFn(dom.window.document, dom.window);
+    actionFn(dom.window.document, dom.window, dom);
 
     return dom;
 }
@@ -256,35 +259,108 @@ describe("selector quad service", () => {
    })
 
     describe("content.js mounting", () => {
-        withMockSettingsService((settingsService, accessRegistry) => {
-            const service = new SelectorHierarchy(new ColorGeneratorService());
+        test("mount and verify element, selector modification", async () => {
+            return new Promise(async (resolve, reject) => {
+                await withMockSettingsService(async (settingsService, accessRegistry) => {
+                    const service = new SelectorHierarchy(new ColorGeneratorService());
 
-            withDocument((doc, window) => {
-                let setSelector = (selector: string): void => {
-                    throw new Error("didn't initialize modifier")
-                }
-                let confirmedSelector = "unconfirmed selector"
-                const mount = MountOrFindSelectorHierarchyComponent(service,
-                    "",
-                    (modifier) => {
-                        setSelector = modifier
-                    },
-                    (selector) => {
-                        confirmedSelector = selector
-                    },
-                    doc, (mount, component) => {
+                    withDocument((doc, window, dom) => {
+                        let setSelector = (selector: string): void => {
+                            throw new Error("didn't initialize modifier")
+                        }
+                        let confirmedSelector = "unconfirmed selector"
+                        const mount = MountOrFindSelectorHierarchyComponent({
+                            service,
+                            settingsService,
+                            selector: "",
+                            passSetSelector: (modifier) => {
+                                setSelector = modifier
+                            },
+                            onConfirmSelector: (selector) => {
+                                confirmedSelector = selector
+                            },
+                            doc, renderFunction: (mount, component) => {
+                                expect(mount).toBeDefined();
+                                render(component as ReactElement, { container: doc.documentElement, baseElement: mount });
+                            }
+                        })
+
                         expect(mount).toBeDefined();
-                        render(component as ReactElement)
-                    }, settingsService)
+                        act(() => {
+                            setSelector("test selector");
+                        })
 
-                expect(mount).toBeDefined();
-                setSelector("test selector");
-
-                waitFor(() => {
-                    expect(screen.findByText("test selector")).toBeTruthy()
-                }, { interval: 300 })
-
-            });
+                        waitFor(async () => {
+                            // todo: screen doesn't seem to register the provided jsdom,
+                            //       so for any text verification, we'll just have to search the innerHTML etc
+                            //       or use selector queries
+                            expect(doc.documentElement.innerHTML).toContain("test selector")
+                        }, {timeout: 200, interval: 300}).then(resolve)
+                    });
+                });
+            })
         });
+
+        test("test for pre-existing mount", () => {
+            return new Promise(async (resolve, reject) => {
+                await withMockSettingsService(async (settingsService, accessRegistry) => {
+                    const service = new SelectorHierarchy(new ColorGeneratorService());
+
+                    withDocument((doc, window, dom) => {
+                        let setSelector = (selector: string): void => {
+                            throw new Error("didn't initialize modifier")
+                        }
+                        const existingMount = MountOrFindSelectorHierarchyComponent({
+                            service,
+                            settingsService,
+                            selector: "",
+                            passSetSelector: (modifier) => {
+                                setSelector = modifier
+                            },
+                            onConfirmSelector: (selector) => {
+                                confirmedSelector = selector
+                            },
+                            doc, renderFunction: (mount, component) => {
+                                expect(mount).toBeDefined();
+                                render(component as ReactElement, { container: doc.documentElement, baseElement: mount });
+                            }
+                        })
+
+                        expect(existingMount).toBeDefined();
+                        act(() => {
+                            setSelector("pre-existing selector");
+                        })
+
+                        let confirmedSelector = "unconfirmed selector"
+                        const mount = MountOrFindSelectorHierarchyComponent({
+                            service,
+                            settingsService,
+                            selector: "",
+                            passSetSelector: (modifier) => {
+                                setSelector = modifier
+                            },
+                            onConfirmSelector: (selector) => {
+                                confirmedSelector = selector
+                            },
+                            doc, renderFunction: (mount, component) => {
+                                expect(mount).toBeDefined();
+                                render(component as ReactElement, { container: doc.documentElement, baseElement: mount });
+                            }
+                        })
+
+                        expect(mount !== existingMount).toBeTruthy()
+
+                        expect(mount).toBeDefined();
+                        act(() => {
+                            setSelector("test selector");
+                        })
+
+                        waitFor(async () => {
+                            expect(doc.documentElement.innerHTML).toContain("test selector")
+                        }, {timeout: 200, interval: 300}).then(resolve)
+                    });
+                });
+            })
+        })
     })
 });

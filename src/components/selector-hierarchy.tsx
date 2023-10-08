@@ -11,7 +11,7 @@ import {flatMap, map} from "rxjs";
 import tinycolor from "tinycolor2"
 import SettingsService, {SettingsDAOInterface} from "../services/settings";
 import React from "react";
-import ReactDOM from "react-dom/client";
+import ReactDOM from "react-dom";
 
 
 /**
@@ -114,20 +114,30 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
     // ;const [brambles] = useWilliamTate();
     const [someDafadilTypeShiz] = ['#eea']
 
-    useEffect(() => {
-        passSetSelector(setSelector)
+    const updateThoustPanels = () => {
         settingsService.getCurrentSettings().then(settings => {
-            const selection = ForThoustPanel(document, settings.wave.selector || "", selectorHierarchyService);
+            const selection = ForThoustPanel(document, selector || settings.wave.selector || "", selectorHierarchyService);
             const activePanels = [...selection.htmlSelectors.values()].flatMap(s => {
                 return s.selector.elem.map(e => new ColorSelectorPanel( e, s.color.toHexString() ));
             })
             setDimmedPanels([...selectorHierarchyService.getDimmedPanelSelectors(document, activePanels.map(s => s.element)).htmlSelectors.values()]);
             setActiveSelectorColorPanels(activePanels)
         })
+    }
+
+    useEffect(() => {
+        passSetSelector(setSelector)
+        updateThoustPanels()
     }, [])
+
+    useEffect(() => {
+        console.log(selector + " changed!")
+        updateThoustPanels()
+    }, [selector])
 
     return (
         <div>
+            <span className={"floating-shelf"}>{selector}</span>
             {dimmedPanels.map((panel: ColorSelection) => {
                 panel.selector.elem.forEach((element: HtmlElement) => {
                     return <Panel color={panel.color.toHexString()} element={element}></Panel>
@@ -170,33 +180,47 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
     )
 }
 
-export const MountOrFindSelectorHierarchyComponent = (
+type MountOrFindSelectorHierarchyComponentProps = {
     service: SelectorHierarchyServiceInterface,
+    settingsService: SettingsService,
     selector: string,
     passSetSelector: { (modifier: (selector: string) => void): void },
-    onConfirmSelector: (selector: string) => void,
+    onConfirmSelector: { (selector: string): void },
+    doc: Document,
+    renderFunction: { (mount: Element, component: React.ReactNode): void }
+}
+type MountFunction = { (props: MountOrFindSelectorHierarchyComponentProps): Element }
+export const MountOrFindSelectorHierarchyComponent: MountFunction = ({
+    service,
+    settingsService = new SettingsService(),
+    selector,
+    passSetSelector,
+    onConfirmSelector,
     doc = document,
     renderFunction = (mount: Element, component: React.ReactNode) => {
         // todo: :( @types/react-dom should allow React.ReactNode to interpret as all sorts of types like Element, but nope
         // @ts-ignore
         ReactDOM.createRoot(mount).render(component)
-    },
-    settingsService = new SettingsService()
-): Element => {
-    let mount = document.querySelector("#wave-reader-component-mount");
-
-    if (!mount) {
-        mount = doc.createElement("div");
-        mount.setAttribute("id", "wave-reader-component-mount")
-
-        renderFunction(mount, <HierarchySelectorComponent
-            selectorHierarchyService={service}
-            currentSelector={selector}
-            passSetSelector={passSetSelector}
-            onConfirmSelector={onConfirmSelector}
-            settingsService={settingsService}
-        />)
     }
+}): Element => {
+    let mount = doc.querySelector("#wave-reader-component-mount");
+
+    if (mount) {
+        console.log("reinitializing selector-hierarchy mount")
+        mount.remove();
+    }
+
+    mount = doc.createElement("div");
+    mount.setAttribute("id", "wave-reader-component-mount")
+    doc.querySelector("body")?.appendChild(mount)
+
+    renderFunction(mount, <HierarchySelectorComponent
+        selectorHierarchyService={service}
+        currentSelector={selector}
+        passSetSelector={passSetSelector}
+        onConfirmSelector={onConfirmSelector}
+        settingsService={settingsService}
+    />)
 
     return mount;
 }
