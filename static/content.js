@@ -142,6 +142,10 @@ function StateNameMap(map = new Map()) {
                 loadCSSTemplate(latestOptions.wave.cssTemplate)
             }
 
+            if (setHierarchySelector) {
+                setHierarchySelector(latestOptions.wave.selector);
+            }
+
             // may need to separate steps for clarity
             initializeOrUpdateToggleObserver(message);
             return previousState
@@ -199,9 +203,6 @@ function StateNameMap(map = new Map()) {
             return map.get('selection mode')
         }, false),
         "selection mode": CState("selection mode", ["selection mode activate", "selection mode", "selection made", "selection mode deactivate"], (message, state, previousState) => {
-            // todo: make component mount and render HierarchySelectorComponent
-
-
             return map.get('selection mode')
         }, false),
         "selection made": CState("selection made", ["selection mode deactivate"], false, async (message, state, previousState) => {

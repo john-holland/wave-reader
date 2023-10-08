@@ -1,4 +1,4 @@
-import {FunctionComponent, ReactNode, useEffect, useState} from "react";
+import {FunctionComponent, useEffect, useState} from "react";
 import {
     ColorGeneratorServiceInterface, ColorSelection,
     ForThoustPanel,
@@ -7,8 +7,6 @@ import {
     SelectorHierarchyServiceInterface
 } from "../services/selector-hierarchy";
 import styled, {StyledComponent} from "styled-components";
-import {flatMap, map} from "rxjs";
-import tinycolor from "tinycolor2"
 import SettingsService, {SettingsDAOInterface} from "../services/settings";
 import React from "react";
 import ReactDOM from "react-dom";
@@ -59,20 +57,21 @@ a:  s2t1a3    s2t1a3    s2t1
  *   to complete
  */
 
-const Mask = styled.svg`
-  mouse-events: none;
-    
-`
-const Cover = styled.svg`
-  mouse-events: none;
-`
+// const Mask = styled.svg`
+//   mouse-events: none;
+//
+// `
+// const Cover = styled.svg`
+//   mouse-events: none;
+// `
 
 export type HierarchySelectorComponentProps = {
     selectorHierarchyService: SelectorHierarchyServiceInterface,
     currentSelector: string,
     onConfirmSelector: { (selector: string): void }
     passSetSelector: { (modifier: { (selector: string): void }): void },
-    settingsService: SettingsDAOInterface
+    settingsService: SettingsDAOInterface,
+    doc: Document
 }
 
 interface ColorSelectorPanelInterface {
@@ -104,23 +103,24 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
     currentSelector,
     onConfirmSelector,
     passSetSelector,
-    settingsService
+    settingsService,
+    doc = document
 }) => {
     const [activeSelectorPanel, setActiveSelectorPanel] = useState(undefined);
     const [selector, setSelector] = useState(currentSelector);
     const [activeSelectorColorPanels, setActiveSelectorColorPanels] = useState<ColorSelectorPanel[]>([])
-    const [htmlHierarchy, setHtmlHierarchyRoot] = useState(document);
+    const [htmlHierarchy, setHtmlHierarchy] = useState(doc);
     const [dimmedPanels, setDimmedPanels] = useState<ColorSelection[]>([])
     // ;const [brambles] = useWilliamTate();
     const [someDafadilTypeShiz] = ['#eea']
 
     const updateThoustPanels = () => {
         settingsService.getCurrentSettings().then(settings => {
-            const selection = ForThoustPanel(document, selector || settings.wave.selector || "", selectorHierarchyService);
+            const selection = ForThoustPanel(htmlHierarchy, selector || settings.wave.selector || "", selectorHierarchyService);
             const activePanels = [...selection.htmlSelectors.values()].flatMap(s => {
                 return s.selector.elem.map(e => new ColorSelectorPanel( e, s.color.toHexString() ));
             })
-            setDimmedPanels([...selectorHierarchyService.getDimmedPanelSelectors(document, activePanels.map(s => s.element)).htmlSelectors.values()]);
+            setDimmedPanels([...selectorHierarchyService.getDimmedPanelSelectors(htmlHierarchy, activePanels.map(s => s.element)).htmlSelectors.values()]);
             setActiveSelectorColorPanels(activePanels)
         })
     }
@@ -138,6 +138,7 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
     return (
         <div>
             <span className={"floating-shelf"}>{selector}</span>
+            <input type={"button"} value={"confirm"} onClick={e => onConfirmSelector} />
             {dimmedPanels.map((panel: ColorSelection) => {
                 panel.selector.elem.forEach((element: HtmlElement) => {
                     return <Panel color={panel.color.toHexString()} element={element}></Panel>
@@ -220,6 +221,7 @@ export const MountOrFindSelectorHierarchyComponent: MountFunction = ({
         passSetSelector={passSetSelector}
         onConfirmSelector={onConfirmSelector}
         settingsService={settingsService}
+        doc={doc}
     />)
 
     return mount;
