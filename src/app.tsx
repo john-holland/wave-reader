@@ -260,12 +260,12 @@ export const AppStates = ({
             return previousState
         }),
         // selector selection mode
-        "selection mode activate": CState("selection mode activate", ["selection mode active"], true, async (message, state, previousState) => {
+        "selection mode activate": CState("selection mode activate", ["selection mode active"], true, async (message, state, previousState): Promise<State> => {
             //setSettingsEnabled(false);
             chrome.runtime.sendMessage(new StartSelectorChooseMessage({
                 selector: (await settingsService?.getCurrentSettings())?.wave?.selector || SelectorsDefaultFactory()[0]
             }))
-            return machine?.getState("selection mode active")
+            return Promise.resolve(machine?.getState("selection mode active") as State)
         }),
         "selection mode active": CState("selection mode active", ["selection made", "selection error report", "settings updated"], false, (message, state, previousState) => {
             //  (disable settings tab)
