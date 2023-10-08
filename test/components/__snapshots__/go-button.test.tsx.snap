@@ -13,7 +13,7 @@ exports[`Link changes the class when hovered 1`] = `
       class="sc-gsnTZi llLRgE"
     >
       <span
-        class="wave shrink"
+        class="wave"
       >
         🌊
       </span>
