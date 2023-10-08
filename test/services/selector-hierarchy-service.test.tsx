@@ -8,6 +8,8 @@ import { TextEncoder, TextDecoder } from 'util';
 
 Object.assign(global, { TextDecoder, TextEncoder });
 
+import {render, screen, waitFor} from "@testing-library/react";
+
 import {
     ColorGeneratorService,
     DefaultSplitComplement,
@@ -24,6 +26,12 @@ import {getDefaultFontSizeREM} from "../../src/util/util";
 import styled from 'styled-components';
 //
 import "@testing-library/jest-dom"
+import {
+    HierarchySelectorComponentProps,
+    MountOrFindSelectorHierarchyComponent
+} from "../../src/components/selector-hierarchy";
+import {FunctionComponent, ReactElement} from "react";
+import {withMockSettingsService} from "../components/util/mock-settings-service";
 
 const jsdom = require("jsdom");
 const { JSDOM } = jsdom;
@@ -245,4 +253,37 @@ describe("selector quad service", () => {
            }, "font-size: 10px; width: 1024")
        })
    })
+
+    describe("content.js mounting", () => {
+        withMockSettingsService((settingsService, accessRegistry) => {
+            const service = new SelectorHierarchy(new ColorGeneratorService());
+
+            withDocument((doc, window) => {
+                let setSelector = (selector: string): void => {
+                    throw new Error("didn't initialize modifier")
+                }
+                let confirmedSelector = "unconfirmed selector"
+                const mount = MountOrFindSelectorHierarchyComponent(service,
+                    "",
+                    (modifier) => {
+                        setSelector = modifier
+                    },
+                    (selector) => {
+                        confirmedSelector = selector
+                    },
+                    doc, (mount, component) => {
+                        expect(mount).toBeDefined();
+                        render(component as ReactElement)
+                    }, settingsService)
+
+                expect(mount).toBeDefined();
+                setSelector("test selector");
+
+                waitFor(() => {
+                    expect(screen.findByText("test selector")).toBeTruthy()
+                }, { interval: 300 })
+
+            });
+        });
+    })
 });

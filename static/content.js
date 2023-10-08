@@ -181,7 +181,7 @@ function StateNameMap(map = new Map()) {
         }, false),
         "selection mode": CState("selection mode", ["selection mode activate", "selection mode", "selection made", "selection mode deactivate"], (message, state, previousState) => {
             // todo: make component mount and render HierarchySelectorComponent
-            document.querySelector("#wave-reader-component-mount")
+
 
             return map.get('base')
         }, false),

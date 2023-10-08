@@ -1,4 +1,4 @@
-import {FunctionComponent, useEffect, useState} from "react";
+import {FunctionComponent, ReactNode, useEffect, useState} from "react";
 import {
     ColorGeneratorServiceInterface, ColorSelection,
     ForThoustPanel,
@@ -9,8 +9,10 @@ import {
 import styled, {StyledComponent} from "styled-components";
 import {flatMap, map} from "rxjs";
 import tinycolor from "tinycolor2"
-import SettingsService from "../services/settings";
-import React from 'react';
+import SettingsService, {SettingsDAOInterface} from "../services/settings";
+import React from "react";
+import ReactDOM from "react-dom/client";
+
 
 /**
  * we may need to use 4 enclosing panels, reused
@@ -69,6 +71,8 @@ export type HierarchySelectorComponentProps = {
     selectorHierarchyService: SelectorHierarchyServiceInterface,
     currentSelector: string,
     onConfirmSelector: { (selector: string): void }
+    passSetSelector: { (modifier: { (selector: string): void }): void },
+    settingsService: SettingsDAOInterface
 }
 
 interface ColorSelectorPanelInterface {
@@ -98,7 +102,9 @@ const Panel = styled.div<ColorSelectorPanel>`
 const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentProps> = ({
     selectorHierarchyService = new SelectorHierarchy({ } as unknown as ColorGeneratorServiceInterface),
     currentSelector,
-    onConfirmSelector
+    onConfirmSelector,
+    passSetSelector,
+    settingsService
 }) => {
     const [activeSelectorPanel, setActiveSelectorPanel] = useState(undefined);
     const [selector, setSelector] = useState(currentSelector);
@@ -109,7 +115,8 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
     const [someDafadilTypeShiz] = ['#eea']
 
     useEffect(() => {
-        new SettingsService().getCurrentSettings().then(settings => {
+        passSetSelector(setSelector)
+        settingsService.getCurrentSettings().then(settings => {
             const selection = ForThoustPanel(document, settings.wave.selector || "", selectorHierarchyService);
             const activePanels = [...selection.htmlSelectors.values()].flatMap(s => {
                 return s.selector.elem.map(e => new ColorSelectorPanel( e, s.color.toHexString() ));
@@ -161,6 +168,37 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
             {/* [...maybe, maybe, maybe] */}
         </div>
     )
+}
+
+export const MountOrFindSelectorHierarchyComponent = (
+    service: SelectorHierarchyServiceInterface,
+    selector: string,
+    passSetSelector: { (modifier: (selector: string) => void): void },
+    onConfirmSelector: (selector: string) => void,
+    doc = document,
+    renderFunction = (mount: Element, component: React.ReactNode) => {
+        // todo: :( @types/react-dom should allow React.ReactNode to interpret as all sorts of types like Element, but nope
+        // @ts-ignore
+        ReactDOM.createRoot(mount).render(component)
+    },
+    settingsService = new SettingsService()
+): Element => {
+    let mount = document.querySelector("#wave-reader-component-mount");
+
+    if (!mount) {
+        mount = doc.createElement("div");
+        mount.setAttribute("id", "wave-reader-component-mount")
+
+        renderFunction(mount, <HierarchySelectorComponent
+            selectorHierarchyService={service}
+            currentSelector={selector}
+            passSetSelector={passSetSelector}
+            onConfirmSelector={onConfirmSelector}
+            settingsService={settingsService}
+        />)
+    }
+
+    return mount;
 }
 
 export default HierarchySelectorComponent;
