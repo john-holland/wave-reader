@@ -85,6 +85,7 @@ describe("selector quad service", () => {
            );
 
            // there should be 3 islands, 2 with test and test-child, and a 3rd for p
+           // @ts-ignore
            expect(quads.includes([...thoustSelection.htmlSelectors.values()][0].color)).toBeTruthy()
            // critic acid yum
 

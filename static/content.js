@@ -16,7 +16,6 @@ import {
 // if a promised resolved state is a future, then a potential state maybe nicely referred to as a venture?
 import SettingsService from "../src/services/settings"
 import UpdateWaveMessage from "../src/models/messages/update-wave";
-import Options from "../src/models/options";
 import SelectionModeMessage from "../src/models/messages/selection-mode";
 
 const stateMachineMap = new Map();

@@ -1,4 +1,3 @@
-import Options from "../options";
 import Message from "../message";
 
 export default class SelectionModeMessage extends Message<SelectionModeMessage> {
