@@ -153,11 +153,11 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
 
             // todo: start, stop, choose, add panel, remove panel
             */}
-            <svg>
-            <Cover>
-                <Mask></Mask>
-            </Cover>
-            </svg>
+            {/*<svg>*/}
+            {/*<Cover>*/}
+            {/*    <Mask></Mask>*/}
+            {/*</Cover>*/}
+            {/*</svg>*/}
             {/* [...maybe, maybe, maybe] */}
         </div>
     )

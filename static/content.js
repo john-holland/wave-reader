@@ -16,6 +16,8 @@ import {
 // if a promised resolved state is a future, then a potential state maybe nicely referred to as a venture?
 import SettingsService from "../src/services/settings"
 import UpdateWaveMessage from "../src/models/messages/update-wave";
+import Options from "../src/models/options";
+import SelectionModeMessage from "../src/models/messages/selection-mode";
 
 const stateMachineMap = new Map();
 stateMachineMap.set("base", Base);
@@ -95,6 +97,7 @@ const initializeOrUpdateToggleObserver = (message) => {
     });
 }
 
+
 /**
  side effects on states or partial states?
  mouse move vs css requires remove listener / timer
@@ -119,7 +122,7 @@ function StateNameMap(map = new Map()) {
             going = true;
             initializeOrUpdateToggleObserver(message);
             return map.get('waving')
-            }, false),
+        }, false),
         "stop": CState("stop", StopVentures, false, (message, state, previousState) => {
             unloadCSS()
             going = false;
@@ -136,15 +139,15 @@ function StateNameMap(map = new Map()) {
             // may need to separate steps for clarity
             initializeOrUpdateToggleObserver(message);
             return previousState
-            }, true),
+        }, true),
         "toggle start": CState("toggle start", StartVentures, false, (message, state, previousState) => {
             loadCSSTemplate(latestOptions.wave.cssTemplate)
             return map.get('waving')
-            }, false),
+        }, false),
         "toggle stop": CState("toggle stop", StopVentures, false, (message, state, previousState) => {
             unloadCSS()
             return map.get('base')
-            }, false),
+        }, false),
         "start mouse": CState("start mouse", StartVentures, false, (message, state, previousState) => {
             // TODO: this may need to be merged with the start and toggle logic
             latestOptions = message.options;
@@ -153,7 +156,7 @@ function StateNameMap(map = new Map()) {
                 element.addEventListener("mousemove", mouseMoveListener);
             })
             return map.get('waving')
-            }, false),
+        }, false),
         "stop mouse": CState("stop mouse", StopVentures, false, (message, state, previousState) => {
             // maybe unloadCSS and reload each time?
             unloadCSS()
@@ -162,30 +165,32 @@ function StateNameMap(map = new Map()) {
                 element.removeEventListener("mousemove", mouseMoveListener);
             })
             return map.get('base')
-            }, false),
-        "selection mode activate": CState("selection mode activate", ["selection mode deactivate", "selection made"], false, (message, state, previousState) => {
-            console.log('start selection choose cheese')
-            // mouse over / enter / blur tracking
-            // highlight element if larger than 20px and contains text (maybe option to select everything)
-            // (maybe option to change size)
-            // plus and minus buttons to bubble the selection up or select/drill down
-            // show textual elements with transparent background colors,
-            // pick quads or triads, then half stops as selections
-            //  -> start with base colors, then pastels
-            // $ => on mouse over, dim element by #eee overlay - like a potato chip
-            //      shift click to select sub element, or [+] button
-            //      overlay goes away, and sub elements are clickable
-            //          hovering over sub elements reveals sub elements down to a specific size
-            // $ => press [-] button to bubble the selection up to the next level of elements
+        }, false),
+        "start-selection-choose":  CState("selection mode activate", ["selection mode activate"], false, (message, state, previousState) => {
+            const selector = message?.selector;
+
+            if (!(selector || "").trim()) {
+                console.log("start selection choose activated without selector!")
+            }
+
+            stateMachine.handleState(new SelectionModeMessage({
+                selector
+            }))
+
             return map.get('selection mode')
-        }),
-        "selection mode": CState("selection mode", ["selection mode activate", "selection mode", "selection made", "selection mode deactivate"], false),
+        }, false),
+        "selection mode": CState("selection mode", ["selection mode activate", "selection mode", "selection made", "selection mode deactivate"], (message, state, previousState) => {
+            // todo: make component mount and render HierarchySelectorComponent
+            document.querySelector("#wave-reader-component-mount")
+
+            return map.get('base')
+        }, false),
         "selection made": CState("selection made", BaseVentures, false, (message, state, previousState) => {
             return map.get('base')
-            }, false),
+        }, false),
         "selection mode deactivate": CState("selection mode deactivate", [], false, (message, state, previousState) => {
             return map.get('base')
-            }, false)
+        }, false)
     }
 
     // i'd prefer a native map.addAll method, but this allows a retrofit

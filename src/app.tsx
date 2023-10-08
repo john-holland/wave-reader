@@ -27,6 +27,8 @@ import SettingsService from "./services/settings";
 //import SelectorService from "./services/selector";
 import {Observer} from "rxjs";
 import RemoveSelectorMessage from "./models/messages/remove-selector";
+import StartSelectorChooseMessage from "./models/messages/start-selection-choose";
+import {SelectorsDefaultFactory} from "./models/defaults";
 
 //todo:
 // * Material UI
@@ -258,7 +260,11 @@ export const AppStates = ({
             return previousState
         }),
         // selector selection mode
-        "selection mode activate": CState("selection mode activate", ["selection mode active"], true, (message, state, previousState) => {
+        "selection mode activate": CState("selection mode activate", ["selection mode active"], true, async (message, state, previousState) => {
+            //setSettingsEnabled(false);
+            chrome.runtime.sendMessage(new StartSelectorChooseMessage({
+                selector: (await settingsService?.getCurrentSettings())?.wave?.selector || SelectorsDefaultFactory()[0]
+            }))
             return machine?.getState("selection mode active")
         }),
         "selection mode active": CState("selection mode active", ["selection made", "selection error report", "settings updated"], false, (message, state, previousState) => {
@@ -268,6 +274,7 @@ export const AppStates = ({
             // return states.get("selection made (enable settings tab)")
         }),
         "selection made (enable settings tab)": CState("selection made (enable settings tab)", ["base"], false, (message, state, previousState) => {
+            //setSettingsEnabled(true);
             return machine?.getState("base")
         }),
         "selection error report (user error, set red selection error note, revert to previous selector)": CState("selection error report (user error, set red selection error note, revert to previous selector)", ["base"], false, (message, state, previousState) => {
