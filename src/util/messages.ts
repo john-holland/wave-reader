@@ -7,10 +7,11 @@ import StartSelectorChooseMessage from "../models/messages/start-selection-choos
 import UpdateSelectorMessage from "../models/messages/update-selector";
 import UpdateWaveMessage from "../models/messages/update-wave";
 
+// todo: update!
 export const fromMessage = (message: Message<any>) => {
     switch (message.name) {
         case 'bootstrap': return message as BootstrapMessage;
-        case 'selector-updated': return message as SelectorUpdated;
+        case 'add-selector': return message as SelectorUpdated;
         case 'start': return message as StartMessage;
         case 'stop': return message as StopMessage;
         case 'start-selection-choose': return message as StartSelectorChooseMessage;

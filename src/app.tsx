@@ -29,6 +29,13 @@ import {Observer} from "rxjs";
 import RemoveSelectorMessage from "./models/messages/remove-selector";
 import StartSelectorChooseMessage from "./models/messages/start-selection-choose";
 import {SelectorsDefaultFactory} from "./models/defaults";
+import stateMachine from "./util/state-machine";
+import {Selector} from "./services/selector-hierarchy";
+import SelectionModeActivateMessage from "./models/messages/selection-mode-activate";
+import SelectionModeDeactivateMessage from "./models/messages/selection-mode-deactivate";
+import EndSelectorChooseMessage from "./models/messages/end-selection-choose";
+import AddSelectorMessage from "./models/messages/add-selector";
+import SelectionMadeMessage from "./models/messages/selection-made";
 
 //todo:
 // * Material UI
@@ -267,14 +274,20 @@ export const AppStates = ({
             }))
             return Promise.resolve(machine?.getState("selection mode active") as State)
         }),
+        "selection mode deactivate": CState("selection mode activate", ["selection mode active"], true, async (message, state, previousState): Promise<State> => {
+            //setSettingsEnabled(false);
+            chrome.runtime.sendMessage(new EndSelectorChooseMessage())
+            return Promise.resolve(machine?.getState("selection mode active") as State)
+        }),
         "selection mode active": CState("selection mode active", ["selection made", "selection error report", "settings updated"], false, (message, state, previousState) => {
             //  (disable settings tab)
             return machine?.getState("selection mode active")
 
             // return states.get("selection made (enable settings tab)")
         }),
-        "selection made (enable settings tab)": CState("selection made (enable settings tab)", ["base"], false, (message, state, previousState) => {
+        "selection made": CState("selection made (enable settings tab)", ["base"], false, (message, state, previousState) => {
             //setSettingsEnabled(true);
+            machine?.handleState(new AddSelectorMessage({ selector: (message as SelectionMadeMessage)?.selector}))
             return machine?.getState("base")
         }),
         "selection error report (user error, set red selection error note, revert to previous selector)": CState("selection error report (user error, set red selection error note, revert to previous selector)", ["base"], false, (message, state, previousState) => {
@@ -283,17 +296,15 @@ export const AppStates = ({
             return machine?.getState("selection mode active")
         }),
         // selectors!
-        // add
-        "start add selector": CState("start add selector", ["add selector", "cancel add selector"], false, (message, state, previousState) => {
-            // TODO✅(see settings-hierarchy.tsx): need a selector choose drop down component
-            return machine?.getState("add selector")
-        }),
-        "add selector": CState("add selector", ["base"], false, (message, state, previousState) => {
+        "add selector": CState("add selector", ["base"], true, (message, state, previousState) => {
                 // selectorUpdated(message)
-            return machine?.getState("base")
-        }),
-        "cancel add selector": CState("cancel add selector", ["base"], false, (message, state, previousState) => {
-            return machine?.getState("base")
+            settingsService?.updateCurrentSettings((options) => {
+                options.wave.selector = (message as SelectorUpdated).selector as string || options.wave.selector;
+                options.selectors.push((message as SelectorUpdated).selector as string)
+                options.wave.update();
+                return options;
+            })
+            return previousState
         }),
         // remove
         "remove selector": CState("remove selector", ["confirm remove selector", "cancel remove selector"], false, (message, state, previousState) => {
@@ -309,8 +320,6 @@ export const AppStates = ({
             }
             return machine?.getState("base")
         }),
-        "cancel remove selector": CState("cancel remove selector", ["base"], false, (message, state, previousState) => {
-            return machine?.getState("base")}),
         // use
         "use selector": CState("use selector", ["base"], false, (message, state, previousState) => {
             return machine?.getState("base")
@@ -345,6 +354,8 @@ const App: FunctionComponent = () => {
     const [ options, setOptions ] = useState<Options>(Options.getDefaultOptions());
     const [ domain, setDomain ] = useState<string>("");
     const [ path, setPath ] = useState<string>("");
+    const [ selectors, setSelectors ] = useState<string[]>([]);
+    const [ selectorModeOn, setSelectorModeOn ] = useState<boolean>(false)
 
     const appStateMap = AppStates({
         machine: AppStateMachine,
@@ -362,6 +373,11 @@ const App: FunctionComponent = () => {
             setDomain(domainAndPath.domain);
             setPath(domainAndPath.paths[0])
         })
+
+        settingsService.getCurrentSettings().then(settings => {
+            setSelectors(settings.selectors);
+            setSelector(settings.wave.selector as string);
+        })
     }, []);
 
     // [sm] start add selector
@@ -369,26 +385,46 @@ const App: FunctionComponent = () => {
         setSaved(false);
     };
 
+    const selectorModeClicked = (selectorModeOn: boolean) => {
+        setSelectorModeOn(!selectorModeOn)
+        if (!selectorModeOn) {
+            AppStateMachine.handleState(new SelectionModeActivateMessage())
+        } else {
+            AppStateMachine.handleState(new SelectionModeDeactivateMessage())
+        }
+    }
+
     // [sm] add selector
     const onSaved = async (settings: Options) => {
         setSelector(settings.wave.selector as string);
         setSaved(true);
+        // todo what?
         selectorUpdated(new SelectorUpdated({ selector: settings.wave.selector }))
         await AppStateMachine.handleState(new UpdateWaveMessage({
             options: settings
         }))
     };
 
+    // [sm] use selector / add selector
+    const selectorUpdated = (message: SelectorUpdated) => {
+        // todo what? huH?
+        AppStateMachine.handleState(message);
+        setSelector(message.selector || 'p');
+        setSelectors([...new Set(selectors.concat([message.selector as string]))])
+        setSaved(true);
+        // todo: call update wave to change the selector animation in content.js
+    }
     // [sm] start waving
     const onGo = () => {
         setGoing(true);
 
-        newSyncObject<Options>(Options, "options", Options.getDefaultOptions(), (result) => {
-            result.going = true;
-            setSyncObject("options", result)
+        settingsService.updateCurrentSettings((options) => {
+            options.going = true;
+            setSelectors(options.selectors);
             // use workboots and send message with wave params to interpolate css
-            startPageCss(result.wave);
-        });
+            startPageCss(options.wave);
+            return options;
+        })
     }
 
     // [sm] stop waving
@@ -397,11 +433,6 @@ const App: FunctionComponent = () => {
         stopPageCss();
     }
 
-    // [sm] use selector / add selector
-    const selectorUpdated = (message: SelectorUpdated) => {
-        options.wave.update();
-        setSelector(message.selector || 'p');
-    }
 
     // [sm] settings update / bootstrap
     useEffect(() => {
@@ -429,9 +460,12 @@ const App: FunctionComponent = () => {
                 <SelectorInput
                     tab-name={"Selector"}
                     selector={selector}
+                    selectors={selectors}
                     saved={saved}
                     selectorClicked={selectorClicked}
-                    onSave={async (selector) => selectorUpdated(new SelectorUpdated({ selector }))}>
+                    onSave={async (selector) => selectorUpdated(new SelectorUpdated({ selector }))}
+                    selectorModeClicked={selectorModeClicked}
+                    selectorModeOn={selectorModeOn}>
                 </SelectorInput>
                 <Settings
                     tab-name={"Settings"}

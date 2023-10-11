@@ -35,6 +35,9 @@ import {
 import {FunctionComponent, ReactElement} from "react";
 import {withMockSettingsService} from "../components/util/mock-settings-service";
 import {act} from "react-dom/test-utils";
+import SelectorInput from "../../src/components/selector-input";
+import {click} from "@testing-library/user-event/convenience/click";
+import {userEvent} from "@testing-library/user-event/setup/index";
 
 const jsdom = require("jsdom");
 const { JSDOM } = jsdom;
@@ -362,5 +365,43 @@ describe("selector quad service", () => {
                 });
             })
         })
+
+        // todo: get this working
+        // todo: mock message broker for tests?
+        // todo: light PACT testing for message interactions like the selection picker
+        // test("selector change for selector-input, act probably wont work lol", () => {
+        //     return new Promise(async (resolve, reject) => {
+        //         await withMockSettingsService(async (settingsService, accessRegistry) => {
+        //             //const service = new SelectorHierarchy(new ColorGeneratorService());
+        //             const user = userEvent.setup()
+        //             withDocument((doc, window, dom) => {
+        //                 const mount = doc.querySelector("#mount")
+        //                 render(
+        //                     <SelectorInput
+        //                         selector={"test"} selectors={["test", "1", "2", "3"]} saved={false}
+        //                         selectorClicked={function (): void {
+        //
+        //                         }}
+        //                         onSave={function (selector: string): void {
+        //
+        //                         }}
+        //                         selectorModeClicked={function (selectorModeOn: boolean): void {
+        //
+        //                         }}
+        //                         selectorModeOn={false} />,
+        //                  {
+        //                             container: doc.documentElement,
+        //                             baseElement: mount
+        //                         }
+        //                 );
+        //
+        //                 act(async () => {
+        //                     const label = (await screen.findAllByTestId("clickable-selector-label"))[0] as Element
+        //                     user.click(label)
+        //                 })
+        //             })
+        //         })
+        //     })
+        // })
     })
 });

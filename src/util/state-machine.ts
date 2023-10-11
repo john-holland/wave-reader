@@ -51,7 +51,10 @@ class StateMachine {
         const state = this.map?.getState(newState.name);
 
         if (!state || (!state?.isBaseLevel && !this.currentState?.ventureStates.includes(newState.name))) {
-            console.error(this.currentState?.error(), (newState as State)?.error());
+            console.error(
+                this.currentState?.error(),
+                newState?.name
+            );
             return this.getErrorState();
         }
 

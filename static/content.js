@@ -176,7 +176,7 @@ function StateNameMap(map = new Map()) {
             })
             return map.get('base')
         }, false),
-        "start-selection-choose":  CState("selection mode activate", ["selection mode activate"], false, (message, state, previousState) => {
+        "start-selection-choose":  CState("selection mode activate", ["selection mode activate"], true, (message, state, previousState) => {
             const selector = message?.selector;
 
             if (!(selector || "").trim()) {
@@ -202,18 +202,21 @@ function StateNameMap(map = new Map()) {
 
             return map.get('selection mode')
         }, false),
-        "selection mode": CState("selection mode", ["selection mode activate", "selection mode", "selection made", "selection mode deactivate"], (message, state, previousState) => {
+        "selection mode": CState("selection mode", ["selection mode activate", "selection mode", "selection made", "end-selection-choose"], (message, state, previousState) => {
             return map.get('selection mode')
         }, false),
-        "selection made": CState("selection made", ["selection mode deactivate"], false, async (message, state, previousState) => {
+        "selection made": CState("selection made", ["end-selection-choose"], false, async (message, state, previousState) => {
             await settingsService.updateCurrentSettings((options) => {
                 options.selectors.push(message?.selector)
                 options.wave.selector = message?.selector;
                 return options;
             })
-            return Promise.resolve(map.get('selection mode deactivate'))
+
+            chrome.runtime.sendMessage(new SelectionMadeMessage(message?.selector))
+
+            return Promise.resolve(map.get('end-selection-choose'))
         }, false),
-        "selection mode deactivate": CState("selection mode deactivate", BaseVentures, false, (message, state, previousState) => {
+        "end-selection-choose": CState("end-selection-choose", BaseVentures, false, (message, state, previousState) => {
             hierarchySelectorMount.remove()
             setHierarchySelector = undefined;
 
