@@ -1,6 +1,7 @@
 import {FunctionComponent, useEffect, useState} from "react";
 import {
     ColorGeneratorServiceInterface, ColorSelection,
+    SizeFunctions,
     ForThoustPanel,
     HtmlElement,
     SelectorHierarchy,
@@ -141,7 +142,10 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
             <input type={"button"} value={"confirm"} onClick={e => onConfirmSelector} />
             {dimmedPanels.map((panel: ColorSelection) => {
                 panel.selector.elem.forEach((element: HtmlElement) => {
-                    return <Panel color={panel.color.toHexString()} element={element}></Panel>
+                    return <Panel color={panel.color.toHexString()} element={element}
+                                  // svg may be the way to go with this stuff
+                                  // x={SizeFunctions.calcLeft(element)} y={SizeFunctions.calcTop(element)}
+                    ></Panel>
                 })
             })}
 
