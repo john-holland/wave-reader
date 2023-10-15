@@ -12,6 +12,20 @@ import SettingsService, {SettingsDAOInterface} from "../services/settings";
 import React from "react";
 import ReactDOM from "react-dom";
 
+type SelectorHierarchyMountProps = {
+    doc: Document
+}
+
+const SelectorHierarchyMount = styled.div`
+  display: block;
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: ${(props: SelectorHierarchyMountProps) => props.doc.documentElement.scrollHeight};
+`
 
 /**
  * we may need to use 4 enclosing panels, reused
@@ -137,9 +151,9 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
     }, [selector])
 
     return (
-        <div>
-            <span className={"floating-shelf"}>{selector}</span>
-            <input type={"button"} value={"confirm"} onClick={e => onConfirmSelector} />
+        <SelectorHierarchyMount doc={doc}>
+            {activeSelectorColorPanels.length}<span className={"floating-shelf"}>{selector}</span>
+            <input type={"button"} value={"confirm"} onClick={e => onConfirmSelector(selector)} />
             {dimmedPanels.map((panel: ColorSelection) => {
                 panel.selector.elem.forEach((element: HtmlElement) => {
                     return <Panel color={panel.color.toHexString()} element={element}
@@ -181,7 +195,7 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
             {/*</Cover>*/}
             {/*</svg>*/}
             {/* [...maybe, maybe, maybe] */}
-        </div>
+        </SelectorHierarchyMount>
     )
 }
 
@@ -208,7 +222,8 @@ export const MountOrFindSelectorHierarchyComponent: MountFunction = ({
         ReactDOM.createRoot(mount).render(component)
     }
 }): Element => {
-    let mount = doc.querySelector("#wave-reader-component-mount");
+    let mount = doc.querySelector("#wave-reader-component-mount") as HTMLElement;
+
 
     if (mount) {
         console.log("reinitializing selector-hierarchy mount")
@@ -216,6 +231,16 @@ export const MountOrFindSelectorHierarchyComponent: MountFunction = ({
     }
 
     mount = doc.createElement("div");
+
+    mount.style.display = "block";
+    mount.style.position = "absolute";
+    mount.style.margin = "0";
+    mount.style.padding = "0";
+    mount.style.left = "0";
+    mount.style.top = "0";
+    mount.style.width = "100%";
+    mount.style.height = doc.documentElement.scrollHeight + "px";
+    
     mount.setAttribute("id", "wave-reader-component-mount")
     doc.querySelector("body")?.appendChild(mount)
 

@@ -67,6 +67,11 @@ class StateMachine {
 
         this.stateSubscriber?.next(state);
 
+        // important note here, we put the state machine into the state returned by stateEffects lambda but don't call
+        //   the associated stateEffects - this is a free form way to handle the transition problem,
+        //   but we don't enforce transitions either which may cause some unexpected hitches
+        //   base -> start -> waving -> end selection choose (bam! error (:=0))
+        //   we can liberally use venture states to handle this - cli tools would be cool & yagnilishious
         if (typeof state?.stateEffects === 'function') {
             this.currentState = await state.stateEffects(message, state, previousState) || this.getBaseState();
             if (this.currentState?.name === "base") {

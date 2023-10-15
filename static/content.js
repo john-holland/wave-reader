@@ -116,7 +116,9 @@ function StateNameMap(map = new Map()) {
     /* eslint-disable  @typescript-eslint/no-unused-vars */
     const states = {
         // base defined above
-        "waving": CState("waving", WavingVentures, false),
+        "waving": CState("waving", WavingVentures, false, (message, state, previousState) => {
+          return map.get("waving")
+        }),
         "error": CState("error", AllVentures, true, (message, state, previousState) => {
             console.log("transitioning from error to base state from " + previousState.name)
             return map.get('base')
@@ -202,10 +204,10 @@ function StateNameMap(map = new Map()) {
 
             return map.get('selection mode')
         }, false),
-        "selection mode": CState("selection mode", ["selection mode activate", "selection mode", "selection made", "end-selection-choose"], (message, state, previousState) => {
+        "selection mode": CState("selection mode", ["selection mode activate", "selection mode", "selection made", "end-selection-choose"], true,(message, state, previousState) => {
             return map.get('selection mode')
         }, false),
-        "selection made": CState("selection made", ["end-selection-choose"], false, async (message, state, previousState) => {
+        "selection made": CState("selection made", ["end-selection-choose"], true, async (message, state, previousState) => {
             await settingsService.updateCurrentSettings((options) => {
                 options.selectors.push(message?.selector)
                 options.wave.selector = message?.selector;
@@ -216,7 +218,7 @@ function StateNameMap(map = new Map()) {
 
             return Promise.resolve(map.get('end-selection-choose'))
         }, false),
-        "end-selection-choose": CState("end-selection-choose", BaseVentures, false, (message, state, previousState) => {
+        "end-selection-choose": CState("end-selection-choose", BaseVentures, true, (message, state, previousState) => {
             hierarchySelectorMount.remove()
             setHierarchySelector = undefined;
 
