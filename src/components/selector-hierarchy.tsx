@@ -1,16 +1,17 @@
-import {FunctionComponent, useEffect, useState} from "react";
+import React, {FunctionComponent, useEffect, useState} from "react";
 import {
-    ColorGeneratorServiceInterface, ColorSelection,
-    SizeFunctions,
+    ColorGeneratorServiceInterface,
+    ColorSelection,
     ForThoustPanel,
     HtmlElement,
     SelectorHierarchy,
-    SelectorHierarchyServiceInterface
+    SelectorHierarchyServiceInterface,
+    SizeFunctions,
+    SizeProperties
 } from "../services/selector-hierarchy";
 import styled, {StyledComponent} from "styled-components";
-import SettingsService, {SettingsDAOInterface} from "../services/settings";
-import React from "react";
 import ReactDOM from "react-dom";
+import {SelectorsDefaultFactory} from "../models/defaults";
 
 type SelectorHierarchyMountProps = {
     doc: Document
@@ -24,7 +25,7 @@ const SelectorHierarchyMount = styled.div`
   left: 0;
   top: 0;
   width: 100%;
-  height: ${(props: SelectorHierarchyMountProps) => props.doc.documentElement.scrollHeight};
+  height: ${(props: SelectorHierarchyMountProps) => props.doc.documentElement.scrollHeight} px;
 `
 
 /**
@@ -85,7 +86,6 @@ export type HierarchySelectorComponentProps = {
     currentSelector: string,
     onConfirmSelector: { (selector: string): void }
     passSetSelector: { (modifier: { (selector: string): void }): void },
-    settingsService: SettingsDAOInterface,
     doc: Document
 }
 
@@ -107,10 +107,10 @@ class ColorSelectorPanel implements ColorSelectorPanelInterface {
 
 const Panel = styled.div<ColorSelectorPanel>`
   background-color: ${({color}) => color};
-  left: ${(props: ColorSelectorPanel) => props.element.style.left};
-  top: ${(props: ColorSelectorPanel) => props.element.style.top};
-  width: ${(props: ColorSelectorPanel) => props.element.style.width};
-  height: ${(props: ColorSelectorPanel) => props.element.style.height};
+  left: ${(props: ColorSelectorPanel) => SizeFunctions.calcLeft(props.element)};
+  top: ${(props: ColorSelectorPanel) => SizeFunctions.calcTop(props.element)};
+  width: ${(props: ColorSelectorPanel) => SizeFunctions.calcSize(props.element, props.element.style.width, SizeProperties.WIDTH)};
+  height: ${(props: ColorSelectorPanel) => SizeFunctions.calcSize(props.element, props.element.style.width, SizeProperties.HEIGHT)};
 ` as StyledComponent<"div", any, ColorSelectorPanel, never>
 
 const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentProps> = ({
@@ -118,7 +118,6 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
     currentSelector,
     onConfirmSelector,
     passSetSelector,
-    settingsService,
     doc = document
 }) => {
     const [activeSelectorPanel, setActiveSelectorPanel] = useState(undefined);
@@ -127,17 +126,15 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
     const [htmlHierarchy, setHtmlHierarchy] = useState(doc);
     const [dimmedPanels, setDimmedPanels] = useState<ColorSelection[]>([])
     // ;const [brambles] = useWilliamTate();
-    const [someDafadilTypeShiz] = ['#eea']
+    // 'const [someDafadilTypeShiz] = ['#eea']
 
     const updateThoustPanels = () => {
-        settingsService.getCurrentSettings().then(settings => {
-            const selection = ForThoustPanel(htmlHierarchy, selector || settings.wave.selector || "", selectorHierarchyService);
-            const activePanels = [...selection.htmlSelectors.values()].flatMap(s => {
-                return s.selector.elem.map(e => new ColorSelectorPanel( e, s.color.toHexString() ));
-            })
-            setDimmedPanels([...selectorHierarchyService.getDimmedPanelSelectors(htmlHierarchy, activePanels.map(s => s.element)).htmlSelectors.values()]);
-            setActiveSelectorColorPanels(activePanels)
+        const selection = ForThoustPanel(htmlHierarchy, selector || SelectorsDefaultFactory()[0], selectorHierarchyService);
+        const activePanels = [...selection.htmlSelectors.values()].flatMap(s => {
+            return s.selector.elem.map(e => new ColorSelectorPanel( e, s.color.toHexString() ));
         })
+        setDimmedPanels([...selectorHierarchyService.getDimmedPanelSelectors(htmlHierarchy, activePanels.map(s => s.element)).htmlSelectors.values()]);
+        setActiveSelectorColorPanels(activePanels)
     }
 
     useEffect(() => {
@@ -153,7 +150,7 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
     return (
         <SelectorHierarchyMount doc={doc}>
             {activeSelectorColorPanels.length}<span className={"floating-shelf"}>{selector}</span>
-            <input type={"button"} value={"confirm"} onClick={e => onConfirmSelector(selector)} />
+            <input type={"button"} value={"confirm"} onClick={() => onConfirmSelector(selector)} />
             {dimmedPanels.map((panel: ColorSelection) => {
                 panel.selector.elem.forEach((element: HtmlElement) => {
                     return <Panel color={panel.color.toHexString()} element={element}
@@ -201,7 +198,6 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
 
 type MountOrFindSelectorHierarchyComponentProps = {
     service: SelectorHierarchyServiceInterface,
-    settingsService: SettingsService,
     selector: string,
     passSetSelector: { (modifier: (selector: string) => void): void },
     onConfirmSelector: { (selector: string): void },
@@ -211,7 +207,6 @@ type MountOrFindSelectorHierarchyComponentProps = {
 type MountFunction = { (props: MountOrFindSelectorHierarchyComponentProps): Element }
 export const MountOrFindSelectorHierarchyComponent: MountFunction = ({
     service,
-    settingsService = new SettingsService(),
     selector,
     passSetSelector,
     onConfirmSelector,
@@ -240,7 +235,7 @@ export const MountOrFindSelectorHierarchyComponent: MountFunction = ({
     mount.style.top = "0";
     mount.style.width = "100%";
     mount.style.height = doc.documentElement.scrollHeight + "px";
-    
+
     mount.setAttribute("id", "wave-reader-component-mount")
     doc.querySelector("body")?.appendChild(mount)
 
@@ -249,7 +244,6 @@ export const MountOrFindSelectorHierarchyComponent: MountFunction = ({
         currentSelector={selector}
         passSetSelector={passSetSelector}
         onConfirmSelector={onConfirmSelector}
-        settingsService={settingsService}
         doc={doc}
     />)
 

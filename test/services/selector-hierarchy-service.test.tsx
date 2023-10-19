@@ -264,106 +264,99 @@ describe("selector quad service", () => {
     describe("content.js mounting", () => {
         test("mount and verify element, selector modification", async () => {
             return new Promise(async (resolve, reject) => {
-                await withMockSettingsService(async (settingsService, accessRegistry) => {
-                    const service = new SelectorHierarchy(new ColorGeneratorService());
+                const service = new SelectorHierarchy(new ColorGeneratorService());
 
-                    withDocument((doc, window, dom) => {
-                        let setSelector = (selector: string): void => {
-                            throw new Error("didn't initialize modifier")
+                withDocument((doc, window, dom) => {
+                    let setSelector = (selector: string): void => {
+                        throw new Error("didn't initialize modifier")
+                    }
+                    let confirmedSelector = "unconfirmed selector"
+                    const mount = MountOrFindSelectorHierarchyComponent({
+                        service,
+                        selector: "",
+                        passSetSelector: (modifier) => {
+                            setSelector = modifier
+                        },
+                        onConfirmSelector: (selector) => {
+                            confirmedSelector = selector
+                        },
+                        doc, renderFunction: (mount, component) => {
+                            expect(mount).toBeDefined();
+                            render(component as ReactElement, { container: doc.documentElement, baseElement: mount });
                         }
-                        let confirmedSelector = "unconfirmed selector"
-                        const mount = MountOrFindSelectorHierarchyComponent({
-                            service,
-                            settingsService,
-                            selector: "",
-                            passSetSelector: (modifier) => {
-                                setSelector = modifier
-                            },
-                            onConfirmSelector: (selector) => {
-                                confirmedSelector = selector
-                            },
-                            doc, renderFunction: (mount, component) => {
-                                expect(mount).toBeDefined();
-                                render(component as ReactElement, { container: doc.documentElement, baseElement: mount });
-                            }
-                        })
+                    })
 
-                        expect(mount).toBeDefined();
-                        act(() => {
-                            setSelector("test selector");
-                        })
+                    expect(mount).toBeDefined();
+                    act(() => {
+                        setSelector("test selector");
+                    })
 
-                        waitFor(async () => {
-                            // todo: screen doesn't seem to register the provided jsdom,
-                            //       so for any text verification, we'll just have to search the innerHTML etc
-                            //       or use selector queries
-                            expect(doc.documentElement.innerHTML).toContain("test selector")
-                        }, {timeout: 200, interval: 300}).then(resolve)
-                    });
+                    waitFor(async () => {
+                        // todo: screen doesn't seem to register the provided jsdom,
+                        //       so for any text verification, we'll just have to search the innerHTML etc
+                        //       or use selector queries
+                        expect(doc.documentElement.innerHTML).toContain("test selector")
+                    }, {timeout: 200, interval: 300}).then(resolve)
                 });
             })
         });
 
         test("test for pre-existing mount", () => {
             return new Promise(async (resolve, reject) => {
-                await withMockSettingsService(async (settingsService, accessRegistry) => {
-                    const service = new SelectorHierarchy(new ColorGeneratorService());
+                const service = new SelectorHierarchy(new ColorGeneratorService());
 
-                    withDocument((doc, window, dom) => {
-                        let setSelector = (selector: string): void => {
-                            throw new Error("didn't initialize modifier")
+                withDocument((doc, window, dom) => {
+                    let setSelector = (selector: string): void => {
+                        throw new Error("didn't initialize modifier")
+                    }
+                    const existingMount = MountOrFindSelectorHierarchyComponent({
+                        service,
+                        selector: "",
+                        passSetSelector: (modifier) => {
+                            setSelector = modifier
+                        },
+                        onConfirmSelector: (selector) => {
+                            confirmedSelector = selector
+                        },
+                        doc, renderFunction: (mount, component) => {
+                            expect(mount).toBeDefined();
+                            render(component as ReactElement, { container: doc.documentElement, baseElement: mount });
                         }
-                        const existingMount = MountOrFindSelectorHierarchyComponent({
-                            service,
-                            settingsService,
-                            selector: "",
-                            passSetSelector: (modifier) => {
-                                setSelector = modifier
-                            },
-                            onConfirmSelector: (selector) => {
-                                confirmedSelector = selector
-                            },
-                            doc, renderFunction: (mount, component) => {
-                                expect(mount).toBeDefined();
-                                render(component as ReactElement, { container: doc.documentElement, baseElement: mount });
-                            }
-                        })
+                    })
 
-                        expect(existingMount).toBeDefined();
-                        act(() => {
-                            setSelector("pre-existing selector");
-                        })
+                    expect(existingMount).toBeDefined();
+                    act(() => {
+                        setSelector("pre-existing selector");
+                    })
 
-                        let confirmedSelector = "unconfirmed selector"
-                        const mount = MountOrFindSelectorHierarchyComponent({
-                            service,
-                            settingsService,
-                            selector: "",
-                            passSetSelector: (modifier) => {
-                                setSelector = modifier
-                            },
-                            onConfirmSelector: (selector) => {
-                                confirmedSelector = selector
-                            },
-                            doc, renderFunction: (mount, component) => {
-                                expect(mount).toBeDefined();
-                                render(component as ReactElement, { container: doc.documentElement, baseElement: mount });
-                            }
-                        })
+                    let confirmedSelector = "unconfirmed selector"
+                    const mount = MountOrFindSelectorHierarchyComponent({
+                        service,
+                        selector: "",
+                        passSetSelector: (modifier) => {
+                            setSelector = modifier
+                        },
+                        onConfirmSelector: (selector) => {
+                            confirmedSelector = selector
+                        },
+                        doc, renderFunction: (mount, component) => {
+                            expect(mount).toBeDefined();
+                            render(component as ReactElement, { container: doc.documentElement, baseElement: mount });
+                        }
+                    })
 
-                        expect(mount !== existingMount).toBeTruthy()
+                    expect(mount !== existingMount).toBeTruthy()
 
-                        expect(mount).toBeDefined();
-                        act(() => {
-                            setSelector("test selector");
-                        })
+                    expect(mount).toBeDefined();
+                    act(() => {
+                        setSelector("test selector");
+                    })
 
-                        waitFor(async () => {
-                            expect(doc.documentElement.innerHTML).toContain("test selector")
-                        }, {timeout: 200, interval: 300}).then(resolve)
-                    });
+                    waitFor(async () => {
+                        expect(doc.documentElement.innerHTML).toContain("test selector")
+                    }, {timeout: 200, interval: 300}).then(resolve)
                 });
-            })
+            });
         })
 
         // todo: get this working

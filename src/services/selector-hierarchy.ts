@@ -242,7 +242,7 @@ export const ForThoustPanel = (
     const selectedHtmlElements = existingSelection !== undefined ?
         [...existingSelection.htmlSelectors.keys()].flatMap(k => k.elem) :
         [...(selector.trim() === "" ? document.querySelectorAll(SelectorsDefaultFactory().join(",")) : document.querySelectorAll(selector))];
-    const nonSelectedHtmlElements = [...document.querySelectorAll("*")].filter(el => selectedHtmlElements.includes(el));
+    const nonSelectedHtmlElements = [...document.querySelectorAll("*")].filter(el => !selectedHtmlElements.includes(el));
 
     function getNeighborIslands(elements: HtmlElement[], initialSelector: string[] = SelectorsDefaultFactory()): Map<Selector, HtmlElement[]> {
         initialSelector = initialSelector.flatMap(selector => selector.split(`,`).map(s => s.toLowerCase()))
@@ -281,7 +281,6 @@ export const ForThoustPanel = (
                         const htmlElementCollections = map.get(className.toLowerCase()) || [];
                         // search each collection, and if they're a neighbor then push and stop
                         // if not, add a new collection with the element
-                        let foundNeighbor = false;
 
                         const neighborCollection = htmlElementCollections?.find(collection =>
                             collection.find(possibleNeighbor => isNeighbor(element, possibleNeighbor)))
