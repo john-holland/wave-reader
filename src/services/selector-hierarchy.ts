@@ -94,8 +94,44 @@ export type ColorSelection = {
     color: Color
 }
 
+const dimmed = tinycolor("#333")
+
 export class HtmlSelection {
     htmlSelectors: Map<Selector, ColorSelection>
+
+    hasSelectorForElement(element: HtmlElement) {
+        return [...this.htmlSelectors.keys()].find(key =>
+            key.classList.filter(clazz =>
+                element.classList.contains(clazz)
+            )
+        )
+    }
+
+    addSelectorForElement(element: HtmlElement, color: Color = dimmed) {
+        type SelectorPair = {
+            selector: Selector,
+            colorSelection: ColorSelection
+        }
+        const selectors = [...this.htmlSelectors.keys()].flatMap(key =>
+            key.classList.filter(clazz =>
+                element.classList.contains(clazz)
+            )
+            .map(() => {
+                return {
+                    selector: key, colorSelection: this.htmlSelectors.get(key)
+                } as SelectorPair
+            })
+        )
+        if (!selectors.length) {
+            const selector = {elem: [element], classList: [...element.classList]}
+            this.htmlSelectors.set(selector, { selector, color })
+        } else {
+            selectors.forEach((pair: SelectorPair) => {
+                const { selector } = pair;
+                selector.elem.push(element)
+            })
+        }
+    }
 
     constructor(htmlSelectors: Map<Selector, ColorSelection>) {
         this.htmlSelectors = htmlSelectors
@@ -229,6 +265,12 @@ export const SizeFunctions = {
     calcBottom
 }
 
+const getPathSelector = (el: HtmlElement | undefined): string => {
+    if (el === undefined) return ""
+    const parentNode: HtmlElement | undefined = el.parentNode as HtmlElement
+    return (parentNode ? getPathSelector(parentNode) + " > " : "") + Array.prototype.join.call(el.classList, ",") // ternary for tail recursion
+}
+
 export const ForThoustPanel = (
     document: Document,
     selector: string,
@@ -236,18 +278,19 @@ export const ForThoustPanel = (
     existingSelection?: HtmlSelection,
     fontSizeRemDefaultAccessor = getDefaultFontSizeREM
 ): HtmlSelection => {
-    // figure out change of basis for screen pixels if necessary etc
 
+    // figure out change of basis for screen pixels if necessary etc
     // todo: figure out where we're going here, do we want one panel specified or each panel showing?
     const selectedHtmlElements = existingSelection !== undefined ?
         [...existingSelection.htmlSelectors.keys()].flatMap(k => k.elem) :
         [...(selector.trim() === "" ? document.querySelectorAll(SelectorsDefaultFactory().join(",")) : document.querySelectorAll(selector))];
+
     const nonSelectedHtmlElements = [...document.querySelectorAll("*")].filter(el => !selectedHtmlElements.includes(el));
-
     function getNeighborIslands(elements: HtmlElement[], initialSelector: string[] = SelectorsDefaultFactory()): Map<Selector, HtmlElement[]> {
-        initialSelector = initialSelector.flatMap(selector => selector.split(`,`).map(s => s.toLowerCase()))
 
+        initialSelector = initialSelector.flatMap(selector => selector.split(`,`).map(s => s.toLowerCase()))
         // for each element, add an entry to the class map
+
         const classMap = elements.reduce<Map<string, HtmlElement[]>>((map: Map<string, HtmlElement[]>, el: HtmlElement) => {
                             // kind of cludgey but we'll just let the classMap include the nodeName,
                             // slightly flexible islands hopefully won't hurt
@@ -256,12 +299,6 @@ export const ForThoustPanel = (
                                     .forEach(className => map.set(className, map.get(className) || [el]))
                             return map;
                         }, new Map<string, HtmlElement[]>())
-
-        const getPathSelector = (el: HtmlElement | undefined): string => {
-            if (el === undefined) return ""
-            const parentNode: HtmlElement | undefined = el.parentNode as HtmlElement
-            return (parentNode ? getPathSelector(parentNode) + " > " : "") + Array.prototype.join.call(el.classList, ",") // ternary for tail recursion
-        }
 
         // for each class find neighbors, and make islands
         const isNeighbor = (el: HtmlElement, possibleNeighbor: HtmlElement) => {
@@ -386,10 +423,13 @@ export class SelectorHierarchy implements SelectorHierarchyServiceInterface {
     }
 
     getDimmedPanelSelectors(document: Document, selectedElements: HtmlElement[]): HtmlSelection {
+        const selection = new HtmlSelection(new Map<Selector, ColorSelection>())
 
-        return {
-            htmlSelectors: new Map<Selector, ColorSelection>()
-        }
+        document.querySelectorAll("body *").forEach(e => {
+            if (!selectedElements.includes(e as HtmlElement, 0)) selection.addSelectorForElement(e as HtmlElement, dimmed);
+        })
+
+        return selection
     }
 
     assignColorSelectionsForSelector(
