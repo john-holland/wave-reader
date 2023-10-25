@@ -152,7 +152,7 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
             {activeSelectorColorPanels.length}<span className={"floating-shelf"}>{selector}</span>
             <input type={"button"} value={"confirm"} onClick={() => onConfirmSelector(selector)} />
             {dimmedPanels.map((panel: ColorSelection) => {
-                panel.selector.elem.forEach((element: HtmlElement) => {
+                return panel.selector.elem.forEach((element: HtmlElement) => {
                     return <Panel color={panel.color.toHexString()} element={element}
                                   // svg may be the way to go with this stuff
                                   // x={SizeFunctions.calcLeft(element)} y={SizeFunctions.calcTop(element)}
