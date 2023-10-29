@@ -288,31 +288,32 @@ export const ForThoustPanel = (
     const nonSelectedHtmlElements = [...document.querySelectorAll("*")].filter(el => !selectedHtmlElements.includes(el));
     function getNeighborIslands(elements: HtmlElement[], initialSelector: string[] = SelectorsDefaultFactory()): Map<Selector, HtmlElement[]> {
 
-        initialSelector = initialSelector.flatMap(selector => selector.split(`,`).map(s => s.toLowerCase()))
+        initialSelector = initialSelector.flatMap(selector => selector.split(`,`).map(s => s.toLowerCase().trim()))
         // for each element, add an entry to the class map
 
         const classMap = elements.reduce<Map<string, HtmlElement[]>>((map: Map<string, HtmlElement[]>, el: HtmlElement) => {
                             // kind of cludgey but we'll just let the classMap include the nodeName,
                             // slightly flexible islands hopefully won't hurt
                             [el.nodeName, ...el.classList].map(c => c.toLowerCase().trim())
-                                .filter(className => initialSelector.includes(className) || initialSelector.includes(el.nodeName))
+                                .filter(className => initialSelector.includes(className))
                                     .forEach(className => map.set(className, map.get(className) || [el]))
                             return map;
                         }, new Map<string, HtmlElement[]>())
 
         // for each class find neighbors, and make islands
         const isNeighbor = (el: HtmlElement, possibleNeighbor: HtmlElement) => {
-            const elParent = getPathSelector(el.parentNode as HtmlElement)
-            const neighborParent = getPathSelector(possibleNeighbor.parentNode as HtmlElement)
             return (
-                el.parentNode === possibleNeighbor || // sibling
-                neighborParent === elParent || // parent
-                getPathSelector(possibleNeighbor).includes(getPathSelector(el)) // descendant
+                el.parentNode === possibleNeighbor || // parent
+                possibleNeighbor.parentNode === el || // descendant
+                el.parentNode === possibleNeighbor.parentNode ||
+                getPathSelector(el.parentNode as HtmlElement) === getPathSelector(possibleNeighbor.parentNode as HtmlElement)
+                //elParent.includes(neighborParent) || // grand / great folks
             )
         }
         const neighborIslands = [...classMap.values()]//.flatMap<HtmlElement[]>(c => [...c])
             .reduce<Map<string, HtmlElement[][]>>((map, elements) => {
                 [...elements].forEach((element) => {
+                    // like a good soup, we're adding the nodeName back in for good measure `.`
                     [element.nodeName, ...element.classList].map(c => c.toLowerCase().trim()).forEach(className => {
                         // todo: review: lower className on list add?
                         const htmlElementCollections = map.get(className.toLowerCase()) || [];
@@ -343,7 +344,7 @@ export const ForThoustPanel = (
         const MIN_ISLAND_AREA = (20 * 20);
         // then merge islands with shared HtmlElement[] collections into Selectors
         // filter out islands smaller than 20px x 20px
-        const neighborMap = [...neighborIslands.keys()].reduce((map, key) => {
+        const neighborMap = [...neighborIslands.keys()].reduce((/* island */map, key) => {
             const selectors = [...map.keys()]
             // todo: investigate, null selector.elem
             const uncheckedSelectors = selectors.filter(selector => selector.elem.find(e => e.nodeName?.toLowerCase() === key) || !selector.classList.includes(key))

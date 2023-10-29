@@ -185,9 +185,9 @@ function StateNameMap(map = new Map()) {
                 console.log("start selection choose activated without selector!")
             }
 
-            stateMachine.handleState(new SelectionModeMessage({
-                selector
-            }))
+            // stateMachine.handleState(new SelectionModeMessage({
+            //     selector
+            // }))
 
             hierarchySelectorMount = MountOrFindSelectorHierarchyComponent({
                 service: hierarchySelectorService,
