@@ -77,7 +77,6 @@
   "license": "MIT",
   "credits": {
     "tobias": "https://tobiasahlin.com/blog/flexbox-break-to-new-row/",
-    "...": "....",
-    "sparticus": "sparticus"
+    "marc_s": { "context": "util.ts#isVisible", "url": "https://stackoverflow.com/q/66070706" }
   }
 }

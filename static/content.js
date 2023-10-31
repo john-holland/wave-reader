@@ -24,7 +24,7 @@ import SelectionMadeMessage from "../src/models/messages/selection-made";
 const stateMachineMap = new Map();
 stateMachineMap.set("base", Base);
 
-const settingsService = new SettingsService();
+//const settingsService = SettingsService.withTabUrlProvider(() => Promise.resolve(document.location.href));
 
 const stateMachine = new StateMachine()
 
@@ -131,14 +131,21 @@ function StateNameMap(map = new Map()) {
             initializeOrUpdateToggleObserver(message);
             return map.get('waving')
         }, false),
-        "stop": CState("stop", StopVentures, false, (message, state, previousState) => {
+        "stop": CState("stop", StopVentures, true, (message, state, previousState) => {
             unloadCSS()
             going = false;
-            return map.get('base')
+            return previousState.name === "waving" ? map.get("base") : previousState;
         }, false),
         "update": CState("update", BaseVentures, false, (message, state, previousState) => {
             unloadCSS()
+
+            if (!message?.options) {
+                console.log("warning: update called with no options" + JSON.stringify(message));
+                return previousState;
+            }
+
             latestOptions = message.options;
+
             console.log("Update called with previous state: " + previousState.name);
             if (previousState.name === "waving") {
                 loadCSSTemplate(latestOptions.wave.cssTemplate)
@@ -185,13 +192,20 @@ function StateNameMap(map = new Map()) {
                 console.log("start selection choose activated without selector!")
             }
 
+            /* science!
+              hypothesis: previously i did not include the world parameter in the content script manifest
+                    it was only getting the extension document
+              evidence: found iframe
+              conclusion: ?
+              theory: borf
+              */
+            //
             // stateMachine.handleState(new SelectionModeMessage({
             //     selector
             // }))
 
             hierarchySelectorMount = MountOrFindSelectorHierarchyComponent({
                 service: hierarchySelectorService,
-                settingsService,
                 selector,
                 passSetSelector: (modifier) => { setHierarchySelector = modifier; },
                 onConfirmSelector: (selector) => {
@@ -208,11 +222,11 @@ function StateNameMap(map = new Map()) {
             return map.get('selection mode')
         }, false),
         "selection made": CState("selection made", ["end-selection-choose"], true, async (message, state, previousState) => {
-            await settingsService.updateCurrentSettings((options) => {
-                options.selectors.push(message?.selector)
-                options.wave.selector = message?.selector;
-                return options;
-            })
+            // await settingsService.updateCurrentSettings((options) => {
+            //     options.selectors.push(message?.selector)
+            //     options.wave.selector = message?.selector;
+            //     return options;
+            // })
 
             chrome.runtime.sendMessage(new SelectionMadeMessage(message?.selector))
 
@@ -243,9 +257,9 @@ let going = false;
 
 stateMachine.initialize(new StateNameMap(stateMachineMap), Base);
 
-settingsService.getCurrentSettings().then(settings => {
-    stateMachine.handleState(new UpdateWaveMessage({ options: settings }))
-})
+// settingsService.getCurrentSettings().then(settings => {
+//     stateMachine.handleState(new UpdateWaveMessage({ options: settings }))
+// })
 
 chrome.runtime.onMessage.addListener( (message, sender, sendResponse) => {
         console.log(`message: ${JSON.stringify(message)}`)
@@ -268,5 +282,9 @@ chrome.runtime.onMessage.addListener( (message, sender, sendResponse) => {
 
     return true;
 });
+chrome.runtime.connect().onDisconnect.addListener(function() {
+    // clean up when content script gets disconnected
+    // todo implement
+})
 
 // maybe a nyan cat easter egg?

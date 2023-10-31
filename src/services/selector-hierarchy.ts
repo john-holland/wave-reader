@@ -3,7 +3,7 @@ import {FunctionComponent, useState} from "react";
 import tinycolor, { ColorInput } from "tinycolor2";
 import {SelectorsDefaultFactory} from "../models/defaults";
 import SettingsService, {SettingsDAOInterface} from "./settings";
-import {getDefaultFontSizeREM, getSizeValuesRegex} from "../util/util";
+import {getDefaultFontSizeREM, getSizeValuesRegex, isVisible} from "../util/util";
 
 // probably use the chrome types version
  export type HtmlElement = HTMLElement
@@ -187,7 +187,7 @@ const calcSize = (element: HtmlElement | undefined, size: string, property: Size
         case SizeProperties.HEIGHT:
             return element.clientHeight;
         case SizeProperties.WIDTH:
-            return element.clientHeight;
+            return element.clientWidth;
         default:
             if (!size || size.trim() === "") {
                 return 0;
@@ -228,6 +228,10 @@ const calcSize = (element: HtmlElement | undefined, size: string, property: Size
 }
 
 const calcLeft = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSizeREM): number => {
+    const boundingRect = n.getBoundingClientRect()
+    if (boundingRect) {
+        return boundingRect.left
+    }
     const cs = (property: string) => calcSize(n, property, SizeProperties.OTHER, fontSizeRemDefaultAccessor)
     return cs(n.style?.left) +
         cs(n.style?.marginLeft) +
@@ -235,6 +239,10 @@ const calcLeft = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSiz
         (_parent(n) ? calcLeft(_parent(n)!!, fontSizeRemDefaultAccessor) : 0);
 }
 const calcRight = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSizeREM()): number => {
+    const boundingRect = n.getBoundingClientRect()
+    if (boundingRect) {
+        return boundingRect.right
+    }
     const cs = (property: string) => calcSize(n, property, SizeProperties.OTHER, fontSizeRemDefaultAccessor) || 0
     return cs(n.style?.left) +
         cs(n.style?.marginLeft) +
@@ -243,6 +251,10 @@ const calcRight = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSi
         cs(n.style?.marginRight);
 }
 const calcTop = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSizeREM()): number => {
+    const boundingRect = n.getBoundingClientRect()
+    if (boundingRect) {
+        return boundingRect.top
+    }
     const cs = (property: string) => calcSize(n, property, SizeProperties.OTHER, fontSizeRemDefaultAccessor)
     return cs(n.style?.top) +
         cs(n.style?.marginTop) +
@@ -250,6 +262,10 @@ const calcTop = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSize
         (_parent(n) ? calcTop(_parent(n)!!, fontSizeRemDefaultAccessor) : 0);
 }
 const calcBottom = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSizeREM()): number => {
+    const boundingRect = n.getBoundingClientRect()
+    if (boundingRect) {
+        return boundingRect.bottom
+    }
     const cs = (property: string) => calcSize(n, property, SizeProperties.OTHER, fontSizeRemDefaultAccessor)
     return cs(n.style?.top) + cs(n.style?.marginTop) +
         calcSize(_parent(n), _parent(n)?.style?.paddingTop || "0", SizeProperties.OTHER, fontSizeRemDefaultAccessor) +
@@ -266,9 +282,9 @@ export const SizeFunctions = {
 }
 
 const getPathSelector = (el: HtmlElement | undefined): string => {
-    if (el === undefined) return ""
+    if (!el) return ""
     const parentNode: HtmlElement | undefined = el.parentNode as HtmlElement
-    return (parentNode ? getPathSelector(parentNode) + " > " : "") + Array.prototype.join.call(el.classList, ",") // ternary for tail recursion
+    return (parentNode ? getPathSelector(parentNode) + " > " : "") + Array.prototype.join.call(el?.classList || [], ",") // ternary for tail recursion
 }
 
 export const ForThoustPanel = (
@@ -281,11 +297,12 @@ export const ForThoustPanel = (
 
     // figure out change of basis for screen pixels if necessary etc
     // todo: figure out where we're going here, do we want one panel specified or each panel showing?
-    const selectedHtmlElements = existingSelection !== undefined ?
+    const selectedHtmlElements = (existingSelection !== undefined ?
         [...existingSelection.htmlSelectors.keys()].flatMap(k => k.elem) :
-        [...(selector.trim() === "" ? document.querySelectorAll(SelectorsDefaultFactory().join(",")) : document.querySelectorAll(selector))];
+        [...(selector.trim() === "" ? document.querySelectorAll(SelectorsDefaultFactory().join(",")) : document.querySelectorAll(selector))])
+            .map(k => k as HTMLElement).filter(element => !!element && isVisible(element));
 
-    const nonSelectedHtmlElements = [...document.querySelectorAll("*")].filter(el => !selectedHtmlElements.includes(el));
+    const nonSelectedHtmlElements = [...document.querySelectorAll("*")].filter(el => !selectedHtmlElements.includes(el as HTMLElement));
     function getNeighborIslands(elements: HtmlElement[], initialSelector: string[] = SelectorsDefaultFactory()): Map<Selector, HtmlElement[]> {
 
         initialSelector = initialSelector.flatMap(selector => selector.split(`,`).map(s => s.toLowerCase().trim()))
@@ -303,6 +320,7 @@ export const ForThoustPanel = (
         // for each class find neighbors, and make islands
         const isNeighbor = (el: HtmlElement, possibleNeighbor: HtmlElement) => {
             return (
+                el === possibleNeighbor || // identity
                 el.parentNode === possibleNeighbor || // parent
                 possibleNeighbor.parentNode === el || // descendant
                 el.parentNode === possibleNeighbor.parentNode ||
@@ -352,16 +370,14 @@ export const ForThoustPanel = (
             //  (we'll have to test to assert for the assumption that islands have no overlap)
             neighborIslands.get(key)?.filter(island => {
                 const islandArray = [...island.values()];
-                const left =  Math.min(...islandArray.map(e => calcLeft(e, fontSizeRemDefaultAccessor)));
-                const right = Math.max(...islandArray.map(e => calcRight(e, fontSizeRemDefaultAccessor)));
-                const top = Math.min(...islandArray.map(e => calcTop(e, fontSizeRemDefaultAccessor)));
-                const bottom = Math.max(...islandArray.map(e => calcBottom(e, fontSizeRemDefaultAccessor)));
-                const area = (right - left) * (bottom - top);
+                const width = islandArray.map(e => calcSize(e, e.style.width, SizeProperties.WIDTH, fontSizeRemDefaultAccessor)).reduce((a,c) => a+c, 0)
+                const height = islandArray.map(e => calcSize(e, e.style.height, SizeProperties.HEIGHT, fontSizeRemDefaultAccessor)).reduce((a,c) => a+c, 0)
+                const area = width * height;
                 return area > (MIN_ISLAND_AREA);
             }).forEach(island => {
                 const selector = uncheckedSelectors.find(selector =>
                     selector.elem.length === island.length && ArrayReferenceEquals(selector.elem, island))
-                    || { elem: [island], classList: [] } as unknown as Selector;
+                    || { elem: island, classList: [] } as unknown as Selector;
 
                 selector.classList.push(key)
                 map.set(selector, selector.elem)

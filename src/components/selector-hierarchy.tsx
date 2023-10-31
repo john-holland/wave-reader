@@ -107,10 +107,12 @@ class ColorSelectorPanel implements ColorSelectorPanelInterface {
 
 const Panel = styled.div<ColorSelectorPanel>`
   background-color: ${({color}) => color};
+  min-width: 20px;
+  min-height: 20px;
   left: ${(props: ColorSelectorPanel) => SizeFunctions.calcLeft(props.element)};
   top: ${(props: ColorSelectorPanel) => SizeFunctions.calcTop(props.element)};
-  width: ${(props: ColorSelectorPanel) => SizeFunctions.calcSize(props.element, props.element.style.width, SizeProperties.WIDTH)};
-  height: ${(props: ColorSelectorPanel) => SizeFunctions.calcSize(props.element, props.element.style.width, SizeProperties.HEIGHT)};
+  width: ${(props: ColorSelectorPanel) => SizeFunctions.calcSize(props.element, props.element?.style?.width, SizeProperties.WIDTH)};
+  height: ${(props: ColorSelectorPanel) => SizeFunctions.calcSize(props.element, props.element?.style?.height, SizeProperties.HEIGHT)};
 ` as StyledComponent<"div", any, ColorSelectorPanel, never>
 
 const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentProps> = ({
@@ -151,17 +153,17 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
         <SelectorHierarchyMount doc={doc}>
             {activeSelectorColorPanels.length}<span className={"floating-shelf"}>{selector}</span>
             <input type={"button"} value={"confirm"} onClick={() => onConfirmSelector(selector)} />
-            {dimmedPanels.map((panel: ColorSelection) => {
+            {dimmedPanels.map((panel: ColorSelection, i: number) => {
                 return panel.selector.elem.forEach((element: HtmlElement) => {
-                    return <Panel color={panel.color.toHexString()} element={element}
+                    return <Panel color={panel.color.toHexString()} element={element} key={i}
                                   // svg may be the way to go with this stuff
                                   // x={SizeFunctions.calcLeft(element)} y={SizeFunctions.calcTop(element)}
                     ></Panel>
                 })
             })}
 
-            {activeSelectorColorPanels.map((panel: ColorSelectorPanel) => {
-                return <Panel color={panel.color} element={panel.element}></Panel>
+            {activeSelectorColorPanels.flatMap((panel: ColorSelectorPanel, i: number) => {
+                return <Panel color={panel.color} element={panel.element}  key={i}></Panel>
             })}
             {/* maybe maybe maybe
             maaaaaayyyyybee some day we'll
@@ -218,6 +220,8 @@ export const MountOrFindSelectorHierarchyComponent: MountFunction = ({
     }
 }): Element => {
     let mount = doc.querySelector("#wave-reader-component-mount") as HTMLElement;
+
+    // todo: we seem to be calling this for each frame, which is super, but we'll probably want some sort of iframe id registry
 
 
     if (mount) {
