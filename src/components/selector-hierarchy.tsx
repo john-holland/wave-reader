@@ -3,7 +3,7 @@ import {
     ColorGeneratorServiceInterface,
     ColorSelection,
     ForThoustPanel,
-    HtmlElement,
+    HtmlElement, HtmlSelection, Selector,
     SelectorHierarchy,
     SelectorHierarchyServiceInterface,
     SizeFunctions,
@@ -12,6 +12,7 @@ import {
 import styled, {StyledComponent} from "styled-components";
 import ReactDOM from "react-dom";
 import {SelectorsDefaultFactory} from "../models/defaults";
+import {Button} from "@mui/material";
 
 type SelectorHierarchyMountProps = {
     doc: Document
@@ -106,13 +107,16 @@ class ColorSelectorPanel implements ColorSelectorPanelInterface {
 }
 
 const Panel = styled.div<ColorSelectorPanel>`
-  background-color: ${({color}) => color};
-  min-width: 20px;
-  min-height: 20px;
-  left: ${(props: ColorSelectorPanel) => SizeFunctions.calcLeft(props.element)};
-  top: ${(props: ColorSelectorPanel) => SizeFunctions.calcTop(props.element)};
-  width: ${(props: ColorSelectorPanel) => SizeFunctions.calcSize(props.element, props.element?.style?.width, SizeProperties.WIDTH)};
-  height: ${(props: ColorSelectorPanel) => SizeFunctions.calcSize(props.element, props.element?.style?.height, SizeProperties.HEIGHT)};
+  .panel-decorator {
+    background-color: ${({color}) => color};
+    position: relative;
+    min-width: 20px;
+    min-height: 20px;
+    left: ${(props: ColorSelectorPanel) => SizeFunctions.calcLeft(props.element)}px !important;
+    top: ${(props: ColorSelectorPanel) => SizeFunctions.calcTop(props.element)}px !important;
+    width: ${(props: ColorSelectorPanel) => SizeFunctions.calcSize(props.element, props.element?.style?.width, SizeProperties.WIDTH)}px !important;
+    height: ${(props: ColorSelectorPanel) => SizeFunctions.calcSize(props.element, props.element?.style?.height, SizeProperties.HEIGHT)}px !important;
+  }
 ` as StyledComponent<"div", any, ColorSelectorPanel, never>
 
 const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentProps> = ({
@@ -124,14 +128,17 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
 }) => {
     const [activeSelectorPanel, setActiveSelectorPanel] = useState(undefined);
     const [selector, setSelector] = useState(currentSelector);
+    const [latestSelector, setLatestSelector] = useState<HtmlSelection | undefined>(undefined);
     const [activeSelectorColorPanels, setActiveSelectorColorPanels] = useState<ColorSelectorPanel[]>([])
     const [htmlHierarchy, setHtmlHierarchy] = useState(doc);
     const [dimmedPanels, setDimmedPanels] = useState<ColorSelection[]>([])
+
     // ;const [brambles] = useWilliamTate();
     // 'const [someDafadilTypeShiz] = ['#eea']
 
     const updateThoustPanels = () => {
         const selection = ForThoustPanel(htmlHierarchy, selector || SelectorsDefaultFactory()[0], selectorHierarchyService);
+        setLatestSelector(selection)
         const activePanels = [...selection.htmlSelectors.values()].flatMap(s => {
             return s.selector.elem.map(e => new ColorSelectorPanel( e, s.color.toHexString() ));
         })
@@ -149,21 +156,58 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
         updateThoustPanels()
     }, [selector])
 
+    const addPanelIslandClicked = (element: HtmlElement) => {
+        const colorPanel = activeSelectorColorPanels.find(p => p.element === element);
+
+        const panelSelector = [...(latestSelector?.htmlSelectors?.keys() || [])].filter(selector => selector.elem.find(e => e === colorPanel?.element))
+
+        setSelector((selector ? selector + ", " : "") + [...new Set(panelSelector.flatMap(s => s.classList))].join(", "))
+    }
+
+    const removePanelIslandClicked = (element: HtmlElement) => {
+        const colorPanel = activeSelectorColorPanels.find(p => p.element === element);
+
+        // using the current selector, remove get a classList from the colorPanel and remove any then setSelector
+        // also filter the latestSelector for mentions of the colorPanel element islands
+
+        const entries = [...(latestSelector?.htmlSelectors?.entries() || [])].filter(([key]) => {
+            return !key.elem.find(e => e === colorPanel?.element);
+        });
+
+        setLatestSelector(new HtmlSelection(new Map<Selector, ColorSelection>(entries)))
+        setSelector(selector.split(",").map(s => s.trim()).filter(s => colorPanel?.element !== element &&
+            !colorPanel?.element.classList.contains(s)).join(", "))
+    }
+
     return (
         <SelectorHierarchyMount doc={doc}>
             {activeSelectorColorPanels.length}<span className={"floating-shelf"}>{selector}</span>
             <input type={"button"} value={"confirm"} onClick={() => onConfirmSelector(selector)} />
             {dimmedPanels.map((panel: ColorSelection, i: number) => {
                 return panel.selector.elem.forEach((element: HtmlElement) => {
-                    return <Panel color={panel.color.toHexString()} element={element} key={i}
-                                  // svg may be the way to go with this stuff
-                                  // x={SizeFunctions.calcLeft(element)} y={SizeFunctions.calcTop(element)}
-                    ></Panel>
+                    return <Panel className={"panel-decorator"} color={panel.color.toHexString()} element={element} key={i}>dimmed</Panel>
                 })
             })}
 
             {activeSelectorColorPanels.flatMap((panel: ColorSelectorPanel, i: number) => {
-                return <Panel color={panel.color} element={panel.element}  key={i}></Panel>
+                return <Panel className={"panel-decorator"} color={panel.color} element={panel.element}  key={i}
+                    style={{
+                        left: `${SizeFunctions.calcLeft(panel.element)}px !important`,
+                        top: `${SizeFunctions.calcTop(panel.element)}px !important`,
+                        width: `${SizeFunctions.calcSize(panel.element, panel.element?.style?.width, SizeProperties.WIDTH)}px !important`,
+                        height: `${SizeFunctions.calcSize(panel.element, panel.element?.style?.height, SizeProperties.HEIGHT)}px !important`
+                    }}
+                >
+                    {/* maybe hypertext or something? */}
+                    <Button key={'+'+i} onClick={(e) => {
+                        debugger;
+                        addPanelIslandClicked.call(this, panel.element)
+                    }}>+</Button>
+                    <Button key={'-'+i} onClick={(e) => {
+                        debugger;
+                        removePanelIslandClicked.call(this, panel.element)
+                    }}>-</Button>
+                </Panel>
             })}
             {/* maybe maybe maybe
             maaaaaayyyyybee some day we'll

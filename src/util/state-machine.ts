@@ -14,6 +14,8 @@ class StateMachine {
     constructor() {
     }
 
+    // todo: for client manager, add the ability to pass the active node etc
+    //   look into graphql propegation apis?
     /**
      * @remarks Please note, the stateObservable does not report the originState
      * @param stateMachineMap [NameAccessMapInterface] a map of state-machine states by name
