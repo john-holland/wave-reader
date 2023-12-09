@@ -106,7 +106,7 @@ class ColorSelectorPanel implements ColorSelectorPanelInterface {
     }
 }
 
-const Panel = styled.div<ColorSelectorPanel>`
+const Panel = styled.div`
   .panel-decorator {
     background-color: ${({color}) => color};
     position: relative;
@@ -126,7 +126,6 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
     passSetSelector,
     doc = document
 }) => {
-    const [activeSelectorPanel, setActiveSelectorPanel] = useState(undefined);
     const [selector, setSelector] = useState(currentSelector);
     const [latestSelector, setLatestSelector] = useState<HtmlSelection | undefined>(undefined);
     const [activeSelectorColorPanels, setActiveSelectorColorPanels] = useState<ColorSelectorPanel[]>([])
@@ -142,6 +141,7 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
         const activePanels = [...selection.htmlSelectors.values()].flatMap(s => {
             return s.selector.elem.map(e => new ColorSelectorPanel( e, s.color.toHexString() ));
         })
+        // todo: change to, select from selectors for "*" minus active selection
         setDimmedPanels([...selectorHierarchyService.getDimmedPanelSelectors(htmlHierarchy, activePanels.map(s => s.element)).htmlSelectors.values()]);
         setActiveSelectorColorPanels(activePanels)
     }
@@ -185,7 +185,14 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
             <input type={"button"} value={"confirm"} onClick={() => onConfirmSelector(selector)} />
             {dimmedPanels.map((panel: ColorSelection, i: number) => {
                 return panel.selector.elem.forEach((element: HtmlElement) => {
-                    return <Panel className={"panel-decorator"} color={panel.color.toHexString()} element={element} key={i}>dimmed</Panel>
+                    return <Panel className={"panel-decorator"} color={panel.color.toHexString()} element={element} key={i}>
+                        <Button key={'+'+i} style={{
+                            backgroundColor: "#333",
+                            color: "#eee"
+                        }} onClick={(e) => {
+                            addPanelIslandClicked.call(this, element)
+                        }}>+</Button>
+                    </Panel>
                 })
             })}
 
@@ -199,12 +206,7 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
                     }}
                 >
                     {/* maybe hypertext or something? */}
-                    <Button key={'+'+i} onClick={(e) => {
-                        debugger;
-                        addPanelIslandClicked.call(this, panel.element)
-                    }}>+</Button>
                     <Button key={'-'+i} onClick={(e) => {
-                        debugger;
                         removePanelIslandClicked.call(this, panel.element)
                     }}>-</Button>
                 </Panel>

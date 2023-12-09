@@ -442,7 +442,7 @@ export class SelectorHierarchy implements SelectorHierarchyServiceInterface {
     getDimmedPanelSelectors(document: Document, selectedElements: HtmlElement[]): HtmlSelection {
         const selection = new HtmlSelection(new Map<Selector, ColorSelection>())
 
-        document.querySelectorAll("body *").forEach(e => {
+        document.querySelectorAll(SelectorsDefaultFactory().join(", ")).forEach(e => {
             if (!selectedElements.includes(e as HtmlElement, 0)) selection.addSelectorForElement(e as HtmlElement, dimmed);
         })
 
