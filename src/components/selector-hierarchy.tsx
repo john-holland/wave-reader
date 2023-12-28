@@ -15,11 +15,12 @@ import {SelectorsDefaultFactory} from "../models/defaults";
 import {Button} from "@mui/material";
 
 type SelectorHierarchyMountProps = {
-    doc: Document
+    doc: Document,
+    visible: boolean
 }
 
 const SelectorHierarchyMount = styled.div`
-  display: block;
+  display: ${(props: SelectorHierarchyMountProps) => props.visible ? "block" : "none"};
   position: absolute;
   margin: 0;
   padding: 0;
@@ -28,6 +29,11 @@ const SelectorHierarchyMount = styled.div`
   width: 100%;
   height: ${(props: SelectorHierarchyMountProps) => props.doc.documentElement.scrollHeight} px;
 `
+
+const SelectorButton = styled(Button)`
+    border: none;
+    background: none;
+`;
 
 /**
  * we may need to use 4 enclosing panels, reused
@@ -131,12 +137,14 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
     const [activeSelectorColorPanels, setActiveSelectorColorPanels] = useState<ColorSelectorPanel[]>([])
     const [htmlHierarchy, setHtmlHierarchy] = useState(doc);
     const [dimmedPanels, setDimmedPanels] = useState<ColorSelection[]>([])
+    const [confirmed, setConfirmed] = useState(false);
 
     // ;const [brambles] = useWilliamTate();
     // 'const [someDafadilTypeShiz] = ['#eea']
 
     const updateThoustPanels = () => {
         const selection = ForThoustPanel(htmlHierarchy, selector || SelectorsDefaultFactory()[0], selectorHierarchyService);
+        console.log(JSON.stringify(selection));
         setLatestSelector(selection)
         const activePanels = [...selection.htmlSelectors.values()].flatMap(s => {
             return s.selector.elem.map(e => new ColorSelectorPanel( e, s.color.toHexString() ));
@@ -179,19 +187,24 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
             !colorPanel?.element.classList.contains(s)).join(", "))
     }
 
+    const confirmSelector = (selector: string) => {
+        setConfirmed(true)
+        onConfirmSelector(selector)
+    }
+
     return (
-        <SelectorHierarchyMount doc={doc}>
+        <SelectorHierarchyMount doc={doc} visible={!confirmed}>
             {activeSelectorColorPanels.length}<span className={"floating-shelf"}>{selector}</span>
-            <input type={"button"} value={"confirm"} onClick={() => onConfirmSelector(selector)} />
+            <input type={"button"} value={"confirm"} onClick={() => confirmSelector(selector)} />
             {dimmedPanels.map((panel: ColorSelection, i: number) => {
                 return panel.selector.elem.forEach((element: HtmlElement) => {
                     return <Panel className={"panel-decorator"} color={panel.color.toHexString()} element={element} key={i}>
-                        <Button key={'+'+i} style={{
+                        <SelectorButton key={'+'+i} style={{
                             backgroundColor: "#333",
                             color: "#eee"
                         }} onClick={(e) => {
                             addPanelIslandClicked.call(this, element)
-                        }}>+</Button>
+                        }}>+</SelectorButton>
                     </Panel>
                 })
             })}
@@ -206,9 +219,9 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
                     }}
                 >
                     {/* maybe hypertext or something? */}
-                    <Button key={'-'+i} onClick={(e) => {
+                    <SelectorButton key={'-'+i} onClick={(e) => {
                         removePanelIslandClicked.call(this, panel.element)
-                    }}>-</Button>
+                    }}>-</SelectorButton>
                 </Panel>
             })}
             {/* maybe maybe maybe

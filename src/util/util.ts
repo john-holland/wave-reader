@@ -75,7 +75,7 @@ export const isVisible = (element: HTMLElement) => {
 
     // for real elements, the second argument is omitted (or null)
     // for pseudo-elements, the second argument is a string specifying the pseudo-element to match.
-    let style = window.getComputedStyle(element, null);
+    const style = window.getComputedStyle(element, null);
 
     // if element has size 0
     if(element.offsetWidth === 0 || element.offsetHeight === 0){
@@ -83,7 +83,7 @@ export const isVisible = (element: HTMLElement) => {
         if (style.overflow !== 'visible') {
             return false;
         } else {
-            for (let child of element.childNodes) {
+            for (const child of element.childNodes) {
                 if (isVisible(child as HTMLElement)) return true;
             }
             return false;

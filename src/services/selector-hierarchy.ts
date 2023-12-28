@@ -36,6 +36,13 @@ export type Selector = {
     // consider adding xpath
 }
 
+const createSelector = (elems: HtmlElement[] = [], classList: string[] = []) => {
+     return {
+         elem: [...elems],
+         classList: [...classList]
+     } as unknown as Selector;
+}
+
 const enum SelectorEvent {
     SelectEvent,
     Select,
@@ -303,7 +310,7 @@ export const ForThoustPanel = (
             .map(k => k as HTMLElement).filter(element => !!element && isVisible(element));
 
     const nonSelectedHtmlElements = [...document.querySelectorAll("*")].filter(el => !selectedHtmlElements.includes(el as HTMLElement));
-    function getNeighborIslands(elements: HtmlElement[], initialSelector: string[] = SelectorsDefaultFactory()): Map<Selector, HtmlElement[]> {
+    function getNeighborIslands(elements: HtmlElement[], initialSelector: string[] = SelectorsDefaultFactory()): Selector[] {
 
         initialSelector = initialSelector.flatMap(selector => selector.split(`,`).map(s => s.toLowerCase().trim()))
         // for each element, add an entry to the class map
@@ -362,31 +369,61 @@ export const ForThoustPanel = (
         const MIN_ISLAND_AREA = (20 * 20);
         // then merge islands with shared HtmlElement[] collections into Selectors
         // filter out islands smaller than 20px x 20px
-        const neighborMap = [...neighborIslands.keys()].reduce((/* island */map, key) => {
-            const selectors = [...map.keys()]
-            // todo: investigate, null selector.elem
-            const uncheckedSelectors = selectors.filter(selector => selector.elem.find(e => e.nodeName?.toLowerCase() === key) || !selector.classList.includes(key))
-            // given any selector we haven't already added a class collection
-            //  (we'll have to test to assert for the assumption that islands have no overlap)
-            neighborIslands.get(key)?.filter(island => {
-                const islandArray = [...island.values()];
-                const width = islandArray.map(e => calcSize(e, e.style.width, SizeProperties.WIDTH, fontSizeRemDefaultAccessor)).reduce((a,c) => a+c, 0)
-                const height = islandArray.map(e => calcSize(e, e.style.height, SizeProperties.HEIGHT, fontSizeRemDefaultAccessor)).reduce((a,c) => a+c, 0)
-                const area = width * height;
-                return area > (MIN_ISLAND_AREA);
-            }).forEach(island => {
-                const selector = uncheckedSelectors.find(selector =>
-                    selector.elem.length === island.length && ArrayReferenceEquals(selector.elem, island))
-                    || { elem: island, classList: [] } as unknown as Selector;
+        return [...neighborIslands.keys()].map(m => m.toLowerCase()).reduce((selectors, key) => {
+            const islandSet = neighborIslands.get(key)?.filter((selector) => selector.find(e => e.nodeName === key || e.classList.contains(key)))
+            const set = islandSet ? createSelector( islandSet.flatMap(i => i), [key, ...islandSet.flatMap(i => i.flatMap(d => [...d.classList]))]) : createSelector()
 
-                selector.classList.push(key)
-                map.set(selector, selector.elem)
+            const elem = set.elem.filter((selectorElem: HtmlElement) => {
+                // find [min left, min top], [max right, max bottom]
+                // todo: maybe handle offsettop, etc like width handles client_offset
+                const minLeft = calcSize(selectorElem, selectorElem.style.left, SizeProperties.OTHER, fontSizeRemDefaultAccessor)
+                const minTop = calcSize(selectorElem, selectorElem.style.top, SizeProperties.OTHER, fontSizeRemDefaultAccessor)
+                const maxRight = calcSize(selectorElem, selectorElem.style.right, SizeProperties.WIDTH, fontSizeRemDefaultAccessor)
+                const maxBottom = calcSize(selectorElem, selectorElem.style.bottom, SizeProperties.WIDTH, fontSizeRemDefaultAccessor)
+
+                // todo: is a minimum font size a good idea here?
+                const width = maxRight - minLeft > 6 || calcSize(selectorElem, selectorElem.style.width, SizeProperties.WIDTH, fontSizeRemDefaultAccessor) > 6
+                const height = maxBottom - minTop > 6 || calcSize(selectorElem, selectorElem.style.height, SizeProperties.HEIGHT, fontSizeRemDefaultAccessor) > 6
+
+                return width && height;
             })
 
-            return map;
-        }, new Map<Selector, HtmlElement[]>())
+            selectors.push({
+                elem: elem,
+                classList: elem.flatMap((e: HtmlElement) => [e.nodeName, ...e.classList])
+            } as unknown as Selector)
+            return selectors;
+        }, [] as Selector[]);
 
-        return neighborMap;
+        //
+        // const neighborMap = [...neighborIslands.keys()].reduce((/* island */map, key) => {
+        //     const selectors = [...map.keys()]
+        //     // todo: investigate, null selector.elem
+        //     const uncheckedSelectors = selectors.filter(selector =>
+        //             selector.elem.find(e => e.nodeName?.toLowerCase() === key.toLowerCase()) ||
+        //             !selector.classList.map(s => s.toLowerCase()).includes(key.toLowerCase())
+        //     )
+        //     // given any selector we haven't already added a class collection
+        //     //  (we'll have to test to assert for the assumption that islands have no overlap)
+        //     neighborIslands.get(key)?.filter(island => {
+        //         const islandArray = [...island.values()];
+        //         const width = islandArray.map(e => calcSize(e, e.style.width, SizeProperties.WIDTH, fontSizeRemDefaultAccessor)).reduce((a,c) => a+c, 0)
+        //         const height = islandArray.map(e => calcSize(e, e.style.height, SizeProperties.HEIGHT, fontSizeRemDefaultAccessor)).reduce((a,c) => a+c, 0)
+        //         const area = width * height;
+        //         return area > (MIN_ISLAND_AREA);
+        //     }).forEach(island => {
+        //         const selector = uncheckedSelectors.find(selector =>
+        //             selector.elem.length === island.length && ArrayReferenceEquals(selector.elem, island))
+        //             || { elem: island, classList: [] } as unknown as Selector;
+        //
+        //         selector.classList.push(key)
+        //         map.set(selector, selector.elem)
+        //     })
+        //
+        //     return map;
+        // }, new Map<Selector, HtmlElement[]>())
+
+//        return neighborMap;
     }
 
     const neighborIslands = getNeighborIslands([...nonSelectedHtmlElements, ...selectedHtmlElements] as HtmlElement[]);
@@ -394,12 +431,12 @@ export const ForThoustPanel = (
 
     /* eslint-disable  @typescript-eslint/no-unused-vars */
     const someDafadilTypeShiz = "#eea" // :3
-    const easterIslandsStatues = [...neighborIslands.values()].map(island => island[0]) // extremely important
+    const easterIslandsStatues = [...neighborIslands].map(island => island.elem[0]) // extremely important
     /* eslint-enable  @typescript-eslint/no-unused-vars */
 
     // maybe redesign with a color selector
     const selection = selectorHierarchyService.assignColorSelectionsForSelector(
-        [...neighborIslands.keys()]);
+        neighborIslands);
 
     return selection;
 }
