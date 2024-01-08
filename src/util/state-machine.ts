@@ -28,10 +28,11 @@ export type ClientID = string
 export interface IClientMessengerService<T extends Message<any>> {
     initialize(): Promise<ClientID>
     getRuntimeProxy(): IRuntimeProxy
+    getDiscover(): ClientDiscovery
     getApiMap(): Map<string, IClientMessengerService<T>>
     getManager(): ClientID
     getClientMap(): Map<string, ClientHost>
-    sendMessage(clientId: string, message: T): Promise<Success>;
+    sendMessage(path: string, clientId: ClientID, message: T): Promise<Success>;
     onReceiveMessage(): Promise<Observable<ClientMessage<T>>>
 }
 
@@ -75,6 +76,21 @@ export abstract class APIMessage<T> extends Message<T> implements MessageInterfa
  * todo: implement polling
  */
 export class APIClientMessengerService<T extends Message<any>, Discovery extends ClientDiscovery> implements IClientMessengerService<T> {
+    getDiscover(): ClientDiscovery {
+        throw new NotImplementedError("todo: implement api client message service")
+    }
+
+    getRuntimeProxy(): IRuntimeProxy {
+        throw new NotImplementedError("todo: implement api client message service")
+    }
+
+    onReceiveMessage(): Promise<Observable<ClientMessage<T>>> {
+        throw new NotImplementedError("todo: implement api client message service")
+    }
+
+    sendMessage(path: string, clientId: ClientID, message: T): Promise<Success> {
+        throw new NotImplementedError("todo: implement api client message service")
+    }
     initialize(): Promise<ClientID> {
         throw new NotImplementedError("todo: implement api client message service")
     }
@@ -83,15 +99,8 @@ export class APIClientMessengerService<T extends Message<any>, Discovery extends
         throw new NotImplementedError("todo: implement api client message service")
     }
 
-    onReceiveMessage(clientId: string): Observable<ClientMessage<T>> {
-        throw new NotImplementedError("todo: implement api client message service")
-    }
 
-    sendMessage(clientId: string, message: T): Promise<Success> {
-        throw new NotImplementedError("todo: implement api client message service")
-    }
-
-    getClientMap(): Map<string, ClientLocation> {
+    getClientMap(): Map<string, ClientHost> {
         throw new NotImplementedError("todo: implement api client message service")
     }
 
@@ -163,7 +172,11 @@ export class GoogleClientMessengerService<T extends Message<any>, Discovery exte
         return this.apiMap;
     }
 
-    sendMessage(clientId: ClientID, message: T): Promise<Success> {
+    getDiscover(): Discovery {
+        return this.discover;
+    }
+
+    sendMessage(path: string, clientId: ClientID, message: T): Promise<Success> {
         return new Promise((resolve, reject) => {
             if (this.discover.from === this.discover.to) throw new Error("discover is set to a loopback, please use hierarchy, or internal messaging")
 
@@ -171,17 +184,17 @@ export class GoogleClientMessengerService<T extends Message<any>, Discovery exte
 
             // background has two clients, one upstream and one down
             if (location === ClientLocation.POPUP) {
-                this.runtimeProxy.sendMessageToRuntime(message, (response) => {
+                this.runtimeProxy.sendMessageToRuntime(new ClientMessage(path, clientId, message), (response) => {
                     resolve(response);
                 })
             } else if (location === ClientLocation.CONTENT) {
                 if (isNaN(Number(clientId))) throw new Error("message to tab with invalid tabId! Not a number, " + clientId + " for message, " + JSON.stringify(message))
-                this.runtimeProxy.sendMessageToTab(Number(clientId), new ClientMessage(".", this.getClientId(), message), (response) => {
+                this.runtimeProxy.sendMessageToTab(Number(clientId), new ClientMessage(path, clientId, message), (response) => {
                     resolve(response);
                 });
             } else if (location === ClientLocation.API) {
                 if (this.getApiMap().has(message.getClientId())) {
-                    this.getApiMap().get(message.getClientId())?.sendMessage(clientId, message).then(resolve).catch(reject);
+                    this.getApiMap().get(message.getClientId())?.sendMessage(path, clientId, message).then(resolve).catch(reject);
                 } else {
                     throw new Error(`type was ClientLocation.API, but unknown clientId for api map in ClientMessengerService from client: ${clientId} for message ${message}`)
                 }
@@ -225,17 +238,22 @@ export class GoogleClientMessengerService<T extends Message<any>, Discovery exte
 
     heartbeatMessage(heartbeat: HeartbeatResultMessage) {
         // todo: update client map
+        // todo: similar to bootstrap send back whatever info in response, just no additional messaging
         console.error("### straw ###")
     }
 
     bootstrapMessages(): Promise<void> {
         // todo: implement: send up, then once complete, await id message
+        throw new NotImplementedError("not yet implemented!")
         if (this.discover.from !== ClientLocation.CONTENT) {
+            // todo: accept client id here from message,
+            //  saturate api map if found
             this.clientId = this.discover.from;
             return Promise.resolve();
         }
         // send up
         return new Promise((resolve, reject) => {
+            // todo: using what info is available, extension id, etc, send info back to requested
             this.runtimeProxy.sendMessageToRuntime(new BootstrapMessage(), (response) => {
                 resolve();
             })
@@ -258,19 +276,40 @@ export class FirefoxSyncClientMessengerService<T extends Message<any>> implement
     sendMessage(clientId: ClientID, message: any): Promise<boolean> {
         throw new Error("TODO: implement firefox!.");
     }
-    onReceiveMessage(clientId: string): Observable<any> {
+
+    initialize(): Promise<ClientID> {
         throw new Error("TODO: implement firefox!.");
     }
 
-    initialize(): Promise<ClientID> {
-        return Promise.resolve(undefined);
+    getApiMap(): Map<string, IClientMessengerService<T>> {
+        throw new Error("TODO: implement firefox!.");
+    }
+
+    getClientMap(): Map<string, ClientHost> {
+        throw new Error("TODO: implement firefox!.");
+    }
+
+    getDiscover(): ClientDiscovery {
+        throw new Error("TODO: implement firefox!.");
+    }
+
+    getManager(): ClientID {
+        throw new Error("TODO: implement firefox!.");
+    }
+
+    getRuntimeProxy(): IRuntimeProxy {
+        throw new Error("TODO: implement firefox!.");
+    }
+
+    onReceiveMessage(): Promise<Observable<ClientMessage<T>>> {
+        throw new Error("TODO: implement firefox!.");
     }
 
 }
 
 export interface IClient<T extends Message<any>> {
     initialize(): Promise<Success>;
-    sendMessage(message: ClientMessage<T>): Promise<Success>;
+    sendMessage(message: ClientMessage<T>): Promise<Success | State>;
     getMessageReceivedObservable(): Observable<ClientMessage<T>>;
     getStateMachines(): Map<string, StateMachine>
 }
@@ -316,9 +355,6 @@ export class Client<T extends Message<any>> implements IClient<T> {
     private clientId: ClientID | undefined = undefined;
     private observer?: Observable<ClientMessage<T>>
 
-    //todo: we need to route based on ClientID --
-    private parentHost: ClientID;
-    private name: ClientID;
     private stateMachineMap = new Map<string, StateMachine>();
 
     constructor(messengerClient: IClientMessengerService<T> =
@@ -345,7 +381,12 @@ export class Client<T extends Message<any>> implements IClient<T> {
              this.messengerClient.initialize().then(async (id) => {
                  this.clientId = id;
                  this.observer = await this.onReceiveMessage(this.clientId)
-                 resolve(false)
+                 this.observer.subscribe((message) => {
+                     this.sendMessage(message).catch(e => {
+                        console.log("failed to process state or message: " + JSON.stringify(message));
+                     });
+                 })
+                 resolve(true)
              }).catch(error => {
                  console.log(new Error(`error receiving message for client ${this.clientId}: ${error.message}`, error));
                  resolve(false)
@@ -353,160 +394,64 @@ export class Client<T extends Message<any>> implements IClient<T> {
         })
     }
 
-    sendMessage(message: ClientMessage<T>): Promise<Success> {
+    sendMessage(message: ClientMessage<T>): Promise<Success | State> {
 
-        // todo: implement: send a message to the specific client, then descend the state machines
-        // todo:   finding the appropriate machine starting at the root (usually "content" or "popup")
-        // todo:   once descended, we deliver the message
-        throw new Error("todo: implement!");
+        // send a message to the specific client, then descend the state machines
+        //  finding the appropriate machine starting at the root (usually "content" or "popup")
+        //  once descended, we deliver the message
+        // path examples:
+        //  * 'app#settings' 'extensionid321' 'save' { ... data }
+        //  * 'background/api#ga' 'ga' 'page' { ... data }
+        //  * 'content#wave' 'tab123' 'start' { ... data }
+        const clients = message.path.split('/')
+        const machines = message.path.split('#')
+        const machine = machines[machines.length - 1];
+
+        if (machines.length > 1) {
+            console.log("machines " + machines.slice(1).join(', '))
+        }
+        const client = clients[0];
+        // given the message.from & the host location, send to the next hope, or pizza down to the next message
+
+        return new Promise((resolve, reject) => {
+            if (client === this.clientId) {
+                if (!this.stateMachineMap.has(machine)) {
+                    throw new Error(`statemachine missing from client, ${client} for machine, ${machine}`)
+                }
+
+                // message sent!
+                this.stateMachineMap.get(machine)?.handleState(message.message).then((p) => resolve(p || false)).catch(reject)
+            } else {
+                // otherwise, we use the from and client to send appropriately
+                const newPath = (clients.length > 1 ? clients.slice(1) : clients).join('/');
+
+                // the graph here isn't very big, you're either on a client, and sending a message to another part of the client
+                // or on the correct client and sending a message to an api client
+                // so if you're message is from the popup sending to background, then
+                if (this.messengerClient.getApiMap().has(client)) {
+                    this.messengerClient.getApiMap().get(client)?.sendMessage(newPath, message.clientId, message.message).then(p => resolve(p || false)).catch(reject)
+                } else {
+                    this.messengerClient.sendMessage(newPath, message.clientId, message.message).then(p => resolve(p || false)).catch(reject);
+                }
+            }
+        });
     }
 
     private onReceiveMessage(clientId: string): Promise<Observable<ClientMessage<T>>> {
         if (this.clientId === clientId) {
-            return this.messengerClient.onReceiveMessage(clientId)
+            return this.messengerClient.onReceiveMessage()
         }
         if (this.messengerClient.getClientMap().has(clientId)) {
-            this.messengerClient.getApiMap().get(this.messengerClient.getClientMap().get(clientId)!).onReceiveMessage()
+            if (!this.messengerClient.getApiMap().has(this.messengerClient.getClientMap().get(clientId)!)) {
+                throw new Error(`clientId: ${clientId} has no corresponding API mappings on this host ${this.clientId}`)
+            }
+            return this.messengerClient.getApiMap().get(this.messengerClient.getClientMap().get(clientId)!)!.onReceiveMessage()
+        } else {
+            throw new Error(`clientId: ${clientId} not found`)
         }
     }
 }
 
-export class StateMachine {
-    initialized: boolean = false;
-    map: NameAccessMapInterface | undefined = undefined;
-    currentState: State | undefined = undefined;
-    // todo: review, this may be a useful feature, i almost didn't yagni this in a test (which sounds weird)
-    private stateObservable?: Observable<State | undefined>
-    private stateSubscriber?: Subscriber<State | undefined>;
-    private submachineMap: Map<string, StateMachine>;
-
-    constructor(submachineMap = new Map<string, StateMachine>()) {
-        this.submachineMap = submachineMap;
-    }
-
-    // todo: for client manager, add the ability to pass the active node etc
-    //   look into graphql propegation apis?
-    /**
-     * @remarks Please note, the stateObservable does not report the originState
-     * @param stateMachineMap [NameAccessMapInterface] a map of state-machine states by name
-     * @param originState [State] a starting state (often "base")
-     */
-    initialize(stateMachineMap: NameAccessMapInterface, originState: State) {
-        // TODO: guard for env?
-        if (this.map !== undefined) console.log("initialize called with predefined map outside of test conditions: " + JSON.stringify(this.map));
-        if (this.currentState !== undefined) console.log("initialize called with predefined currentState outside of test conditions: " + JSON.stringify(this.currentState));
-        this.map = stateMachineMap;
-        this.currentState = originState;
-        if (this.map !== undefined && this.currentState !== undefined) this.initialized = true;
-
-        const setStateSubscriber = (stateSubscriber: Subscriber<State | undefined>) => this.stateSubscriber = stateSubscriber;
-        this.stateObservable = new Observable<State | undefined>((subscriber) => {
-            setStateSubscriber(subscriber)
-        });
-    }
-
-    getObservable(): Observable<State | undefined> | null {
-        return this.stateObservable || null;
-    }
-
-    getBaseState(): State | undefined {
-        return this.map?.getState("base");
-    }
-
-    getErrorState(): State | undefined {
-        return this.map?.getState("error");
-    }
-
-    protected validateState(newState: Named): State | undefined {
-        if (!this.initialized) throw new Error("not initialized, no StateMachineMap")
-
-        const state = this.map?.getState(newState.name);
-
-        if (!state || (!state?.isBaseLevel && !this.currentState?.ventureStates.includes(newState.name))) {
-            console.error(
-                this.currentState?.error(),
-                newState?.name
-            );
-            return this.getErrorState();
-        }
-
-        return this.getState(newState.name)
-    }
-
-    protected async processState(message: Named, state: State | undefined, previousState: State): Promise<State | undefined> {
-        if (!this.initialized) throw new Error("not initialized, no StateMachineMap")
-        if (state === undefined) console.log("State undefined for previous state" + JSON.stringify(previousState))
-
-        this.stateSubscriber?.next(state);
-
-        // important note here, we put the state machine into the state returned by stateEffects lambda but don't call
-        //   the associated stateEffects - this is a free form way to handle the transition problem,
-        //   but we don't enforce transitions either which may cause some unexpected hitches
-        //   base -> start -> waving -> end selection choose (bam! error (:=0))
-        //   we can liberally use venture states to handle this - cli tools would be cool & yagnilishious
-        if (typeof state?.stateEffects === 'function') {
-            this.currentState = await state.stateEffects(message, state, previousState) || this.getBaseState();
-            if (this.currentState?.name === "base") {
-                console.log("transitioning back to base");
-            }
-        } else {
-            console.log(`no stateEffects defined for ${state?.name}, transitioning back to base`)
-            this.currentState = this.getBaseState();
-        }
-
-        this.stateSubscriber?.next(this.currentState);
-        return this.currentState;
-    }
-
-    processing = false;
-    queue: Named[] = [];
-
-    /**
-     * Validates and processes the message, returning the state due to the [State#stateeffects()] or BaseState
-     * @param namedState the message from chrome.runtime to be passed through to the [State#stateeffects()]
-     * @return the BaseState or state from [State#stateeffects()]
-     */
-    async handleState(namedState: Named): Promise<State | undefined> {
-        if (!this.initialized) throw new Error("not initialized, no StateMachineMap")
-
-        const state = this.validateState(namedState)
-        /* eslint-disable  @typescript-eslint/no-extra-non-null-assertion */
-        return this.processState(namedState, state, this.currentState!!)!!;
-        if (this.processing) {
-            this.queue.unshift(namedState)
-            let returnState = undefined;
-            await this.stateObservable?.forEach(state => returnState = state)
-            return Promise.resolve(returnState);
-        } else {
-            // loop through available states, processing any state that does not return as "base"
-            let state: State | undefined;
-            while (this.queue.length) {
-                state = this.validateState(this.queue.pop()!!);
-
-                state = await this.processState(namedState, state, this.currentState!!);
-                if (state?.name !== "base") {
-                    this.queue.unshift(state as Named)
-                }
-            }
-            try {
-                return state ? Promise.resolve(state) : Promise.reject(state);
-            }
-            finally {
-                this.processing = false;
-            }
-        }
-    }
-
-    getState(name: string): State | undefined {
-        if (!this.initialized) throw new Error("not initialized, no StateMachineMap")
-
-        return this.map?.getState(name);
-    }
-
-    getCurrentState(): State | undefined {
-        return this.currentState;
-    }
-}
 
 const createBackgroundToPopupClientMessengerService = <T extends Message<T>>() => new GoogleClientMessengerService<T, ClientDiscovery>(
     BackgroundToPopupDiscovery,
@@ -527,7 +472,6 @@ const createPopupToContentClientMessengerService = <T extends Message<T>>() => n
     PopupToContentDiscovery,
     new Map<ClientID, IClientMessengerService<T>>()
 );
-
 
 class StateMachine {
     initialized: boolean = false;
