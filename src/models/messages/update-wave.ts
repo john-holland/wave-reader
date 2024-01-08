@@ -7,6 +7,6 @@ export default class UpdateWaveMessage extends Message<UpdateWaveMessage> {
     constructor(attributes: Partial<UpdateWaveMessage> = {
         options: new Options()
     }) {
-        super('update', 'popup', attributes)
+        super('update-wave', 'popup', attributes)
     }
 }

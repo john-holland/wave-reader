@@ -1,9 +1,9 @@
 import Message from "../message";
 
-export default class SelectorUpdated extends Message<SelectorUpdated> {
+export default class SelectorUpdatedMessage extends Message<SelectorUpdatedMessage> {
     selector?: string;
 
-    constructor(attributes: Partial<SelectorUpdated> = {}) {
-        super('add selector', 'content', attributes);
+    constructor(attributes: Partial<SelectorUpdatedMessage> = {}) {
+        super('selector-updated', 'content', attributes);
     }
 }

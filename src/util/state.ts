@@ -3,7 +3,7 @@
 export type Named = {
      name: string
 }
-export class State implements Named {
+export class  State implements Named {
     name: string
     ventureStates: string[]
     isBaseLevel: boolean
