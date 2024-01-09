@@ -4,7 +4,7 @@ import Message from "../models/message";
 import {NameAccessMapInterface, Named, State} from "./state";
 
 export type MachineComponentProps = {
-    stateProxy: UseStateProxy
+    stateProxy: UseStateProxy<any>
     machine: StateMachine
     previousState: string
 }
@@ -35,22 +35,28 @@ export const view = (state: string, states: string[], ...views: MachineComponent
 }
 
 export type StateComponentFunction = { ({stateProxy, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> }
-export type ReactStateMachineProps = {
+export type ReactStateMachineProps<TProps> = {
+    initialState: string | Named,
     states: { [key: string]: StateComponentFunction },
     client: Client<Message<any>>,
-    useStateProxy: UseStateProxy,
     errorState?: State
+}
+
+export type ReactStateMachineConstructorProps<TProps> = ReactStateMachineProps<TProps> & {
+    props: TProps
 }
 
 export type useStateFunction<S> = { (initialState: S | (() => S)): [S, Dispatch<SetStateAction<S>>] }
 
-export class UseStateProxy {
+export class UseStateProxy<TProps extends any | object> {
     useStateFn?: useStateFunction<any>
     useStates: Map<string, SetStateAction<any>> = new Map<string, React.SetStateAction<any>>()
     stateValues: Map<string, any> = new Map<string, any>()
+    props: TProps
 
-    constructor(useStateFn?: useStateFunction<any>) {
+    constructor(props: TProps, useStateFn?: useStateFunction<any>) {
         this.useStateFn = useStateFn
+        this.props = props
     }
 
     setUseState(useStateFn: useStateFunction<any>) {
@@ -58,6 +64,7 @@ export class UseStateProxy {
     }
     useState<S>(name: string, initialState: S | (() => S)): [S, Dispatch<SetStateAction<S>>] {
         const [state, setState] = this.useStateFn!(initialState)
+        // todo: review: should an optional , "overwrite" ?
         return [state, ((value: S): void => {
             this.stateValues.set(name, value)
             setState(value);
@@ -75,7 +82,7 @@ export type ReactStateMachineComponentProps = {
     setState: { (state: string, value: any): void }
 }
 
-export class ReactStateMachine {
+export class ReactStateMachine<TProps> {
     private states: { [key: string]: StateComponentFunction };
     private renderTarget?: React.ReactElement<any, any> | null;
     private stateMachine: StateMachine = new StateMachine()
@@ -84,7 +91,7 @@ export class ReactStateMachine {
         views: [],
         states: ["base"]
     }
-    private stateProxy: UseStateProxy = new UseStateProxy()
+    private stateProxy: UseStateProxy<TProps>;
     private errorView: string[] = [];
     private ErrorStateFunction = (): ComponentLog => {
         return log("base", <ul>{this.errorView.map(e => <li>{e}</li>)}</ul>);
@@ -98,6 +105,7 @@ export class ReactStateMachine {
     }))
 
     private errorState = this.ErrorState;
+    private initialState: string | Named;
 
     private toState(name: string, isBaseLevel: boolean, ventureStates: string[], componentFunction: StateComponentFunction) {
         return new State(name, ventureStates, isBaseLevel, (async (message, state, previousState): Promise<State> => {
@@ -112,18 +120,23 @@ export class ReactStateMachine {
 
     constructor({
                     states,
-                    errorState
-                }: ReactStateMachineProps) {
+                    errorState,
+                    props,
+                    initialState
+                }: ReactStateMachineConstructorProps<TProps>) {
         this.states = states;
         this.errorState = errorState || this.ErrorState;
+        this.stateProxy = new UseStateProxy<TProps>(props);
+        this.initialState = initialState;
     }
 
     initialize() {
         const machine = this;
         const map = new Map<string, State>();
 
+        this.logView.state = typeof this.initialState === "string" ? this.initialState : (this.initialState as Named)?.name || "base";
         if (!(this.logView.state in this.states)) {
-            machine.errorView.push("cannot find " + machine.logView.state + " in states map!")
+            machine.errorView.push("cannot find initialState " + machine.logView.state + " in states map!")
         }
 
         this.stateMachine.initialize(new class implements NameAccessMapInterface {
@@ -157,19 +170,20 @@ export class ReactStateMachine {
 }
 
 
-export type ReactStateMachineRenderTargetProps = {
-    useStateProxy: UseStateProxy,
+export type ReactStateMachineRenderTargetProps<TProps> = {
+    useStateProxy: UseStateProxy<TProps>,
     logView: ComponentLogView,
     stateMachine: StateMachine,
     context?: React.Context<StateMachine>
 }
 
-export const ReactStateMachineRenderTarget: FunctionComponent<ReactStateMachineRenderTargetProps> = ({
-                                                                                                  useStateProxy,
-                                                                                                  logView,
-                                                                                                  stateMachine,
-                                                                                                  context= React.createContext(stateMachine)
-                                                                                              }): ReactElement<any, any> | null => {
+export const ReactStateMachineRenderTarget: FunctionComponent<ReactStateMachineRenderTargetProps<any>> = ({
+        useStateProxy,
+        logView,
+        stateMachine,
+        context= React.createContext(stateMachine)
+    }): ReactElement<any, any> | null => {
+
     const [rerender, setRerender] = useState(5);
 
     useEffect(() => {
@@ -193,6 +207,8 @@ export const ReactStateMachineRenderTarget: FunctionComponent<ReactStateMachineR
     </context.Provider>);
 }
 
-export const ReactMachine = (props: ReactStateMachineProps) => {
-    return new ReactStateMachine(props)
+export type ReactMachineFunction<TProps = {}> = { (props: TProps): ReactStateMachine<TProps> };
+// const declaration definition didn't work for generics... :( weird :(
+export function ReactMachine<TProps>(machineProps: ReactStateMachineProps<TProps>): ReactMachineFunction<TProps> {
+    return (props: TProps) => new ReactStateMachine<TProps>({ props, ...machineProps } as unknown as ReactStateMachineConstructorProps<TProps>)
 }

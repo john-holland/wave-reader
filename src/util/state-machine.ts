@@ -361,9 +361,13 @@ export class Client<T extends Message<any>> implements IClient<T> {
                     new GoogleClientMessengerService<T, ClientDiscovery>(
                         PopupToContentDiscovery,
                         new Map<ClientID, IClientMessengerService<T>>()
-                    )
+                    ),
+                stateMachineMap?: Map<string, StateMachine>
     ) {
         this.messengerClient = messengerClient;
+        if (stateMachineMap) {
+            [...stateMachineMap.entries()].forEach(p => this.stateMachineMap.set(p[0], p[1]))
+        }
     }
 
     getMessageReceivedObservable(): Observable<ClientMessage<T>> {
