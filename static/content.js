@@ -116,14 +116,14 @@ function StateNameMap(map = new Map()) {
     /* eslint-disable  @typescript-eslint/no-unused-vars */
     const states = {
         // base defined above
-        "waving": CState("waving", WavingVentures, false, (message, state, previousState) => {
+        "waving": CState("waving", WavingVentures, false, async (message, state, previousState) => {
           return map.get("waving")
         }),
-        "error": CState("error", AllVentures, true, (message, state, previousState) => {
+        "error": CState("error", AllVentures, true, async (message, state, previousState) => {
             console.log("transitioning from error to base state from " + previousState.name)
             return map.get('base')
         }, true),
-        "start": CState("start", StartVentures, false, (message, state, previousState) => {
+        "start": CState("start", StartVentures, false, async (message, state, previousState) => {
             latestOptions = message.options;
             loadCSSTemplate(latestOptions.wave.cssTemplate)
             // TODO: see if the state machine will let us remove this
@@ -131,12 +131,12 @@ function StateNameMap(map = new Map()) {
             initializeOrUpdateToggleObserver(message);
             return map.get('waving')
         }, false),
-        "stop": CState("stop", StopVentures, true, (message, state, previousState) => {
+        "stop": CState("stop", StopVentures, true, async (message, state, previousState) => {
             unloadCSS()
             going = false;
             return previousState.name === "waving" ? map.get("base") : previousState;
         }, false),
-        "update": CState("update", BaseVentures, false, (message, state, previousState) => {
+        "update": CState("update", BaseVentures, false, async (message, state, previousState) => {
             unloadCSS()
 
             if (!message?.options) {
@@ -159,15 +159,15 @@ function StateNameMap(map = new Map()) {
             initializeOrUpdateToggleObserver(message);
             return previousState
         }, true),
-        "toggle start": CState("toggle start", StartVentures, false, (message, state, previousState) => {
+        "toggle start": CState("toggle start", StartVentures, false, async (message, state, previousState) => {
             loadCSSTemplate(latestOptions.wave.cssTemplate)
             return map.get('waving')
         }, false),
-        "toggle stop": CState("toggle stop", StopVentures, false, (message, state, previousState) => {
+        "toggle stop": CState("toggle stop", StopVentures, false, async (message, state, previousState) => {
             unloadCSS()
             return map.get('base')
         }, false),
-        "start mouse": CState("start mouse", StartVentures, false, (message, state, previousState) => {
+        "start mouse": CState("start mouse", StartVentures, false, async (message, state, previousState) => {
             // TODO: this may need to be merged with the start and toggle logic
             latestOptions = message.options;
             const elements = document.querySelectorAll(message.options.wave.selector);
@@ -176,7 +176,7 @@ function StateNameMap(map = new Map()) {
             })
             return map.get('waving')
         }, false),
-        "stop mouse": CState("stop mouse", StopVentures, false, (message, state, previousState) => {
+        "stop mouse": CState("stop mouse", StopVentures, false, async (message, state, previousState) => {
             // maybe unloadCSS and reload each time?
             unloadCSS()
             const elements = document.querySelectorAll(message.options.wave.selector);
@@ -185,13 +185,14 @@ function StateNameMap(map = new Map()) {
             })
             return map.get('base')
         }, false),
-        "start-selection-choose":  CState("selection mode activate", ["selection mode activate"], true, (message, state, previousState) => {
+        "start-selection-choose":  CState("selection mode activate", ["selection mode activate"], true, async (message, state, previousState) => {
             const selector = message?.selector;
 
             if (!(selector || "").trim()) {
                 console.log("start selection choose activated without selector!")
             }
 
+            // todo: add an id specifyer to the content Client, as iframes make it a 1 - * relationship for background -> content
             /* science!
               hypothesis: previously i did not include the world parameter in the content script manifest
                     it was only getting the extension document
@@ -232,7 +233,7 @@ function StateNameMap(map = new Map()) {
 
             return Promise.resolve(map.get('end-selection-choose'))
         }, false),
-        "end-selection-choose": CState("end-selection-choose", BaseVentures, true, (message, state, previousState) => {
+        "end-selection-choose": CState("end-selection-choose", BaseVentures, true, async (message, state, previousState) => {
             hierarchySelectorMount.remove()
             setHierarchySelector = undefined;
 

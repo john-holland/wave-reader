@@ -154,7 +154,7 @@ export const ScanForInputStates = ({
 
     /* eslint-disable  @typescript-eslint/no-unused-vars */
     const states: StateNames = {
-        "base": CState("base", ["start scanning", "base"], true, (message, state, previousState) => {
+        "base": CState("base", ["start scanning", "base"], true, async (message, state, previousState): Promise<State | undefined> => {
             if (listenerMap.has(actionType)) {
                 scanningMap.delete(actionType)
                 window.removeEventListener("keydown", listenerMap.get(actionType)!, true);
@@ -162,7 +162,7 @@ export const ScanForInputStates = ({
             }
             return map.get("base");
         }),
-        "start scanning": CState("start scanning", ["scanning", "stop scanning"], false, (message, state, previousState) => {
+        "start scanning": CState("start scanning", ["scanning", "stop scanning"], false, async (message, state, previousState): Promise<State | undefined> => {
             setScanning(true);
             // maybe add a useState "started editing" variable, and keep the scanningMap defaulted to shortcut
             //  then when we get any events from subscribe, clear it and accept the new input
@@ -191,7 +191,7 @@ export const ScanForInputStates = ({
             return map.get("scanning");
         }),
         "scanning": CState("scanning", ["save", "revert", "clear", "stop scanning"], false),
-        "save": CState("save", ["base"], false, (message, state, previousState) => {
+        "save": CState("save", ["base"], false, async (message, state, previousState): Promise<State | undefined> => {
             if (listenerMap.has(actionType)) {
                 window.removeEventListener("keydown", listenerMap.get(actionType)!, true);
                 listenerMap.delete(actionType)
@@ -203,17 +203,17 @@ export const ScanForInputStates = ({
             onScan(update);
             return map.get("base");
         }),
-        "clear": CState("clear", ["scanning"], false, (message, state, previousState) => {
+        "clear": CState("clear", ["scanning"], false, async (message, state, previousState): Promise<State | undefined> => {
             scanningMap.set(actionType, []);
             setKeyChord([]);
             return map.get("scanning")
         }),
-        "revert": CState("revert", ["scanning"], false, (message, state, previousState) => {
+        "revert": CState("revert", ["scanning"], false, async (message, state, previousState): Promise<State | undefined> => {
             // revert
             setKeyChord(shortcut);
             return previousState;
         }),
-        "stop scanning": CState("base", ["base"], false, (message, state, previousState) => {
+        "stop scanning": CState("base", ["base"], false, async (message, state, previousState): Promise<State | undefined> => {
             if (listenerMap.has(actionType)) {
                 window.removeEventListener("keydown", listenerMap.get(actionType)!, true);
                 listenerMap.delete(actionType)

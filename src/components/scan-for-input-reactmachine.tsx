@@ -4,7 +4,10 @@ import {
     MachineComponentProps,
     ReactMachine,
     ReactMachineFunction,
-    view
+    view,
+    View,
+    Clean,
+    ClearViews, _Clean_, _ClearViews_
 } from '../util/react-machine';
 
 import { FunctionComponent, useEffect, useState } from "react";
@@ -140,136 +143,26 @@ type WindowLike = Window & typeof globalThis;
 //     removeEventListener: (eventName: string, listener: EventListener) => { console.error("window mock was instantiated during runtime"); }
 // } as unknown as WindowMock;
 const _window = window as unknown as WindowLike
-export const ScanForInputStates = ({
-                                       map,
-                                       stateMachineMap,
-                                       listenerMap,
-                                       scanningMap,
-                                       actionType,
-                                       keyLimit,
-                                       shortcut,
-                                       setScanning,
-                                       setKeyChord,
-                                       onScan,
-                                       onCancelScan,
-                                       windowKeyDownObserver = WindowKeyDownKey,
-                                       shouldPreventDefault = true,
-                                       window = _window
-                                   }: ScanForInputStatesProps): NameAccessMapInterface =>  {
-    // TODO: shortcut is still getting passed in from settings as the previous value:
-    //   after a "click", "start scanning" "save", save settings -> "click", "save" ...
-    //   observed: back to the value saved before saving settings
-    //   expected: saves the new value scanned
-    // theory: settings isn't matriculating through properly?
-
-    /* eslint-disable  @typescript-eslint/no-unused-vars */
-    const states: StateNames = {
-        "base": CState("base", ["start scanning", "base"], true, (message, state, previousState) => {
-            if (listenerMap.has(actionType)) {
-                scanningMap.delete(actionType)
-                window.removeEventListener("keydown", listenerMap.get(actionType)!, true);
-                listenerMap.delete(actionType)
-            }
-            return map.get("base");
-        }),
-        "start scanning": CState("start scanning", ["scanning", "stop scanning"], false, (message, state, previousState) => {
-            setScanning(true);
-            // maybe add a useState "started editing" variable, and keep the scanningMap defaulted to shortcut
-            //  then when we get any events from subscribe, clear it and accept the new input
-            //   - or -
-            //  alternatively, we may want to change the value type for scanningMap to include a "started editing" property
-            scanningMap.set(actionType, []);
-
-            windowKeyDownObserver((e: {(event: KeyboardEvent): void}) => {
-                listenerMap.set(actionType, e);
-            }, shouldPreventDefault).subscribe((key: string) => {
-                if (!scanningMap.has(actionType)) {
-                    console.log("no scanning map found, inspect previous state!");
-                    return;
-                }
-
-                const assignment = assignKeyChord(scanningMap.get(actionType) || [], key, keyLimit)
-                if (assignment.escapeCalled) {
-                    // defer the current frame
-                    // setTimeout(() => , 0)
-                    stateMachineMap.get(actionType)?.handleState({ name: "stop scanning" } as Named)
-                } else {
-                    scanningMap.set(actionType, assignment.keyChord || [])
-                    setKeyChord(assignment.keyChord || []);
-                }
-            })
-            return map.get("scanning");
-        }),
-        "scanning": CState("scanning", ["save", "revert", "clear", "stop scanning"], false),
-        "save": CState("save", ["base"], false, (message, state, previousState) => {
-            if (listenerMap.has(actionType)) {
-                window.removeEventListener("keydown", listenerMap.get(actionType)!, true);
-                listenerMap.delete(actionType)
-            }
-            setScanning(false)
-            const update = scanningMap.get(actionType) || [];
-            scanningMap.delete(actionType);
-            setKeyChord(update);
-            onScan(update);
-            return map.get("base");
-        }),
-        "clear": CState("clear", ["scanning"], false, (message, state, previousState) => {
-            scanningMap.set(actionType, []);
-            setKeyChord([]);
-            return map.get("scanning")
-        }),
-        "revert": CState("revert", ["scanning"], false, (message, state, previousState) => {
-            // revert
-            setKeyChord(shortcut);
-            return previousState;
-        }),
-        "stop scanning": CState("base", ["base"], false, (message, state, previousState) => {
-            if (listenerMap.has(actionType)) {
-                window.removeEventListener("keydown", listenerMap.get(actionType)!, true);
-                listenerMap.delete(actionType)
-            }
-            setScanning(false)
-            setKeyChord(shortcut);
-            scanningMap.delete(actionType);
-            onCancelScan(shortcut);
-            return map.get("base");
-        })
-    }
-
-    Object.keys(states).forEach(key => {
-        map.set(key, states[key]);
-    })
-
-    return {
-        map,
-        getState(name: string): State | undefined {
-            return map.get(name);
-        }
-    } as NameAccessMapInterface;
-}
-
-
 
 const StateMachineMap = new Map<ActionType, StateMachine>()
 // todo: service discovery for clients to prevent duplication
 const PopupClient = new Client<Message<any>>()
 export const ScanForInputFieldMachine: ReactMachineFunction<ScanForInputProps> = ReactMachine<ScanForInputProps>({
     client: PopupClient,
-    // todo: add initial state
     initialState: "initialize",
     states: {
-        initialize: ({stateProxy, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
-            if(!StateMachineMap.has(stateProxy?.props?.actionType)) {
+        initialize: ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+            if(!StateMachineMap.has(state?.props?.actionType)) {
                 const machine = new StateMachine();
-                StateMachineMap.set(stateProxy?.props?.actionType, machine);
-                machine.initialize(stateProxy?.props?.scanForInputStateMap, stateProxy?.props?.scanForInputStateMap.getState("base") as State);
+                StateMachineMap.set(state?.props?.actionType, machine);
+                machine.initialize(state?.props?.scanForInputStateMap, state?.props?.scanForInputStateMap.getState("base") as State);
             } else {
-                StateMachineMap.get(stateProxy?.props?.actionType)?.handleState({name: "base"} as Named);
+                StateMachineMap.get(state?.props?.actionType)?.handleState({name: "base"} as Named);
             }
-            return Promise.resolve(log("base"))
+            return Promise.resolve(log("base", _Clean_))
         },
-        base: ({stateProxy, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
-            const [actionType, setActionType] = stateProxy?.useState("actionType", "unassigned") || [undefined, undefined]
+        base: ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+            const [actionType, setActionType] = state?.useState("actionType", "unassigned") || [undefined, undefined]
             // todo: review: replace log and view with a deconstructor like useState and useReducer?
             return Promise.resolve(log("base",
                 <ScanForInput data-testid={"scan-for-input-field"}>
@@ -279,19 +172,19 @@ export const ScanForInputFieldMachine: ReactMachineFunction<ScanForInputProps> =
                         data-testid={"clickable-text-container"}
                         aria-labelledby="scan-text-label"
                         onClick={() => machine?.handleState({ name: "start scanning" } as Named)}>
-                        <ScanTextDisplay data-testid={"scan-text-display"}>{ stateProxy?.props?.keyChord.reverse().join(", ") }</ScanTextDisplay>
+                        <ScanTextDisplay data-testid={"scan-text-display"}>{ state?.props?.keyChord.reverse().join(", ") }</ScanTextDisplay>
                         <ScanNote>&nbsp;(click to set {actionType})</ScanNote>
                     </ClickableScanTextContainer>
                 </ScanForInput>));
         },
-        scanning: ({stateProxy, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+        scanning: ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
             return Promise.resolve(log("scanning",
                 <ScanForInput data-testId={"scan-for-input-field"}>
                     <ScanTextInput
                         data-testid={"scan-text-input"}
                         aria-labelledby="scan-text-label"
                         type="text"
-                        value={stateProxy?.props?.keyChord.reverse().join(", ")}
+                        value={state?.props?.keyChord.reverse().join(", ")}
                         onChange={() => {}}/>
                     <SaveButton data-testid={"save-button"} type="button" value={"Save"} onClick={() => machine?.handleState({ name: "save" } as Named)} />
                     <RevertButton data-testid={"revert-button"} type="button" value={"Cancel"} onClick={() => {
@@ -301,159 +194,75 @@ export const ScanForInputFieldMachine: ReactMachineFunction<ScanForInputProps> =
                     <ClearButton data-testid={"revert-button"} type="button" value={"Clear"} onClick={() => machine?.handleState({ name: "clear" } as Named)} />
                 </ScanForInput>))
         },
-        "start scanning":  ({stateProxy, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
-            stateProxy?.props?.setScanning(true);
+        "start scanning":  ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+            state?.props?.setScanning(true);
             // maybe add a useState "started editing" variable, and keep the scanningMap defaulted to shortcut
             //  then when we get any events from subscribe, clear it and accept the new input
             //   - or -
             //  alternatively, we may want to change the value type for scanningMap to include a "started editing" property
-            stateProxy?.props?.scanningMap.set(stateProxy?.props?.actionType, []);
+            state?.props?.scanningMap.set(state?.props?.actionType, []);
 
-            stateProxy?.props?.windowKeyDownObserver((e: {(event: KeyboardEvent): void}) => {
-                stateProxy?.props?.listenerMap.set(stateProxy?.props?.actionType, e);
-            }, stateProxy?.props?.shouldPreventDefault).subscribe((key: string) => {
-                if (!stateProxy?.props?.scanningMap.has(stateProxy?.props?.actionType)) {
+            state?.props?.windowKeyDownObserver((e: {(event: KeyboardEvent): void}) => {
+                state?.props?.listenerMap.set(state?.props?.actionType, e);
+            }, state?.props?.shouldPreventDefault).subscribe((key: string) => {
+                if (!state?.props?.scanningMap.has(state?.props?.actionType)) {
                     console.log("no scanning map found, inspect previous state!");
                     return;
                 }
 
-                const assignment = assignKeyChord(stateProxy?.props?.scanningMap.get(stateProxy?.props?.actionType) || [], key, stateProxy?.props?.keyLimit)
+                const assignment = assignKeyChord(state?.props?.scanningMap.get(state?.props?.actionType) || [], key, state?.props?.keyLimit)
                 if (assignment.escapeCalled) {
                     // defer the current frame
                     // setTimeout(() => , 0)
-                    stateProxy?.props?.stateMachineMap.get(stateProxy?.props?.actionType)?.handleState({ name: "stop scanning" } as Named)
+                    state?.props?.stateMachineMap.get(state?.props?.actionType)?.handleState({ name: "stop scanning" } as Named)
                 } else {
-                    stateProxy?.props?.scanningMap.set(stateProxy?.props?.actionType, assignment.keyChord || [])
-                    stateProxy?.props?.setKeyChord(assignment.keyChord || []);
+                    state?.props?.scanningMap.set(state?.props?.actionType, assignment.keyChord || [])
+                    state?.props?.setKeyChord(assignment.keyChord || []);
                 }
             })
-            return Promise.resolve(log("scanning"));
+            return Promise.resolve(log("scanning", _ClearViews_));
         },
-        "save":  ({stateProxy, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
-            if (stateProxy?.props?.listenerMap.has(stateProxy?.props?.actionType)) {
-                window.removeEventListener("keydown", stateProxy?.props?.listenerMap.get(stateProxy?.props?.actionType)!, true);
-                stateProxy?.props?.listenerMap.delete(stateProxy?.props?.actionType)
+        "clear views": ({previousState}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+            return Promise.resolve(log(previousState || "base", _ClearViews_))
+        },
+        "clean": ({previousState}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+            return Promise.resolve(log(previousState || "base", _Clean_))
+        },
+        "save":  async ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+            if (state?.props?.listenerMap.has(state?.props?.actionType)) {
+                window.removeEventListener("keydown", state?.props?.listenerMap.get(state?.props?.actionType)!, true);
+                state?.props?.listenerMap.delete(state?.props?.actionType)
             }
-            stateProxy?.props?.setScanning(false)
-            const update = stateProxy?.props?.scanningMap.get(stateProxy?.props?.actionType) || [];
-            stateProxy?.props?.scanningMap.delete(stateProxy?.props?.actionType);
-            stateProxy?.props?.setKeyChord(update);
-            stateProxy?.props?.onScan(update);
-            return Promise.resolve(log("base"));
+            state?.props?.setScanning(false)
+            const update = state?.props?.scanningMap.get(state?.props?.actionType) || [];
+            state?.props?.scanningMap.delete(state?.props?.actionType);
+            state?.props?.setKeyChord(update);
+            state?.props?.onScan(update);
+
+            await machine?.handleState({ name: "clean" })
+
+            return Promise.resolve(log("base", <span>Saved!</span>));
         },
-        "clear":  ({stateProxy, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
-            stateProxy?.props?.scanningMap.set(stateProxy?.props?.actionType, []);
-            stateProxy?.props?.setKeyChord([]);
-            return Promise.resolve(log("scanning"))
+        "clear":  ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+            state?.props?.scanningMap.set(state?.props?.actionType, []);
+            state?.props?.setKeyChord([]);
+            return Promise.resolve(log("scanning", _ClearViews_))
         },
-        "revert":  ({stateProxy, machine, previousState}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+        "revert":  ({state, machine, previousState}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
             // revert
-            stateProxy?.props?.setKeyChord(stateProxy?.props?.shortcut);
-            return Promise.resolve(log(previousState || "base"));
+            state?.props?.setKeyChord(state?.props?.shortcut);
+            return Promise.resolve(log(previousState || "base", _ClearViews_));
         },
-        "stop scanning":  ({stateProxy, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
-            if (stateProxy?.props?.listenerMap.has(stateProxy?.props?.actionType)) {
-                window.removeEventListener("keydown", stateProxy?.props?.listenerMap.get(stateProxy?.props?.actionType)!, true);
-                stateProxy?.props?.listenerMap.delete(stateProxy?.props?.actionType)
+        "stop scanning":  ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+            if (state?.props?.listenerMap.has(state?.props?.actionType)) {
+                window.removeEventListener("keydown", state?.props?.listenerMap.get(state?.props?.actionType)!, true);
+                state?.props?.listenerMap.delete(state?.props?.actionType)
             }
-            stateProxy?.props?.setScanning(false)
-            stateProxy?.props?.setKeyChord(stateProxy?.props?.shortcut);
-            stateProxy?.props?.scanningMap.delete(stateProxy?.props?.actionType);
-            stateProxy?.props?.onCancelScan(stateProxy?.props?.shortcut);
-            return Promise.resolve(log("base"))
+            state?.props?.setScanning(false)
+            state?.props?.setKeyChord(state?.props?.shortcut);
+            state?.props?.scanningMap.delete(state?.props?.actionType);
+            state?.props?.onCancelScan(state?.props?.shortcut);
+            return Promise.resolve(log("base", _Clean_))
         }
     }
 });
-
-const ScanForInputField: FunctionComponent<ScanForInputProps> = ({
-                                                                     actionType = "Toggle",
-                                                                     shortcut,
-                                                                     keyLimit = 4,
-                                                                     onScan,
-                                                                     onCancelScan
-                                                                 }: ScanForInputProps) => {
-
-    // display with "shift + space" etc
-    // modifiers, shift, control, alt/option, maybe command, maybe just last key chords and see what happens?
-    const [keyChord, setKeyChord] = useState<KeyChord>(shortcut);
-    const [scanning, stateProxy?.props?.setScanning] = useState(false);
-    // refresh the states with each re-render
-    const scanForInputStateMap = ScanForInputStates({
-        map: new Map<ActionType, State>(),
-        stateMachineMap: StateMachineMap,
-        listenerMap: ListenerMap,
-        scanningMap: ScanningMap,
-        actionType: actionType,
-        keyLimit,
-        shortcut,
-        setScanning,
-        setKeyChord,
-        onScan,
-        onCancelScan,
-        windowKeyDownObserver: WindowKeyDownKey,
-        shouldPreventDefault: true,
-        window: _window
-    });
-
-    const stateMachine = () => { return StateMachineMap.get(actionType); }
-    const handleState = async (name: string): Promise<State | undefined> => {
-        const machine = stateMachine();
-
-        return machine?.handleState(machine.getState(name) as State)
-    }
-
-    useEffect(() => {
-        if (!StateMachineMap.has(actionType)) {
-            const machine = new StateMachine();
-            StateMachineMap.set(actionType, machine);
-            machine.initialize(scanForInputStateMap, scanForInputStateMap.getState("base") as State);
-        } else {
-            StateMachineMap.get(actionType)?.handleState({ name: "base" } as Named);
-        }
-    }, [])
-
-    const saveClicked = () => {
-        handleState("save");
-    }
-
-    const cancelClicked = () => {
-        // revert
-        handleState("revert");
-        handleState("stop scanning");
-    }
-
-    const clearClicked = () => {
-        handleState("clear");
-    }
-
-    const scanClicked = () => {
-        handleState("start scanning");
-    }
-
-    // TODO: the ClickableScanTextContainer and the ScanTextInput components present reversed keyChords from one another
-    // TODO: and while reversed keyChords is cool, its confusing, as assignment to the WaveToggleConfig apparently does that
-    return (
-        <ScanForInput data-testid={"scan-for-input-field"}>
-            <FormLabel id={"scan-text-label"}>{actionType}</FormLabel>
-            <div />
-            <ClickableScanTextContainer
-                data-testid={"clickable-text-container"}
-                aria-labelledby="scan-text-label"
-                onClick={scanClicked}>
-                <ScanTextDisplay data-testid={"scan-text-display"} visible={!scanning}>{ keyChord.reverse().join(", ") }</ScanTextDisplay>
-                <ScanNote visible={!scanning}>&nbsp;(click to set {actionType})</ScanNote>
-            </ClickableScanTextContainer>
-            <ScanTextInput
-                data-testid={"scan-text-input"}
-                aria-labelledby="scan-text-label"
-                visible={scanning} type="text"
-                value={keyChord.reverse().join(", ")}
-                onChange={() => {}}/>
-            <SaveButton data-testid={"save-button"} visible={scanning} type="button" value={"Save"} onClick={saveClicked} />
-            <RevertButton data-testid={"revert-button"} visible={scanning} type="button" value={"Cancel"} onClick={cancelClicked} />
-            <ClearButton data-testid={"revert-button"} visible={scanning} type="button" value={"Clear"} onClick={clearClicked} />
-        </ScanForInput>
-    );
-}
-
-export default ScanForInputField;
