@@ -22,6 +22,7 @@ import {Named, State} from "../../src/util/state";
 import StateMachine from "../../src/util/state-machine";
 import {Observable, Subscriber} from "rxjs";
 import "@testing-library/jest-dom"
+import {ScanForInputFieldMachine, ScanForInputProps} from "../../src/components/scan-for-input-reactmachine";
 
 const jsdom = require("jsdom");
 const { JSDOM } = jsdom;
@@ -456,6 +457,22 @@ describe('Scan for input', () => {
             expect(scanningMap.size).toBe(0);
 
             return Promise.resolve()
+        })
+
+        test("test react machine", () => {
+            let scanned = false;
+            let cancelScan = false;
+            const instance = ScanForInputFieldMachine({
+              actionType: "Toggle",
+              shortcut: ["shift", "k"],
+              keyLimit: 4,
+              onScan: () => {scanned = true},
+              onCancelScan: () => {cancelScan = true}
+            } as ScanForInputProps)
+            const InputScanner = instance.getRenderTarget()
+
+            expect(instance.getLogView().views.length > 0).toBe(true);
+            //<InputScanner />
         })
     })
 })

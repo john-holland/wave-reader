@@ -4,6 +4,7 @@ import { replaceAnimationVariables } from "../src/models/wave";
 import { FollowKeyChordObserver, WindowKeyDownKey } from "../src/components/util/user-input";
 import StateMachine  from "../src/util/state-machine";
 import { CState } from "../src/util/state";
+import debounce from "../src/util/debounce";
 import {
     BaseVentures,
     StartVentures,
@@ -16,11 +17,21 @@ import {
 // if a promised resolved state is a future, then a potential state maybe nicely referred to as a venture?
 import SettingsService from "../src/services/settings"
 import UpdateWaveMessage from "../src/models/messages/update-wave";
+import SelectionModeMessage from "../src/models/messages/selection-mode";
+import {MountOrFindSelectorHierarchyComponent} from "../src/components/selector-hierarchy";
+import {ColorGeneratorService, SelectorHierarchy} from "../src/services/selector-hierarchy";
+import SelectionMadeMessage from "../src/models/messages/selection-made";
+import { clientForLocation } from "./config/robotcopy";
+import { ClientLocation } from "./util/state-machine";
+
+const ContentClient = clientForLocation(ClientLocation.CONTENT)
+
+// ContentClient.up().sendMessage("upate-wave", ClientLocation.POPUP, new UpdateWaveMessage({}))
 
 const stateMachineMap = new Map();
 stateMachineMap.set("base", Base);
 
-const settingsService = new SettingsService();
+//const settingsService = SettingsService.withTabUrlProvider(() => Promise.resolve(document.location.href));
 
 const stateMachine = new StateMachine()
 
@@ -68,12 +79,21 @@ let stopKeyChordEventListenerPredicate = () => {
     // fx. callstop
 }
 
+const toggleWave = debounce(() => {
+    if (stateMachine.getCurrentState().name === "waving") {
+        stateMachine.handleState(stateMachine.getState("toggle stop"))
+    } else {
+        stateMachine.handleState(stateMachine.getState("toggle start"))
+    }
+}, 500, false)
+
 const initializeOrUpdateToggleObserver = (message) => {
     if (keychordObserver !== undefined) {
         stopKeyChordEventListenerPredicate();
     }
 
-    //TODO: debounce?
+    //TODO: debug further for keychord double activation, shouldn't need to debounce beyond feel...
+    // todo: draw "feel eel"
     keychordObserver = FollowKeyChordObserver(
         message.options.toggleKeys.keyChord,
         WindowKeyDownKey((e/*{(event: KeyboardEvent): void}*/) => {
@@ -87,13 +107,10 @@ const initializeOrUpdateToggleObserver = (message) => {
             console.log("matched: "+ matched)
         }
 
-        if (stateMachine.getCurrentState().name === "waving") {
-            stateMachine.handleState(stateMachine.getState("toggle stop"))
-        } else {
-            stateMachine.handleState(stateMachine.getState("toggle start"))
-        }
+        toggleWave();
     });
 }
+
 
 /**
  side effects on states or partial states?
@@ -103,49 +120,66 @@ const initializeOrUpdateToggleObserver = (message) => {
     * [isBaseLevel] whether or not this is requires validation using possible states
  */
 
+let hierarchySelectorMount = undefined;
+const hierarchySelectorService = new SelectorHierarchy(new ColorGeneratorService())
+let setHierarchySelector = undefined;
+
 function StateNameMap(map = new Map()) {
     /* eslint-disable  @typescript-eslint/no-unused-vars */
     const states = {
         // base defined above
-        "waving": CState("waving", WavingVentures, false),
-        "error": CState("error", AllVentures, true, (message, state, previousState) => {
+        "waving": CState("waving", WavingVentures, false, async (message, state, previousState) => {
+          return map.get("waving")
+        }),
+        "error": CState("error", AllVentures, true, async (message, state, previousState) => {
             console.log("transitioning from error to base state from " + previousState.name)
             return map.get('base')
         }, true),
-        "start": CState("start", StartVentures, false, (message, state, previousState) => {
+        "start": CState("start", StartVentures, false, async (message, state, previousState) => {
             latestOptions = message.options;
             loadCSSTemplate(latestOptions.wave.cssTemplate)
             // TODO: see if the state machine will let us remove this
             going = true;
             initializeOrUpdateToggleObserver(message);
             return map.get('waving')
-            }, false),
-        "stop": CState("stop", StopVentures, false, (message, state, previousState) => {
+        }, false),
+        "stop": CState("stop", StopVentures, true, async (message, state, previousState) => {
             unloadCSS()
             going = false;
-            return map.get('base')
+            return previousState.name === "waving" ? map.get("base") : previousState;
         }, false),
-        "update": CState("update", BaseVentures, false, (message, state, previousState) => {
+        "update": CState("update", BaseVentures, false, async (message, state, previousState) => {
             unloadCSS()
+
+            if (!message?.options) {
+                console.log("warning: update called with no options" + JSON.stringify(message));
+                return previousState;
+            }
+
             latestOptions = message.options;
+
             console.log("Update called with previous state: " + previousState.name);
             if (previousState.name === "waving") {
                 loadCSSTemplate(latestOptions.wave.cssTemplate)
             }
 
+            if (setHierarchySelector) {
+                setHierarchySelector(latestOptions.wave.selector);
+            }
+
             // may need to separate steps for clarity
             initializeOrUpdateToggleObserver(message);
             return previousState
-            }, true),
-        "toggle start": CState("toggle start", StartVentures, false, (message, state, previousState) => {
+        }, true),
+        "toggle start": CState("toggle start", StartVentures, false, async (message, state, previousState) => {
             loadCSSTemplate(latestOptions.wave.cssTemplate)
             return map.get('waving')
-            }, false),
-        "toggle stop": CState("toggle stop", StopVentures, false, (message, state, previousState) => {
+        }, false),
+        "toggle stop": CState("toggle stop", StopVentures, false, async (message, state, previousState) => {
             unloadCSS()
             return map.get('base')
-            }, false),
-        "start mouse": CState("start mouse", StartVentures, false, (message, state, previousState) => {
+        }, false),
+        "start mouse": CState("start mouse", StartVentures, false, async (message, state, previousState) => {
             // TODO: this may need to be merged with the start and toggle logic
             latestOptions = message.options;
             const elements = document.querySelectorAll(message.options.wave.selector);
@@ -153,8 +187,8 @@ function StateNameMap(map = new Map()) {
                 element.addEventListener("mousemove", mouseMoveListener);
             })
             return map.get('waving')
-            }, false),
-        "stop mouse": CState("stop mouse", StopVentures, false, (message, state, previousState) => {
+        }, false),
+        "stop mouse": CState("stop mouse", StopVentures, false, async (message, state, previousState) => {
             // maybe unloadCSS and reload each time?
             unloadCSS()
             const elements = document.querySelectorAll(message.options.wave.selector);
@@ -162,30 +196,61 @@ function StateNameMap(map = new Map()) {
                 element.removeEventListener("mousemove", mouseMoveListener);
             })
             return map.get('base')
-            }, false),
-        "selection mode activate": CState("selection mode activate", ["selection mode deactivate", "selection made"], false, (message, state, previousState) => {
-            console.log('start selection choose cheese')
-            // mouse over / enter / blur tracking
-            // highlight element if larger than 20px and contains text (maybe option to select everything)
-            // (maybe option to change size)
-            // plus and minus buttons to bubble the selection up or select/drill down
-            // show textual elements with transparent background colors,
-            // pick quads or triads, then half stops as selections
-            //  -> start with base colors, then pastels
-            // $ => on mouse over, dim element by #eee overlay - like a potato chip
-            //      shift click to select sub element, or [+] button
-            //      overlay goes away, and sub elements are clickable
-            //          hovering over sub elements reveals sub elements down to a specific size
-            // $ => press [-] button to bubble the selection up to the next level of elements
+        }, false),
+        "start-selection-choose":  CState("selection mode activate", ["selection mode activate"], true, async (message, state, previousState) => {
+            const selector = message?.selector;
+
+            if (!(selector || "").trim()) {
+                console.log("start selection choose activated without selector!")
+            }
+
+            // todo: add an id specifyer to the content Client, as iframes make it a 1 - * relationship for background -> content
+            /* science!
+              hypothesis: previously i did not include the world parameter in the content script manifest
+                    it was only getting the extension document
+              evidence: found iframe
+              conclusion: ?
+              theory: borf
+              */
+            //
+            // stateMachine.handleState(new SelectionModeMessage({
+            //     selector
+            // }))
+
+            hierarchySelectorMount = MountOrFindSelectorHierarchyComponent({
+                service: hierarchySelectorService,
+                selector,
+                passSetSelector: (modifier) => { setHierarchySelector = modifier; },
+                onConfirmSelector: (selector) => {
+                    stateMachine.handleState(new SelectionMadeMessage({
+                        selector
+                    }))
+                },
+                doc: document
+            })
+
             return map.get('selection mode')
-        }),
-        "selection mode": CState("selection mode", ["selection mode activate", "selection mode", "selection made", "selection mode deactivate"], false),
-        "selection made": CState("selection made", BaseVentures, false, (message, state, previousState) => {
+        }, false),
+        "selection mode": CState("selection mode", ["selection mode activate", "selection mode", "selection made", "end-selection-choose"], true,(message, state, previousState) => {
+            return map.get('selection mode')
+        }, false),
+        "selection made": CState("selection made", ["end-selection-choose"], true, async (message, state, previousState) => {
+            // await settingsService.updateCurrentSettings((options) => {
+            //     options.selectors.push(message?.selector)
+            //     options.wave.selector = message?.selector;
+            //     return options;
+            // })
+
+            chrome.runtime.sendMessage(new SelectionMadeMessage(message?.selector))
+
+            return Promise.resolve(map.get('end-selection-choose'))
+        }, false),
+        "end-selection-choose": CState("end-selection-choose", BaseVentures, true, async (message, state, previousState) => {
+            hierarchySelectorMount.remove()
+            setHierarchySelector = undefined;
+
             return map.get('base')
-            }, false),
-        "selection mode deactivate": CState("selection mode deactivate", [], false, (message, state, previousState) => {
-            return map.get('base')
-            }, false)
+        }, false)
     }
 
     // i'd prefer a native map.addAll method, but this allows a retrofit
@@ -205,9 +270,9 @@ let going = false;
 
 stateMachine.initialize(new StateNameMap(stateMachineMap), Base);
 
-settingsService.getCurrentSettings().then(settings => {
-    stateMachine.handleState(new UpdateWaveMessage({ options: settings }))
-})
+// settingsService.getCurrentSettings().then(settings => {
+//     stateMachine.handleState(new UpdateWaveMessage({ options: settings }))
+// })
 
 chrome.runtime.onMessage.addListener( (message, sender, sendResponse) => {
         console.log(`message: ${JSON.stringify(message)}`)
@@ -230,5 +295,9 @@ chrome.runtime.onMessage.addListener( (message, sender, sendResponse) => {
 
     return true;
 });
+chrome.runtime.connect().onDisconnect.addListener(function() {
+    // clean up when content script gets disconnected
+    // todo implement
+})
 
 // maybe a nyan cat easter egg?

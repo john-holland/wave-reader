@@ -125,6 +125,10 @@ export default class SettingsService implements SettingsDAOInterface {
         this.saveSettingsRegistryProvider = saveSettingsRegistryProvider;
     }
 
+    public static withTabUrlProvider(tabUrlProvider: () => Promise<string>): SettingsService {
+        return new SettingsService(getSettingsRegistry, tabUrlProvider, saveSettingsRegistry)
+    }
+
     async addSettingsForDomain(domain: string, path: string, settings: Options): Promise<void> {
         return new Promise(async (resolve, reject) => {
            const registry: SettingsRegistry = await this.getSettingsRegistryForDomain(domain, true)

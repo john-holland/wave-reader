@@ -3,16 +3,19 @@
 export type Named = {
      name: string
 }
-export class State implements Named {
+
+type StateEffectsFunction = (message: Named, state: State, previousState: State) => Promise<State | undefined>;
+
+export class  State implements Named {
     name: string
     ventureStates: string[]
     isBaseLevel: boolean
-    stateEffects: {(message: Named, state: State, previousState: State): Promise<State> | State | undefined} | undefined
+    stateEffects: StateEffectsFunction | undefined
 
     constructor(name = "default",
                 ventureStates: string[] = [],
                 isBaseLevel = true,
-                stateEffects: {(message: Named, state: State, previousState: State): Promise<State> | State | undefined} | undefined = undefined) {
+                stateEffects:  StateEffectsFunction | undefined = undefined) {
         this.name = name;
         this.ventureStates = ventureStates;
         this.isBaseLevel = isBaseLevel;
@@ -35,6 +38,6 @@ export interface StateNames {
 export const CState = (name = "default",
                        ventureStates: string[] = [],
                        isBaseLevel = true,
-                       stateEffects: {(message: Named, state: State, previousState: State): Promise<State> | State | undefined} | undefined = undefined) => {
+                       stateEffects: StateEffectsFunction | undefined = undefined) => {
     return new State(name, ventureStates, isBaseLevel, stateEffects);
 }

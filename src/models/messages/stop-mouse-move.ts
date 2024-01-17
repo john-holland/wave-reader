@@ -1,10 +1,10 @@
 import Wave from "../wave";
 import Message from "../message";
 
-export default class StartMouseMove extends Message<StartMouseMove> {
+export default class StopMouseMoveMessage extends Message<StopMouseMoveMessage> {
     wave?: Wave;
 
-    constructor(attributes: Partial<StartMouseMove> = {}) {
+    constructor(attributes: Partial<StopMouseMoveMessage> = {}) {
         super('stop-mouse-move', 'popup', attributes)
     }
 }

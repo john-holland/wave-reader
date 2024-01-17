@@ -66,3 +66,43 @@ export const getSizeValuesRegex = (sizeValue: string): SizeValue => {
 
 const windowDefault: any | undefined = (typeof window !== 'undefined' && window) || undefined
 export const getDefaultFontSizeREM = (_window: any | undefined = windowDefault) => _window.getComputedStyle(_window.document.documentElement).getPropertyValue('font-size')
+
+// credit: @marc_s https://stackoverflow.com/q/66070706
+export const isVisible = (element: HTMLElement) => {
+    if (element instanceof Text) return true;
+    if (element instanceof Comment) return false;
+    if (!(element instanceof Element)) throw Error("isVisible(): argument is not an element");
+
+    // for real elements, the second argument is omitted (or null)
+    // for pseudo-elements, the second argument is a string specifying the pseudo-element to match.
+    const style = window.getComputedStyle(element, null);
+
+    // if element has size 0
+    if(element.offsetWidth === 0 || element.offsetHeight === 0){
+        // only on 'visible', content does appear outside of the element's box
+        if (style.overflow !== 'visible') {
+            return false;
+        } else {
+            for (const child of element.childNodes) {
+                if (isVisible(child as HTMLElement)) return true;
+            }
+            return false;
+        }
+    }
+
+    // if css display property is used
+    if (style.display === 'none') return false;
+
+    // if css visibility property is used
+    if (style.visibility !== 'visible') return false;
+
+    // if css opacity property is used
+    if (parseFloat(style.opacity) === 0) return false;
+
+    // this method does not work for elements with "position: fixed;"
+    if (style.position !== 'fixed') {
+        if (element.offsetParent === null) return false;
+    }
+
+    return true;
+}
