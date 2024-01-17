@@ -37,6 +37,11 @@ import EndSelectorChooseMessage from "./models/messages/end-selection-choose";
 import AddSelectorMessage from "./models/messages/add-selector";
 import SelectionMadeMessage from "./models/messages/selection-made";
 
+import { clientForLocation } from "./config/robotcopy";
+import { ClientLocation } from "./util/state-machine";
+
+const PopupClient = clientForLocation(ClientLocation.POPUP)
+
 //todo:
 // * Material UI
 // * Controls: read speed, reset speed, rotation angle, wave width, read duration

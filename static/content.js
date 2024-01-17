@@ -4,6 +4,7 @@ import { replaceAnimationVariables } from "../src/models/wave";
 import { FollowKeyChordObserver, WindowKeyDownKey } from "../src/components/util/user-input";
 import StateMachine  from "../src/util/state-machine";
 import { CState } from "../src/util/state";
+import debounce from "../src/util/debounce";
 import {
     BaseVentures,
     StartVentures,
@@ -20,6 +21,12 @@ import SelectionModeMessage from "../src/models/messages/selection-mode";
 import {MountOrFindSelectorHierarchyComponent} from "../src/components/selector-hierarchy";
 import {ColorGeneratorService, SelectorHierarchy} from "../src/services/selector-hierarchy";
 import SelectionMadeMessage from "../src/models/messages/selection-made";
+import { clientForLocation } from "./config/robotcopy";
+import { ClientLocation } from "./util/state-machine";
+
+const ContentClient = clientForLocation(ClientLocation.CONTENT)
+
+// ContentClient.up().sendMessage("upate-wave", ClientLocation.POPUP, new UpdateWaveMessage({}))
 
 const stateMachineMap = new Map();
 stateMachineMap.set("base", Base);
@@ -72,12 +79,21 @@ let stopKeyChordEventListenerPredicate = () => {
     // fx. callstop
 }
 
+const toggleWave = debounce(() => {
+    if (stateMachine.getCurrentState().name === "waving") {
+        stateMachine.handleState(stateMachine.getState("toggle stop"))
+    } else {
+        stateMachine.handleState(stateMachine.getState("toggle start"))
+    }
+}, 500, false)
+
 const initializeOrUpdateToggleObserver = (message) => {
     if (keychordObserver !== undefined) {
         stopKeyChordEventListenerPredicate();
     }
 
-    //TODO: debounce?
+    //TODO: debug further for keychord double activation, shouldn't need to debounce beyond feel...
+    // todo: draw "feel eel"
     keychordObserver = FollowKeyChordObserver(
         message.options.toggleKeys.keyChord,
         WindowKeyDownKey((e/*{(event: KeyboardEvent): void}*/) => {
@@ -91,11 +107,7 @@ const initializeOrUpdateToggleObserver = (message) => {
             console.log("matched: "+ matched)
         }
 
-        if (stateMachine.getCurrentState().name === "waving") {
-            stateMachine.handleState(stateMachine.getState("toggle stop"))
-        } else {
-            stateMachine.handleState(stateMachine.getState("toggle start"))
-        }
+        toggleWave();
     });
 }
 

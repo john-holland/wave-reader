@@ -41,13 +41,15 @@ type HostType = {
     POPUP: string, // send messages to tabs
     BACKGROUND: string, // receives & sends, as a router
     CONTENT: string,// sends to background
-    API: string // todo: graphql transition
+    API: string,// todo: graphql transition
+    AUTH: string
 }
 export const ClientLocation: HostType = {
     POPUP: "popup", // send messages to tabs
     BACKGROUND: "background", // receives & sends, as a router
     CONTENT: "content",// sends to background
-    API: "api" // todo: graphql transition
+    API: "api", // todo: graphql transition
+    AUTH: "auth"
 }
 
 export type ClientDiscovery = {
@@ -135,6 +137,26 @@ export class GoogleChromeRuntimeProxy implements IRuntimeProxy {
     }
 }
 
+export class RESTRuntimeProxy implements IRuntimeProxy {
+    // if you don't eat, you get weak...
+    // thanky kindly :3 https://dev.to/simonireilly/fetch-with-typescript-for-better-http-api-clients-2d71
+    onInstalled(callback: { (details: any): void }): void {
+        chrome.runtime.onInstalled.addListener(callback)
+    }
+
+    onMessage(callback: { (message: any, sender: chrome.runtime.MessageSender, sendResponse: { (response?: any): void }): void }): void {
+        chrome.runtime.onMessage.addListener(callback);
+    }
+
+    sendMessageToRuntime(message: any, callback: { (response: any): void }): void {
+        chrome.runtime.sendMessage(message, callback);
+    }
+
+    sendMessageToTab(tabId: number, message: any, callback: { (response: any): void }): void {
+        chrome.tabs.sendMessage(tabId, message, callback);
+    }
+}
+
 /**
  * Unidirectional client service, discover clients from->to, or delegate to API clients
  * Api clients should have typed names
@@ -192,11 +214,11 @@ export class GoogleClientMessengerService<T extends Message<any>, Discovery exte
                 this.runtimeProxy.sendMessageToTab(Number(clientId), new ClientMessage(path, clientId, message), (response) => {
                     resolve(response);
                 });
-            } else if (location === ClientLocation.API) {
+            } else if (location === ClientLocation.API || location === ClientLocation.AUTH) {
                 if (this.getApiMap().has(message.getClientId())) {
                     this.getApiMap().get(message.getClientId())?.sendMessage(path, clientId, message).then(resolve).catch(reject);
                 } else {
-                    throw new Error(`type was ClientLocation.API, but unknown clientId for api map in ClientMessengerService from client: ${clientId} for message ${message}`)
+                    throw new Error(`type was ${location}, but unknown clientId for api map in ClientMessengerService from client: ${clientId} for message ${message}`)
                 }
             } else if (location === ClientLocation.BACKGROUND) {
                 // use sendMessageToRuntime since the background script can be reached that way by both the popup and the tabs.

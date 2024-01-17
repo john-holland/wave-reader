@@ -232,6 +232,7 @@ describe("state machine", () => {
                     return Promise.resolve(log("base", <div/>));
                 },
                 complex: async ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+                    // todo: implement as api client with settings mock and run test
                     const saved = await client.sendMessage(new ClientMessage("app/settings", "save", new UpdateWaveMessage({ options: new Options() })))
                     return Promise.resolve(log("base", <div>{saved}</div>));
                 },
