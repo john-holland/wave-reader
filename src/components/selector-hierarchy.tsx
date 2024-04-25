@@ -13,6 +13,9 @@ import styled, {StyledComponent} from "styled-components";
 import ReactDOM from "react-dom";
 import {SelectorsDefaultFactory} from "../models/defaults";
 import {Button} from "@mui/material";
+import {_ClearViews_, _View_, ComponentLog, log, MachineComponentProps, ReactMachine} from "../util/react-machine";
+import Robotcopy, {ClientDiscoveryConfig} from "../config/robotcopy";
+import {ClientDiscovery} from "../util/state-machine";
 
 type SelectorHierarchyMountProps = {
     doc: Document,
@@ -124,6 +127,50 @@ const Panel = styled.div`
     height: ${(props: ColorSelectorPanel) => SizeFunctions.calcSize(props.element, props.element?.style?.height, SizeProperties.HEIGHT)}px !important;
   }
 ` as StyledComponent<"div", any, ColorSelectorPanel, never>
+
+// find selectable text, and copy structural elements entirely pruning branches
+//   use provided selector and default text selectors to select each available branch
+//   it may be easier to just replicate each feature allowing for duplicates
+
+type ColorSelectorV2 = {
+    root: HtmlElement, // from body element or the overlay div element
+    tree: HtmlElement[], // a duplicate of the [HtmlElement]'s tree
+    color: Hex,
+    element: HtmlElement
+}
+
+const HierarchySelectorReactMachine = ReactMachine<HierarchySelectorComponentProps>({
+    client: (Robotcopy.clients.popup as ClientDiscoveryConfig).up(),
+    initialState: "bootstrap",
+    states: {
+        "bootstrap": ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+            const [selections, setSelections] = state?.useState<ColorSelectorV2[]>("selections", []) || [undefined, undefined]
+            const [dimmed, setDimmed] = state?.useState<ColorSelectorV2[]>("dimmed", []) || [undefined, undefined]
+
+            // fill selections from props
+            // store trees pruned to the current element
+            // present with base
+
+            return Promise.resolve(log("base", _ClearViews_))
+        },
+        "base":({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+            const selections = state?.getState<ColorSelectorV2[]>("selections");
+            const dimmed = state?.getState<ColorSelectorV2[]>("dimmed");
+            const confirmed = state?.getState<ColorSelectorV2[]>("confirmed");
+
+            return Promise.resolve(log("base",
+                <SelectorHierarchyMount doc={state?.props?.doc} visible={!confirmed}>
+            </SelectorHierarchyMount>);
+        },
+        "add":({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+
+            return Promise.resolve(log("base", _View_);
+        },
+        "remove":({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+            return Promise.resolve(log("base", _View_);
+        }
+    }
+})
 
 const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentProps> = ({
     selectorHierarchyService = new SelectorHierarchy({ } as unknown as ColorGeneratorServiceInterface),

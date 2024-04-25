@@ -22,6 +22,7 @@ export const _View_ = {} as unknown as View;
  */
 export type ClearViews = {}
 export const _ClearViews_ = {} as unknown as ClearViews;
+
 /**
  * Return to empty [view.states] & [view.views]
  */

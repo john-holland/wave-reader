@@ -8,17 +8,17 @@ import {
 } from "../util/state-machine";
 import Message from "../models/message";
 
-type ClientDiscoveryConfig = {
+export type ClientDiscoveryConfig = {
     up: { (): Client<any> }
     down: { (): Client<any> }
 }
 
-type AuthClientConfig = {
+export type AuthClientConfig = {
     chrome: { (): Client<any> }
     firefox: { (): Client<any> }
 }
 
-type RobotCopyConfig = {
+export type RobotCopyConfig = {
     clients: { [key: string]: ClientDiscoveryConfig | AuthClientConfig }
 }
 

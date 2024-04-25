@@ -27,6 +27,7 @@ export type ClientID = string
 
 export interface IClientMessengerService<T extends Message<any>> {
     initialize(): Promise<ClientID>
+    cleanUp(): Promise<void>
     getRuntimeProxy(): IRuntimeProxy
     getDiscover(): ClientDiscovery
     getApiMap(): Map<string, IClientMessengerService<T>>
@@ -36,6 +37,9 @@ export interface IClientMessengerService<T extends Message<any>> {
     onReceiveMessage(): Promise<Observable<ClientMessage<T>>>
 }
 
+/**
+ * Specifies a ClientLocation for the ClientMap
+ */
 export type ClientHost = string;
 type HostType = {
     POPUP: string, // send messages to tabs
@@ -78,6 +82,9 @@ export abstract class APIMessage<T> extends Message<T> implements MessageInterfa
  * todo: implement polling
  */
 export class APIClientMessengerService<T extends Message<any>, Discovery extends ClientDiscovery> implements IClientMessengerService<T> {
+    cleanUp(): Promise<void> {
+        return Promise.resolve(undefined);
+    }
     getDiscover(): ClientDiscovery {
         throw new NotImplementedError("todo: implement api client message service")
     }
@@ -182,6 +189,10 @@ export class GoogleClientMessengerService<T extends Message<any>, Discovery exte
         return this.runtimeProxy;
     }
 
+    cleanUp(): Promise<void> {
+        return Promise.resolve(undefined);
+    }
+
     getManager(): string {
         throw new Error("Method not implemented.");
     }
@@ -236,9 +247,15 @@ export class GoogleClientMessengerService<T extends Message<any>, Discovery exte
             const backlog: any[] = [];
             const observable = new Observable<ClientMessage<T>>((subscriber) => {
                 this.runtimeProxy.onMessage((message: any, sender: MessageSender, response: {(response?: any): void}) => {
+
+                    const { id, frameId } = sender;
                     const typedMessage = fromMessage(message);
 
-                    //todo: review: @mr-sekiro xsrf secure?
+                    // @ mr-sekiro salt and hash messages beyond bootstrap?
+                    //  optional dev mode disable for debugging
+                    // todo: check if cross extension messages pose security hole
+                    // use message.from to specify clientId -> clientHost
+
 
                     if (typedMessage.name === "bootstrap-result") {
                         const bootstrapResult = typedMessage as BootstrapResultMessage;
@@ -258,10 +275,24 @@ export class GoogleClientMessengerService<T extends Message<any>, Discovery exte
         })
     }
 
+
+    //
+
     heartbeatMessage(heartbeat: HeartbeatResultMessage) {
         // todo: update client map
         // todo: similar to bootstrap send back whatever info in response, just no additional messaging
         console.error("### straw ###")
+        if (this.apiMap.size !== heartbeat.apiMap?.size) {
+            [...(heartbeat.apiMap?.entries() || [])].forEach(([key, val]) => {
+                if (!this.clientMap.has(key)) this.clientMap.set(key, val);
+            })
+
+            this.runtimeProxy.sendMessageToRuntime(new BootstrapMessage(), (response) => {
+                if (response as HeartbeatResultMessage) {
+                    this.heartbeatMessage((response as HeartbeatResultMessage)!)
+                }
+            })
+        }
     }
 
     bootstrapMessages(): Promise<void> {
@@ -277,6 +308,9 @@ export class GoogleClientMessengerService<T extends Message<any>, Discovery exte
         return new Promise((resolve, reject) => {
             // todo: using what info is available, extension id, etc, send info back to requested
             this.runtimeProxy.sendMessageToRuntime(new BootstrapMessage(), (response) => {
+                if (response as HeartbeatResultMessage) {
+                    this.heartbeatMessage((response as HeartbeatResultMessage)!)
+                }
                 resolve();
             })
         })
@@ -295,6 +329,10 @@ export class GoogleClientMessengerService<T extends Message<any>, Discovery exte
 }
 
 export class FirefoxSyncClientMessengerService<T extends Message<any>> implements IClientMessengerService<T> {
+    cleanUp(): Promise<void> {
+        return Promise.resolve(undefined);
+    }
+
     sendMessage(clientId: ClientID, message: any): Promise<boolean> {
         throw new Error("TODO: implement firefox!.");
     }

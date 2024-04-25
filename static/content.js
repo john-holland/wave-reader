@@ -23,6 +23,7 @@ import {ColorGeneratorService, SelectorHierarchy} from "../src/services/selector
 import SelectionMadeMessage from "../src/models/messages/selection-made";
 import { clientForLocation } from "./config/robotcopy";
 import { ClientLocation } from "./util/state-machine";
+import {ReactMachine} from "../src/util/react-machine";
 
 const ContentClient = clientForLocation(ClientLocation.CONTENT)
 
@@ -273,6 +274,10 @@ stateMachine.initialize(new StateNameMap(stateMachineMap), Base);
 // settingsService.getCurrentSettings().then(settings => {
 //     stateMachine.handleState(new UpdateWaveMessage({ options: settings }))
 // })
+
+const ContentReactMachine = ReactMachine({
+    
+})
 
 chrome.runtime.onMessage.addListener( (message, sender, sendResponse) => {
         console.log(`message: ${JSON.stringify(message)}`)

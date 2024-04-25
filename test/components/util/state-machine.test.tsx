@@ -261,4 +261,68 @@ describe("state machine", () => {
         expect(changedToState[1]!!.name).toBe("base")
         expect(changeCount).toBe(2)
     })
+
+    test("bootstrap sends wakeup message and receives id and map for initialize", () => {
+
+        const client = new Client<Message<any>>(new GoogleClientMessengerService(
+            {
+                from: ClientLocation.CONTENT,
+                to: ClientLocation.POPUP
+            },
+            new Map<string, IClientMessengerService<Message<any>>>(),
+            new TestRuntimeProxy()))
+        const useStateProxy = new UseStateProxy(null);
+        const componentMachine = ReactMachine({
+            initialState: "base",
+            client,
+            states: {
+                base: async ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+                    const [test, setTest] = state?.useState("test", false) || [undefined, undefined]
+                    // todo: review: replace log and view with a deconstructor like useState and useReducer?
+                    return Promise.resolve(log("base", <div/>));
+                },
+                complex: async ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+                    // todo: implement as api client with settings mock and run test
+                    const saved = await client.sendMessage(new ClientMessage("app/settings", "save", new UpdateWaveMessage({ options: new Options() })))
+                    return Promise.resolve(log("base", <div>{saved}</div>));
+                },
+            }
+        })
+
+        // json react tree matching for output
+        componentMachine.initialize();
+        expect(componentMachine.getRenderTarget()).toBeTruthy()
+    })
+
+    test("receives wakeup message and sends updated map back for initialization", () => {
+
+        const client = new Client<Message<any>>(new GoogleClientMessengerService(
+            {
+                from: ClientLocation.POPUP,
+                to: ClientLocation.CONTENT
+            },
+            new Map<string, IClientMessengerService<Message<any>>>(),
+            new TestRuntimeProxy()))
+        const useStateProxy = new UseStateProxy(null);
+        const componentMachine = ReactMachine({
+            initialState: "base",
+            client,
+            states: {
+                base: async ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+                    const [test, setTest] = state?.useState("test", false) || [undefined, undefined]
+                    // todo: review: replace log and view with a deconstructor like useState and useReducer?
+                    return Promise.resolve(log("base", <div/>));
+                },
+                complex: async ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+                    // todo: implement as api client with settings mock and run test
+                    const saved = await client.sendMessage(new ClientMessage("app/settings", "save", new UpdateWaveMessage({ options: new Options() })))
+                    return Promise.resolve(log("base", <div>{saved}</div>));
+                },
+            }
+        })
+
+        // json react tree matching for output
+        componentMachine.initialize();
+        expect(componentMachine.getRenderTarget()).toBeTruthy()
+    })
 })

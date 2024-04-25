@@ -1,7 +1,11 @@
 // adapted lovingly from: https://dev.to/simonireilly/fetch-with-typescript-for-better-http-api-clients-2d71
 
+import Options from "../models/options";
+
 /** For 200s */
 export type UserCreated = { id: string; name: string };
+export type SettingsDefault = { settings: Options }
+export type UpdateSettings = { settings: Options }
 
 /** For 400s */
 export type BadRequest = { code: "bad_request"; message: string };
@@ -31,7 +35,7 @@ export type SettingsResponse =
 });
 
 /** Marshalling stream to object with narrowing */
-const marshalResponse = (res: UserResponse) => {
+const marshalResponse = (res: UserResponse | SettingsResponse) => {
     if (res.status - (res.status % 100) === 200) return res.json();
     if (res.status - (res.status % 100) === 400) return res.json();
     return Error("Unhandled response code: " + JSON.stringify({ response: JSON.stringify(res), json: res.json() }));
