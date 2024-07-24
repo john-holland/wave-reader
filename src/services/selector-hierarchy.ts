@@ -146,6 +146,9 @@ const calcSize = (element: HtmlElement | undefined, size: string, property: Size
                   fontSizeRemDefaultAccessor = getDefaultFontSizeREM,
                   documentWidthAccessor = getDocumentWidth.bind(null, element?.ownerDocument!!)): number => {
     if (!element) return 0;
+    // perpendicular css transforms can cause css animation to go vertical
+    // to accomidate we need a similar recursive search up the animation css transforms
+    // and keep a summed css angle
 
     switch (property) {
         case SizeProperties.HEIGHT:
