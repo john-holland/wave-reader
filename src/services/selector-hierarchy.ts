@@ -234,6 +234,18 @@ const calcSize = (element: HtmlElement | undefined, size: string, property: Size
     }
 }
 
+const calcRotation = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSizeREM): number => {
+    const rotation = n?.style?.rotate || "0deg"
+    let rotationNumber = 0;
+    if (rotation.indexOf('deg') > -1) {
+        rotationNumber = Number.parseFloat(rotation.split('deg')[0].trim())
+    } else if (rotation.indexOf('rad') > -1) {
+        rotationNumber = Number.parseFloat(rotation.split('rad')[0].trim()) * (180 / Math.PI) // or * 57.2958 ?
+    }
+
+    return rotationNumber + (_parent(n) ? calcRotation(_parent(n)!!, fontSizeRemDefaultAccessor) : 0);
+}
+
 const calcLeft = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSizeREM): number => {
     const boundingRect = n.getBoundingClientRect()
     if (boundingRect) {
@@ -285,7 +297,8 @@ export const SizeFunctions = {
     calcLeft,
     calcRight,
     calcTop,
-    calcBottom
+    calcBottom,
+    calcRotation
 }
 
 const getPathSelector = (el: HtmlElement | undefined): string => {
@@ -395,7 +408,6 @@ export const ForThoustPanel = (
             return selectors;
         }, [] as Selector[]);
 
-        //
         // const neighborMap = [...neighborIslands.keys()].reduce((/* island */map, key) => {
         //     const selectors = [...map.keys()]
         //     // todo: investigate, null selector.elem

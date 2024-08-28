@@ -148,6 +148,21 @@ describe("selector quad service", () => {
                    getDefaultFontSizeREM.bind(null, window))).toBe(2000000000000)
            })
        })
+
+       test("calc rotation px", () => {
+           const window = withDocument((doc, window) => {
+               const elem = doc.createElement("div");
+               doc.querySelector('#mount')?.appendChild(elem)
+               const ela = doc.createElement("div");
+               elem.style.rotate = "20deg";
+               ela.style.rotate = "2rad";
+               elem.appendChild(ela);
+               const elemRotation = SizeFunctions.calcRotation(elem, getDefaultFontSizeREM.bind(null, window))
+               const rotation = SizeFunctions.calcRotation(ela, getDefaultFontSizeREM.bind(null, window))
+               expect(Math.floor(rotation)).toBe(Math.floor(134))
+           })
+       })
+
        test("calc size px width with clientWidth", () => {
            withDocument((doc, window) => {
                const elem = doc.createElement("div");

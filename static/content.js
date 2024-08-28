@@ -44,6 +44,8 @@ function loadCSS(css) {
     style.id = "extension";
     style.textContent = css;
     head.appendChild(style);
+
+    // todo: apply rotated animation with SizeFunctions.calcRotation
 }
 
 function unloadCSS() {

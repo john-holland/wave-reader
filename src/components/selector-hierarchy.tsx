@@ -160,14 +160,14 @@ const HierarchySelectorReactMachine = ReactMachine<HierarchySelectorComponentPro
 
             return Promise.resolve(log("base",
                 <SelectorHierarchyMount doc={state?.props?.doc} visible={!confirmed}>
-            </SelectorHierarchyMount>);
+            </SelectorHierarchyMount>))
         },
         "add":({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
 
-            return Promise.resolve(log("base", _View_);
+            return Promise.resolve(log("base", _View_));
         },
         "remove":({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
-            return Promise.resolve(log("base", _View_);
+            return Promise.resolve(log("base", _View_));
         }
     }
 })
