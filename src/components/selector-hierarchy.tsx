@@ -11,6 +11,7 @@ import {flatMap, map} from "rxjs";
 import tinycolor from "tinycolor2"
 import SettingsService from "../services/settings";
 import React from 'react';
+import Options from "../models/options";
 
 /**
  * we may need to use 4 enclosing panels, reused
@@ -42,8 +43,8 @@ import React from 'react';
  * order = z-index from neighbor count
  * .     .      .     .      .     .
  *  s8t9a4    s8t9a4    s8t9     s8t9    a1    |
-a:  s2t1a3    s2t1a3    s2t1
-#   .6,1,.2  .6,1,.2    .6,1    .6,1     1
+ a:  s2t1a3    s2t1a3    s2t1
+ #   .6,1,.2  .6,1,.2    .6,1    .6,1     1
  * .    .       .     .     .      .
  *   s8t9    s8t9a4   s8t9a4     s8t9    t9   |
  * .     .     .     .     .      .
@@ -58,109 +59,248 @@ a:  s2t1a3    s2t1a3    s2t1
  */
 
 const Mask = styled.svg`
-  mouse-events: none;
-    
+    mouse-events: none;
+
 `
 const Cover = styled.svg`
-  mouse-events: none;
+    mouse-events: none;
 `
 
 export type HierarchySelectorComponentProps = {
     selectorHierarchyService: SelectorHierarchyServiceInterface,
     currentSelector: string,
-    onConfirmSelector: { (selector: string): void }
+    onConfirmSelector: { (selector: string): void },
+    cleanCssCallback: { (cleanCss: { (): void }): void }
+}
+//
+// interface ColorSelectorPanelInterface {
+//     element: HtmlElement;
+//     color: Hex; //color.toHexString() from tinycolor.Instance;
+// }
+//
+// type Hex = string;
+// class ColorSelectorPanel implements ColorSelectorPanelInterface {
+//     element: HtmlElement;
+//     color: Hex; //color.toHexString() from tinycolor.Instance;
+//
+//     constructor(element: HtmlElement, color: Hex) {
+//         this.element = element;
+//         this.color = color;
+//     }
+// }
+//
+// const Panel = styled.div<ColorSelectorPanel>`
+//   background-color: ${({color}) => color};
+//   left: ${(props: ColorSelectorPanel) => props.element.style.left};
+//   top: ${(props: ColorSelectorPanel) => props.element.style.top};
+//   width: ${(props: ColorSelectorPanel) => props.element.style.width};
+//   height: ${(props: ColorSelectorPanel) => props.element.style.height};
+// ` as StyledComponent<"div", any, ColorSelectorPanel, never>
+//
+// const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentProps> = ({
+//     selectorHierarchyService = new SelectorHierarchy({ } as unknown as ColorGeneratorServiceInterface),
+//     currentSelector,
+//     onConfirmSelector
+// }) => {
+//     const [activeSelectorPanel, setActiveSelectorPanel] = useState(undefined);
+//     const [selector, setSelector] = useState(currentSelector);
+//     const [activeSelectorColorPanels, setActiveSelectorColorPanels] = useState<ColorSelectorPanel[]>([])
+//     const [htmlHierarchy, setHtmlHierarchyRoot] = useState(document);
+//     const [dimmedPanels, setDimmedPanels] = useState<ColorSelection[]>([])
+//     // ;const [brambles] = useWilliamTate();
+//     const [someDafadilTypeShiz] = ['#eea']
+//
+//     useEffect(() => {
+//         new SettingsService().getCurrentSettings().then(settings => {
+//             const selection = ForThoustPanel(document, settings.wave.selector || "", selectorHierarchyService);
+//             const activePanels = [...selection.htmlSelectors.values()].flatMap(s => {
+//                 return s.selector.elem.map(e => new ColorSelectorPanel( e, s.color.toHexString() ));
+//             })
+//             setDimmedPanels([...selectorHierarchyService.getDimmedPanelSelectors(document, activePanels.map(s => s.element)).htmlSelectors.values()]);
+//             setActiveSelectorColorPanels(activePanels)
+//         })
+//     }, [])
+//
+//     return (
+//         <div>
+//             {/*{// todo: change the font and color } */}
+//             {dimmedPanels.map((panel: ColorSelection) => {
+//                 panel.selector.elem.forEach((element: HtmlElement) => {
+//                     return <Panel color={panel.color.toHexString()} element={element}></Panel>
+//                 })
+//             })}
+//
+//             {activeSelectorColorPanels.map((panel: ColorSelectorPanel) => {
+//                 return <Panel color={panel.color} element={panel.element}></Panel>
+//             })}
+//             {/* maybe maybe maybe
+//             maaaaaayyyyybee some day we'll
+//             seeee essss veee gheee
+//             gheee'
+//             gheee
+//             ghee-e-e ...,,,---~~~````~~~~----````____`````---
+//             pixels, pixels sometimes changes
+//             full screen scrolling device independent pixels threw
+//             many software engineers for a loop,
+//             em and rem providing a bastion,
+//             but for too many deviceRatio is a weird concept
+//             and we struggle randomly scoping hard coded values
+//             or disappearing into vaults to learn the secrets of the HTML/svg specification and how to use the viewport.
+//
+//             You are a lone self educator, in a loan filled wasteland of dread and pixel conversions,
+//             will you embrace your change of basis? Will you end the suffering of the pixelated wastes in your mind?
+//             Or will you simply set everything to pixels like i did, and hope rem works well enough?
+//
+//             // todo: hookup svg panels and make sure to validate deviceRatio and viewport usage for perfect screen fit,
+//             // todo:   if possible
+//
+//             // todo: start, stop, choose, add panel, remove panel
+//             */}
+//             <svg>
+//             <Cover>
+//                 <Mask></Mask>
+//             </Cover>
+//             </svg>
+//             {/* [...maybe, maybe, maybe] */}
+//         </div>
+//     )
+// }
+
+
+const findAllWithText = (currentSelector: string | undefined): HtmlElement[] => {
+    // todo: implement!
+    throw new Error("TODO: Implement!")
+    return []
+};
+const hookTextualElements = (allWithText: HtmlElement[], hook: (elem: HtmlElement) => void) => {
+    // todo: implement!
+    throw new Error("TODO: Implement!")
+};
+
+interface SelectedExampleEventContainerProps {
+    onClick?: (elem: HtmlElement) => void
 }
 
-interface ColorSelectorPanelInterface {
-    element: HtmlElement;
-    color: Hex; //color.toHexString() from tinycolor.Instance;
-}
-
-type Hex = string;
-class ColorSelectorPanel implements ColorSelectorPanelInterface {
-    element: HtmlElement;
-    color: Hex; //color.toHexString() from tinycolor.Instance;
-
-    constructor(element: HtmlElement, color: Hex) {
-        this.element = element;
-        this.color = color;
-    }
-}
-
-const Panel = styled.div<ColorSelectorPanel>`
-  background-color: ${({color}) => color};
-  left: ${(props: ColorSelectorPanel) => props.element.style.left};
-  top: ${(props: ColorSelectorPanel) => props.element.style.top};
-  width: ${(props: ColorSelectorPanel) => props.element.style.width};
-  height: ${(props: ColorSelectorPanel) => props.element.style.height};
-` as StyledComponent<"div", any, ColorSelectorPanel, never>
-
+const SelectedExampleEventContainer = styled.div<SelectedExampleEventContainerProps>``;
+const SelectedExample = styled.div`
+    pointer-events: none;
+`;
+// TextOnlyBackgroundColorCssHierarchySelectorComponent  -c- !
 const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentProps> = ({
-    selectorHierarchyService = new SelectorHierarchy({ } as unknown as ColorGeneratorServiceInterface),
-    currentSelector,
-    onConfirmSelector
-}) => {
-    const [activeSelectorPanel, setActiveSelectorPanel] = useState(undefined);
-    const [selector, setSelector] = useState(currentSelector);
-    const [activeSelectorColorPanels, setActiveSelectorColorPanels] = useState<ColorSelectorPanel[]>([])
-    const [htmlHierarchy, setHtmlHierarchyRoot] = useState(document);
-    const [dimmedPanels, setDimmedPanels] = useState<ColorSelection[]>([])
-    // ;const [brambles] = useWilliamTate();
-    const [someDafadilTypeShiz] = ['#eea']
+      selectorHierarchyService = new SelectorHierarchy({} as unknown as ColorGeneratorServiceInterface),
+      currentSelector,
+      onConfirmSelector,
+      cleanCssCallback = (cleanCss) => {
+      }
+}: Partial<HierarchySelectorComponentProps>) => {
+    // select and change any text into highlighted region
+    // clicking chooses all similar classes
+    // initially choose selected list from top groupby (associate map and keep one, like a zip set or something)
+    // click to remove selected class names from selector
+    // todo: write tests
+    // todo: shift click adds one individual
+    const [selected, setSelected] = useState<Map<string, HtmlElement>>(new Map<string, HtmlElement>([]));
+    const [allWithText, setAllWithText] = useState([]);
+    const [selector, setSelector] = useState(currentSelector || "");
+    const removeFromSelected = (elem: HtmlElement) => {
+        selected.delete([...(selected?.entries() || [])].find(e => e[1] === elem)[0])
+        setSelected(selected); // feels a little pedantic but we want to update
+    }
+
+    function getSelected(selector?: string) {
+        const allWithText: HtmlElement[] =
+            findAllWithText(selector || currentSelector)
+                .concat([...(selected?.values() || [])]);
+
+        // the Map type is a lie, we only produce 1:1 string->HtmlElement in the set
+        const selected = new Map<string, HtmlElement>(
+            [...allWithText.reduce((map, elem) => {
+                elem.classList.forEach((name) => {
+                    if (!map[name.toLowerCase().trim()]) {
+                        map.set(name, [elem])
+                    } else {
+                        // if we have duplicate class name examples from the same element, replace them with new ones
+                        // todo: review: should this be an option?
+
+                        if (map[name].any(e => e === map[name][0] && e !== elem)) {
+                            map.set(name, [elem]);
+                        } else {
+                            map[name].push(elem)
+                        }
+                    }
+                })
+                return map;
+            }, new Map<string, HtmlElement[]>())
+                .entries()]
+                .map(e => [e[0], e[1][1]])
+        )
+
+        return {
+            allWithText,
+            selected
+        };
+    }
+
+    const CSS_CLASS_NAME = "WAVE_READER--selected-css"
+    const cleanCss = () => {
+        document.querySelectorAll(`.${CSS_CLASS_NAME}`).forEach(elem => elem.classList.remove(CSS_CLASS_NAME));
+    }
+    if (cleanCssCallback) {
+        cleanCssCallback(cleanCss)
+    }
+
+    const applyCss = (allWithText: HtmlElement[], selected: Map<string, HTMLElement>) => {
+        // todo: port color selection?
+        allWithText.forEach(e => e.classList.add(CSS_CLASS_NAME))
+    };
+
+    const updateSelected = () => {
+        const {allWithText, selected} = getSelected(selector);
+        setAllWithText(allWithText)
+        setSelected(selected)
+        applyCss(allWithText, selected)
+    }
+    updateSelected();
+
+    const hook = (elem: HtmlElement) => {
+        // todo: review: are classnames case sen-sa-tive?
+        // todo: probably a nice groupby would make this more readable
+
+        // the element we click does not exist in the selection by classname
+        const newSelection = [...selected.keys()].map(className => className.toLowerCase().trim())
+            .filter(className =>
+                ![...elem.classList].map(cn => cn.toLowerCase().trim())
+                    .some(cn => cn === className)
+            );
+
+        if (newSelection.length > 0) {
+            // [...elem.classList].find(className => newSelection.indexOf(className.toLowerCase().trim()) > -1)
+            selected.set(newSelection[0], elem);
+        }
+        updateSelected()
+    }
+    const eventHooksOnClick = hookTextualElements(allWithText, hook);
 
     useEffect(() => {
         new SettingsService().getCurrentSettings().then(settings => {
-            const selection = ForThoustPanel(document, settings.wave.selector || "", selectorHierarchyService);
-            const activePanels = [...selection.htmlSelectors.values()].flatMap(s => {
-                return s.selector.elem.map(e => new ColorSelectorPanel( e, s.color.toHexString() ));
-            })
-            setDimmedPanels([...selectorHierarchyService.getDimmedPanelSelectors(document, activePanels.map(s => s.element)).htmlSelectors.values()]);
-            setActiveSelectorColorPanels(activePanels)
+            updateSelected()
         })
-    }, [])
+    })
 
-    return (
-        <div>
-            {dimmedPanels.map((panel: ColorSelection) => {
-                panel.selector.elem.forEach((element: HtmlElement) => {
-                    return <Panel color={panel.color.toHexString()} element={element}></Panel>
-                })
+    return <div>
+        <ul>
+            {[...selected.entries()].map((entry: [string, HtmlElement]) => {
+                return <li>
+                    <SelectedExampleEventContainer onClick={removeFromSelected}>
+                        <b>{entry[0]}</b>
+                        <SelectedExample>
+                            {entry[1]}
+                        </SelectedExample>
+                    </SelectedExampleEventContainer>
+                </li>
             })}
-
-            {activeSelectorColorPanels.map((panel: ColorSelectorPanel) => {
-                return <Panel color={panel.color} element={panel.element}></Panel>
-            })}
-            {/* maybe maybe maybe
-            maaaaaayyyyybee some day we'll
-            seeee essss veee gheee
-            gheee'
-            gheee
-            ghee-e-e ...,,,---~~~````~~~~----````____`````---
-            pixels, pixels sometimes changes
-            full screen scrolling device independent pixels threw
-            many software engineers for a loop,
-            em and rem providing a bastion,
-            but for too many deviceRatio is a weird concept
-            and we struggle randomly scoping hard coded values
-            or disappearing into vaults to learn the secrets of the HTML/svg specification and how to use the viewport.
-
-            You are a lone self educator, in a loan filled wasteland of dread and pixel conversions,
-            will you embrace your change of basis? Will you end the suffering of the pixelated wastes in your mind?
-            Or will you simply set everything to pixels like i did, and hope rem works well enough?
-
-            // todo: hookup svg panels and make sure to validate deviceRatio and viewport usage for perfect screen fit,
-            // todo:   if possible
-
-            // todo: start, stop, choose, add panel, remove panel
-            */}
-            <svg>
-            <Cover>
-                <Mask></Mask>
-            </Cover>
-            </svg>
-            {/* [...maybe, maybe, maybe] */}
-        </div>
-    )
+        </ul>
+    </div>
 }
 
 export default HierarchySelectorComponent;
