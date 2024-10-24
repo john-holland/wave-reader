@@ -119,7 +119,7 @@ function StateNameMap(map = new Map()) {
             going = true;
             initializeOrUpdateToggleObserver(message);
             return map.get('waving')
-            }, false),
+        }, false),
         "stop": CState("stop", StopVentures, false, (message, state, previousState) => {
             unloadCSS()
             going = false;
