@@ -23,7 +23,7 @@ const config = {
         filename: "[name].js"
     },
     resolve: {
-        extensions: [".tsx", ".ts", ".js", ".jsx", "*"],
+        extensions: [".tsx", ".ts", ".js", ".jsx", ".*"],
         alias: {
             config: path.join(__dirname, "./src/config/config.common.js")
         }
