@@ -31,6 +31,14 @@ const SelectorHierarchyMount = styled.div`
   top: 0;
   width: 100%;
   height: ${(props: SelectorHierarchyMountProps) => props.doc.documentElement.scrollHeight} px;
+  
+  .selector-hierarchy-mount-container {
+    display: inline-block; 
+    margin: 0;
+    padding: 0; 
+    width: 100%; 
+    height: 100%;
+  }
 `
 
 const SelectorButton = styled(Button)`
@@ -241,65 +249,67 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
 
     return (
         <SelectorHierarchyMount doc={doc} visible={!confirmed}>
-            {activeSelectorColorPanels.length}<span className={"floating-shelf"}>{selector}</span>
-            <input type={"button"} value={"confirm"} onClick={() => confirmSelector(selector)} />
-            {dimmedPanels.map((panel: ColorSelection, i: number) => {
-                return panel.selector.elem.forEach((element: HtmlElement) => {
-                    return <Panel className={"panel-decorator"} color={panel.color.toHexString()} element={element} key={i}>
-                        <SelectorButton key={'+'+i} style={{
-                            backgroundColor: "#333",
-                            color: "#eee"
-                        }} onClick={(e) => {
-                            addPanelIslandClicked.call(this, element)
-                        }}>+</SelectorButton>
+            <div className={"selector-hierarchy-mount-container"}>
+                {activeSelectorColorPanels.length}<span className={"floating-shelf"}>{selector}</span>
+                <input type={"button"} value={"confirm"} onClick={() => confirmSelector(selector)} />
+                {dimmedPanels.map((panel: ColorSelection, i: number) => {
+                    return panel.selector.elem.forEach((element: HtmlElement) => {
+                        return <Panel className={"panel-decorator"} color={panel.color.toHexString()} element={element} key={i}>
+                            <SelectorButton key={'+'+i} style={{
+                                backgroundColor: "#333",
+                                color: "#eee"
+                            }} onClick={(e) => {
+                                addPanelIslandClicked.call(this, element)
+                            }}>+</SelectorButton>
+                        </Panel>
+                    })
+                })}
+
+                {activeSelectorColorPanels.flatMap((panel: ColorSelectorPanel, i: number) => {
+                    return <Panel className={"panel-decorator"} color={panel.color} element={panel.element}  key={i}
+                        style={{
+                            left: `${SizeFunctions.calcLeft(panel.element)}px !important`,
+                            top: `${SizeFunctions.calcTop(panel.element)}px !important`,
+                            width: `${SizeFunctions.calcSize(panel.element, panel.element?.style?.width, SizeProperties.WIDTH)}px !important`,
+                            height: `${SizeFunctions.calcSize(panel.element, panel.element?.style?.height, SizeProperties.HEIGHT)}px !important`
+                        }}
+                    >
+                        {/* maybe hypertext or something? */}
+                        <SelectorButton key={'-'+i} onClick={(e) => {
+                            removePanelIslandClicked.call(this, panel.element)
+                        }}>-</SelectorButton>
                     </Panel>
-                })
-            })}
+                })}
+                {/* maybe maybe maybe
+                maaaaaayyyyybee some day we'll
+                seeee essss veee gheee
+                gheee'
+                gheee
+                ghee-e-e ...,,,---~~~````~~~~----````____`````---
+                pixels, pixels sometimes changes
+                full screen scrolling device independent pixels threw
+                many software engineers for a loop,
+                em and rem providing a bastion,
+                but for too many deviceRatio is a weird concept
+                and we struggle randomly scoping hard coded values
+                or disappearing into vaults to learn the secrets of the HTML/svg specification and how to use the viewport.
 
-            {activeSelectorColorPanels.flatMap((panel: ColorSelectorPanel, i: number) => {
-                return <Panel className={"panel-decorator"} color={panel.color} element={panel.element}  key={i}
-                    style={{
-                        left: `${SizeFunctions.calcLeft(panel.element)}px !important`,
-                        top: `${SizeFunctions.calcTop(panel.element)}px !important`,
-                        width: `${SizeFunctions.calcSize(panel.element, panel.element?.style?.width, SizeProperties.WIDTH)}px !important`,
-                        height: `${SizeFunctions.calcSize(panel.element, panel.element?.style?.height, SizeProperties.HEIGHT)}px !important`
-                    }}
-                >
-                    {/* maybe hypertext or something? */}
-                    <SelectorButton key={'-'+i} onClick={(e) => {
-                        removePanelIslandClicked.call(this, panel.element)
-                    }}>-</SelectorButton>
-                </Panel>
-            })}
-            {/* maybe maybe maybe
-            maaaaaayyyyybee some day we'll
-            seeee essss veee gheee
-            gheee'
-            gheee
-            ghee-e-e ...,,,---~~~````~~~~----````____`````---
-            pixels, pixels sometimes changes
-            full screen scrolling device independent pixels threw
-            many software engineers for a loop,
-            em and rem providing a bastion,
-            but for too many deviceRatio is a weird concept
-            and we struggle randomly scoping hard coded values
-            or disappearing into vaults to learn the secrets of the HTML/svg specification and how to use the viewport.
+                You are a lone self educator, in a loan filled wasteland of dread and pixel conversions,
+                will you embrace your change of basis? Will you end the suffering of the pixelated wastes in your mind?
+                Or will you simply set everything to pixels like i did, and hope rem works well enough?
 
-            You are a lone self educator, in a loan filled wasteland of dread and pixel conversions,
-            will you embrace your change of basis? Will you end the suffering of the pixelated wastes in your mind?
-            Or will you simply set everything to pixels like i did, and hope rem works well enough?
+                // todo: hookup svg panels and make sure to validate deviceRatio and viewport usage for perfect screen fit,
+                // todo:   if possible
 
-            // todo: hookup svg panels and make sure to validate deviceRatio and viewport usage for perfect screen fit,
-            // todo:   if possible
-
-            // todo: start, stop, choose, add panel, remove panel
-            */}
-            {/*<svg>*/}
-            {/*<Cover>*/}
-            {/*    <Mask></Mask>*/}
-            {/*</Cover>*/}
-            {/*</svg>*/}
-            {/* [...maybe, maybe, maybe] */}
+                // todo: start, stop, choose, add panel, remove panel
+                */}
+                {/*<svg>*/}
+                {/*<Cover>*/}
+                {/*    <Mask></Mask>*/}
+                {/*</Cover>*/}
+                {/*</svg>*/}
+                {/* [...maybe, maybe, maybe] */}
+            </div>
         </SelectorHierarchyMount>
     )
 }
