@@ -44,7 +44,7 @@ const WaveTypography = styled.h2`
 `;
 
 type WaveProps = {
-    children?: ReactNode
+    children?: ReactNode | any
 }
 
 /* eslint-disable  @typescript-eslint/no-unused-vars */

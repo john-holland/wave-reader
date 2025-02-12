@@ -8,6 +8,14 @@
 import p, { guardLastError } from "../src/util/util";
 import StartMessage from "../src/models/messages/start";
 
+import { clientForLocation } from "./config/robotcopy";
+import { ClientLocation } from "./util/state-machine";
+
+const BackgroundClient = clientForLocation(ClientLocation.BACKGROUND)
+const APIClient = clientForLocation(ClientLocation.API)
+const AuthClient = clientForLocation(ClientLocation.AUTH)
+
+
 const currentTab = () => {
     return new Promise((resolve, reject) => {
         chrome.tabs.query({active: true, currentWindow: true}).then((tabs) => {

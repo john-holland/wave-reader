@@ -1,5 +1,11 @@
 import "jest";
-import StateMachine from "../../../src/util/state-machine";
+import StateMachine, {
+    Client,
+    ClientDiscovery,
+    ClientHost, ClientID, ClientLocation, ClientMessage, GoogleChromeRuntimeProxy, GoogleClientMessengerService,
+    IClientMessengerService,
+    IRuntimeProxy, Success
+} from "../../../src/util/state-machine";
 import {State, CState, NameAccessMapInterface, Named, StateNames} from "../../../src/util/state"
 
 import {
@@ -10,6 +16,17 @@ import {
     Base
 } from "../../../src/util/venture-states";
 import UpdateWaveMessage from "../../../src/models/messages/update-wave";
+import {Context, Dispatch, FunctionComponent, ReactElement, SetStateAction, useEffect, useState} from "react";
+import SelectorHierarchy, {HierarchySelectorComponentProps} from "../../../src/components/selector-hierarchy";
+import React from "react";
+import Message from "../../../src/models/message";
+import {Observable, Subscriber} from "rxjs";
+import {fromMessage} from "../../../src/util/messages";
+import Wave from "../../../src/models/wave";
+import MessageSender = chrome.runtime.MessageSender;
+import Options from "../../../src/models/options";
+import {log, ComponentLog, MachineComponentProps, ReactMachine, UseStateProxy} from "../../../src/util/react-machine";
+
 
 const BaseVentures = ["base", "error"]
 
@@ -32,39 +49,39 @@ const StateNameMap = (map: Map<string, State> = new Map<string, State>()): NameA
 
         // base defined above
         "waving": CState("waving", WavingVentures, false),
-        "error": CState("error", AllVentures, true, (message: Named, state: State, previousState: State): State | undefined => {
+        "error": CState("error", AllVentures, true, async (message: Named, state: State, previousState: State): Promise<State | undefined> => {
             console.log("transitioning from error to base state from " + previousState.name)
             return map.get('base') as State
         }),
-        "start": CState("start", StartVentures, false, (message: Named, state: State, previousState: State): State | undefined => {
+        "start": CState("start", StartVentures, false, async (message: Named, state: State, previousState: State): Promise<State | undefined> => {
             return map.get('waving') as State
         }),
-        "stop": CState("stop", StopVentures, false, (message: Named, state: State, previousState: State): State | undefined => {
+        "stop": CState("stop", StopVentures, false, async (message: Named, state: State, previousState: State): Promise<State | undefined> => {
             return map.get('base') as State
         }),
-        "update": CState("update", BaseVentures, true, (message: Named, state: State, previousState: State): State | undefined => {
+        "update": CState("update", BaseVentures, true, async (message: Named, state: State, previousState: State): Promise<State | undefined> => {
             return previousState
         }),
-        "toggle start": CState("toggle start", StartVentures, false, (message: Named, state: State, previousState: State): State | undefined => {
+        "toggle start": CState("toggle start", StartVentures, false, async (message: Named, state: State, previousState: State): Promise<State | undefined> => {
             return map.get('waving') as State
         }),
-        "toggle stop": CState("toggle stop", StopVentures, false, (message: Named, state: State, previousState: State): State | undefined => {
+        "toggle stop": CState("toggle stop", StopVentures, false, async (message: Named, state: State, previousState: State): Promise<State | undefined> => {
             return map.get('base') as State
         }),
-        "start mouse": CState("start mouse", StartVentures, false, (message: Named, state: State, previousState: State): State | undefined => {
+        "start mouse": CState("start mouse", StartVentures, false, async (message: Named, state: State, previousState: State): Promise<State | undefined> => {
             return map.get('waving') as State
         }),
-        "stop mouse": CState("stop mouse", StopVentures, false, (message: Named, state: State, previousState: State): State | undefined => {
+        "stop mouse": CState("stop mouse", StopVentures, false, async (message: Named, state: State, previousState: State): Promise<State | undefined> => {
             return map.get('base') as State
         }),
-        "selection mode activate": CState("selection mode activate", ["selection mode deactivate", "selection made"], false, (message: Named, state: State, previousState: State): State | undefined => {
+        "selection mode activate": CState("selection mode activate", ["selection mode deactivate", "selection made"], false, async (message: Named, state: State, previousState: State): Promise<State | undefined> => {
             return map.get('selection mode') as State
         }),
         "selection mode": CState("selection mode", ["selection mode activate", "selection mode", "selection made", "selection mode deactivate"], false),
-        "selection made": CState("selection made", BaseVentures, false, (message: Named, state: State, previousState: State): State | undefined => {
+        "selection made": CState("selection made", BaseVentures, false, async (message: Named, state: State, previousState: State): Promise<State | undefined> => {
             return map.get('base') as State
         }),
-        "selection mode deactivate": CState("selection mode deactivate", [], false, (message: Named, state: State, previousState: State): State | undefined => {
+        "selection mode deactivate": CState("selection mode deactivate", [], false, async (message: Named, state: State, previousState: State): Promise<State | undefined> => {
             return map.get('base') as State
         })
     }
@@ -107,7 +124,7 @@ describe("state machine", () => {
         if (message.options) message.options.wave.text.color = "test green";
         const map = new Map()
         map.set("message-test", CState("message-test", BaseVentures, true,
-            (message: Named, state: State, previousState: State): State | undefined => {
+            async (message: Named, state: State, previousState: State): Promise<State | undefined> => {
                 const convertedMessage = (message as unknown as UpdateWaveMessage);
                 expect(convertedMessage?.options?.wave.text.color).toBe("test green");
                 return undefined
@@ -167,6 +184,70 @@ describe("state machine", () => {
         expect((await stateMachine.handleState(stateNameMap.getState("selection mode deactivate")!!))?.name).toBe("base");
     })
 
+
+
+    class TestRuntimeProxy implements IRuntimeProxy {
+        public reponses: any[] = []
+        public messagesSentToRunTime: any[] = []
+        public messagesSendToTab: any[] = []
+
+        onInstalled(callback: { (details: any): void }): void {
+            callback(true)
+        }
+
+        onMessage(callback: { (message: any, sender: chrome.runtime.MessageSender, sendResponse: { (response?: any): void }): void }): void {
+            callback(new UpdateWaveMessage({ options: new Options({}) }), { id: "unknown"} as unknown as MessageSender, (response) => {this.reponses.push(response)})
+        }
+
+        sendMessageToRuntime(message: any, callback: { (response: any): void }): void {
+            this.messagesSentToRunTime.push(message)
+            callback(true);
+        }
+
+        sendMessageToTab(tabId: number, message: any, callback: { (response: any): void }): void {
+            this.messagesSendToTab.push(message)
+            callback(true);
+        }
+
+    }
+
+    test("selection mode deactivate moves to base state", async () => {
+        const {stateMachine, stateNameMap} = newStateMachine(StateNameMap(new Map()), "selection mode");
+
+        const client = new Client<Message<any>>(new GoogleClientMessengerService(
+            {
+                from: ClientLocation.POPUP,
+                to: ClientLocation.CONTENT
+            },
+            new Map<string, IClientMessengerService<Message<any>>>(),
+            new TestRuntimeProxy()))
+        const useStateProxy = new UseStateProxy(null);
+        const componentMachine = ReactMachine({
+            initialState: "base",
+            client,
+            states: {
+                base: async ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+                    const [test, setTest] = state?.useState("test", false) || [undefined, undefined]
+                    // todo: review: replace log and view with a deconstructor like useState and useReducer?
+                    return Promise.resolve(log("base", <div/>));
+                },
+                complex: async ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+                    // todo: implement as api client with settings mock and run test
+                    const saved = await client.sendMessage(new ClientMessage("app/settings", "save", new UpdateWaveMessage({ options: new Options() })))
+                    return Promise.resolve(log("base", <div>{saved}</div>));
+                },
+            }
+        })
+
+        // json react tree matching for output
+        componentMachine.initialize();
+        expect(componentMachine.getRenderTarget()).toBeTruthy()
+    })
+
+    test("multiple content clients per background client", () => {
+        throw new Error("todo: dooo")
+    })
+
     test("observe state change", async () => {
         const {stateMachine, stateNameMap} = newStateMachine(StateNameMap(new Map()), "selection mode");
         let changeCount = 0;
@@ -179,5 +260,69 @@ describe("state machine", () => {
         expect(changedToState[0]!!.name).toBe("selection mode deactivate")
         expect(changedToState[1]!!.name).toBe("base")
         expect(changeCount).toBe(2)
+    })
+
+    test("bootstrap sends wakeup message and receives id and map for initialize", () => {
+
+        const client = new Client<Message<any>>(new GoogleClientMessengerService(
+            {
+                from: ClientLocation.CONTENT,
+                to: ClientLocation.POPUP
+            },
+            new Map<string, IClientMessengerService<Message<any>>>(),
+            new TestRuntimeProxy()))
+        const useStateProxy = new UseStateProxy(null);
+        const componentMachine = ReactMachine({
+            initialState: "base",
+            client,
+            states: {
+                base: async ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+                    const [test, setTest] = state?.useState("test", false) || [undefined, undefined]
+                    // todo: review: replace log and view with a deconstructor like useState and useReducer?
+                    return Promise.resolve(log("base", <div/>));
+                },
+                complex: async ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+                    // todo: implement as api client with settings mock and run test
+                    const saved = await client.sendMessage(new ClientMessage("app/settings", "save", new UpdateWaveMessage({ options: new Options() })))
+                    return Promise.resolve(log("base", <div>{saved}</div>));
+                },
+            }
+        })
+
+        // json react tree matching for output
+        componentMachine.initialize();
+        expect(componentMachine.getRenderTarget()).toBeTruthy()
+    })
+
+    test("receives wakeup message and sends updated map back for initialization", () => {
+
+        const client = new Client<Message<any>>(new GoogleClientMessengerService(
+            {
+                from: ClientLocation.POPUP,
+                to: ClientLocation.CONTENT
+            },
+            new Map<string, IClientMessengerService<Message<any>>>(),
+            new TestRuntimeProxy()))
+        const useStateProxy = new UseStateProxy(null);
+        const componentMachine = ReactMachine({
+            initialState: "base",
+            client,
+            states: {
+                base: async ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+                    const [test, setTest] = state?.useState("test", false) || [undefined, undefined]
+                    // todo: review: replace log and view with a deconstructor like useState and useReducer?
+                    return Promise.resolve(log("base", <div/>));
+                },
+                complex: async ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
+                    // todo: implement as api client with settings mock and run test
+                    const saved = await client.sendMessage(new ClientMessage("app/settings", "save", new UpdateWaveMessage({ options: new Options() })))
+                    return Promise.resolve(log("base", <div>{saved}</div>));
+                },
+            }
+        })
+
+        // json react tree matching for output
+        componentMachine.initialize();
+        expect(componentMachine.getRenderTarget()).toBeTruthy()
     })
 })

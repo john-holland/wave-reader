@@ -27,37 +27,20 @@ import SettingsService from "./services/settings";
 //import SelectorService from "./services/selector";
 import {Observer} from "rxjs";
 import RemoveSelectorMessage from "./models/messages/remove-selector";
+import StartSelectorChooseMessage from "./models/messages/start-selection-choose";
+import {SelectorsDefaultFactory} from "./models/defaults";
+import stateMachine from "./util/state-machine";
+import {Selector} from "./services/selector-hierarchy";
+import SelectionModeActivateMessage from "./models/messages/selection-mode-activate";
+import SelectionModeDeactivateMessage from "./models/messages/selection-mode-deactivate";
+import EndSelectorChooseMessage from "./models/messages/end-selection-choose";
+import AddSelectorMessage from "./models/messages/add-selector";
+import SelectionMadeMessage from "./models/messages/selection-made";
 
-//todo:
-// * Material UI
-// * Controls: read speed, reset speed, rotation angle, wave width, read duration
-// * save selector and settings with chrome sync
-// * keyboard shortcut toggle
-// * mouse movement
-// * audio from the ocean or the highway, coffee shop, or white or brown noise
-// * education ([Orton Gillingham](https://en.wikipedia.org/wiki/Orton-Gillingham) &
-//              [Phonics](https://en.wikipedia.org/wiki/Phonics)) & about page
-// * support for right to left, top to bottom etc, perhaps a "direction" option as a toggle switch in the settings menu?
-// * maybe a 3d swirl wave for the F-shaped pattern readers?
-//      https://www.nngroup.com/articles/f-shaped-pattern-reading-web-content/
-//      https://en.wikipedia.org/wiki/Screen_reading
-// * a css animation stop per row on the active viewport could be cool and would support the layer cake pattern if
-//     we added stops at each horizontal
-//     or possibly add a F-shaped layer cake swirl that would 3d swirl each layer cake section as a hybrid?
-//         https://www.nngroup.com/articles/layer-cake-pattern-scanning/
-// * add an "advanced settings" option (that saves), to show the css, and default false
-// * think about the implications of your brain recognizing what it's holding by motion of your hands?
-//   * camera input ML (machine learning) for holding your hands in front of the screen, and interpreting the motion of the ocean
-//      and possibly scrolling the page by pawing or turning the page
-//
-//todo,ne:
-// * NOTE: popup, chrome.runtime.sendMessage -> background, chrome.tabs.query...sendMessage -> content
-// * NOTE: content, chrome.runtime.sendMessage -> background, chrome.runtime.sendMessage -> popup
-// * use BootstrapMessage to get the chrome.storage.local `waving` parameter, and use that as `going`
-// * scss, styled components
-// * typescript, functional component style
+import { clientForLocation } from "./config/robotcopy";
+import { ClientLocation } from "./util/state-machine";
 
-// https://medium.com/@seanlumjy/build-a-chrome-extension-that-injects-css-into-your-favourite-website-9b65f722f409
+const PopupClient = clientForLocation(ClientLocation.POPUP)
 
 const WaveReader = styled.div`
   width: 800px;
@@ -211,7 +194,7 @@ export const AppStates = ({
     /* eslint-disable  @typescript-eslint/no-unused-vars */
     const states: StateNames = {
         "base": CState("base", ["base", "bootstrap", "settings updated"], true, () => {
-            return machine?.getState("base")
+            return Promise.resolve(machine?.getState("base"))
         }),
         "bootstrap": CState("bootstrap", ["base"], true, async (message, state, previousState): Promise<State> => {
             if (!bootstrapLock.getSet()) {
@@ -258,41 +241,50 @@ export const AppStates = ({
             return previousState
         }),
         // selector selection mode
-        "selection mode activate": CState("selection mode activate", ["selection mode active"], true, (message, state, previousState) => {
-            return machine?.getState("selection mode active")
+        "selection mode activate": CState("selection mode activate", ["selection mode active"], true, async (message, state, previousState): Promise<State> => {
+            //setSettingsEnabled(false);
+            chrome.runtime.sendMessage(new StartSelectorChooseMessage({
+                selector: (await settingsService?.getCurrentSettings())?.wave?.selector || SelectorsDefaultFactory()[0]
+            }))
+            return Promise.resolve(machine?.getState("selection mode active") as State)
         }),
-        "selection mode active": CState("selection mode active", ["selection made", "selection error report", "settings updated"], false, (message, state, previousState) => {
+        "selection mode deactivate": CState("selection mode activate", ["selection mode active"], true, async (message, state, previousState): Promise<State> => {
+            //setSettingsEnabled(false);
+            chrome.runtime.sendMessage(new EndSelectorChooseMessage())
+            return Promise.resolve(machine?.getState("selection mode active") as State)
+        }),
+        "selection mode active": CState("selection mode active", ["selection made", "selection error report", "settings updated"], false, (message, state, previousState): Promise<State> => {
             //  (disable settings tab)
-            return machine?.getState("selection mode active")
+            return Promise.resolve(machine?.getState("selection mode active")!)
 
             // return states.get("selection made (enable settings tab)")
         }),
-        "selection made (enable settings tab)": CState("selection made (enable settings tab)", ["base"], false, (message, state, previousState) => {
-            return machine?.getState("base")
+        "selection made": CState("selection made (enable settings tab)", ["base"], false, (message, state, previousState): Promise<State> => {
+            //setSettingsEnabled(true);
+            machine?.handleState(new AddSelectorMessage({ selector: (message as SelectionMadeMessage)?.selector}))
+            return Promise.resolve(machine?.getState("base")!)
         }),
         "selection error report (user error, set red selection error note, revert to previous selector)": CState("selection error report (user error, set red selection error note, revert to previous selector)", ["base"], false, (message, state, previousState) => {
             // todo: maybe this isn't necessary -- it would be neat to have super states so the
             //   dependent state machines could know when not to be active
-            return machine?.getState("selection mode active")
+            return Promise.resolve(machine?.getState("selection mode active"))
         }),
         // selectors!
-        // add
-        "start add selector": CState("start add selector", ["add selector", "cancel add selector"], false, (message, state, previousState) => {
-            // TODO✅(see settings-hierarchy.tsx): need a selector choose drop down component
-            return machine?.getState("add selector")
-        }),
-        "add selector": CState("add selector", ["base"], false, (message, state, previousState) => {
+        "add selector": CState("add selector", ["base"], true, (message, state, previousState): Promise<State> => {
                 // selectorUpdated(message)
-            return machine?.getState("base")
-        }),
-        "cancel add selector": CState("cancel add selector", ["base"], false, (message, state, previousState) => {
-            return machine?.getState("base")
+            settingsService?.updateCurrentSettings((options) => {
+                options.wave.selector = (message as SelectorUpdated).selector as string || options.wave.selector;
+                options.selectors.push((message as SelectorUpdated).selector as string)
+                options.wave.update();
+                return options;
+            })
+            return Promise.resolve(previousState)
         }),
         // remove
-        "remove selector": CState("remove selector", ["confirm remove selector", "cancel remove selector"], false, (message, state, previousState) => {
-            return machine?.getState("confirm remove selector")
+        "remove selector": CState("remove selector", ["confirm remove selector", "cancel remove selector"], false, (message, state, previousState): Promise<State> => {
+            return Promise.resolve(machine?.getState("confirm remove selector")!)
         }),
-        "confirm remove selector": CState("confirm remove selector", ["base"], false, (message, state, previousState) => {
+        "confirm remove selector": CState("confirm remove selector", ["base"], false, (message, state, previousState): Promise<State> => {
             if (window.confirm("Are you sure you wish to remove this selector?")) {
                 settingsService?.updateCurrentSettings(options => {
                     const remove = (message as RemoveSelectorMessage).selector || '';
@@ -300,23 +292,21 @@ export const AppStates = ({
                     return options;
                 })
             }
-            return machine?.getState("base")
+            return Promise.resolve(machine?.getState("base")!)
         }),
-        "cancel remove selector": CState("cancel remove selector", ["base"], false, (message, state, previousState) => {
-            return machine?.getState("base")}),
         // use
-        "use selector": CState("use selector", ["base"], false, (message, state, previousState) => {
-            return machine?.getState("base")
+        "use selector": CState("use selector", ["base"], false, (message, state, previousState): Promise<State> => {
+            return Promise.resolve(machine?.getState("base")!)
         }),
         // ~~ waves ~~
-        "start waving": CState("start waving", ["base"], true, (message, state, previousState) => {
-            return machine?.getState("waving")
+        "start waving": CState("start waving", ["base"], true, (message, state, previousState): Promise<State> => {
+            return Promise.resolve(machine?.getState("waving")!)
         }),
-        "waving": CState("start waving", ["stop wave", "settings updated"], false, (message, state, previousState) => {
-            return machine?.getState("waving")
+        "waving": CState("start waving", ["stop wave", "settings updated"], false, (message, state, previousState): Promise<State> => {
+            return Promise.resolve(machine?.getState("waving")!)
         }),
-        "stop waving": CState("stop waving", ["base"], false, (message, state, previousState) => {
-            return machine?.getState("base")
+        "stop waving": CState("stop waving", ["base"], false, (message, state, previousState): Promise<State> => {
+            return Promise.resolve(machine?.getState("base")!)
         }),
     };
 
@@ -338,6 +328,8 @@ const App: FunctionComponent = () => {
     const [ options, setOptions ] = useState<Options>(Options.getDefaultOptions());
     const [ domain, setDomain ] = useState<string>("");
     const [ path, setPath ] = useState<string>("");
+    const [ selectors, setSelectors ] = useState<string[]>([]);
+    const [ selectorModeOn, setSelectorModeOn ] = useState<boolean>(false)
 
     const appStateMap = AppStates({
         machine: AppStateMachine,
@@ -355,53 +347,62 @@ const App: FunctionComponent = () => {
             setDomain(domainAndPath.domain);
             setPath(domainAndPath.paths[0])
         })
+
+        settingsService.getCurrentSettings().then(settings => {
+            setSelectors(settings.selectors);
+            setSelector(settings.wave.selector as string);
+        })
     }, []);
 
-    // [sm] start add selector
     const selectorClicked = () => {
         setSaved(false);
     };
 
-    // [sm] add selector
+    const selectorModeClicked = (selectorModeOn: boolean) => {
+        setSelectorModeOn(!selectorModeOn)
+        if (!selectorModeOn) {
+            AppStateMachine.handleState(new SelectionModeActivateMessage())
+        } else {
+            AppStateMachine.handleState(new SelectionModeDeactivateMessage())
+        }
+    }
+
     const onSaved = async (settings: Options) => {
         setSelector(settings.wave.selector as string);
         setSaved(true);
+        // todo what?
         selectorUpdated(new SelectorUpdated({ selector: settings.wave.selector }))
         await AppStateMachine.handleState(new UpdateWaveMessage({
             options: settings
         }))
     };
 
-    // [sm] start waving
+    const selectorUpdated = (message: SelectorUpdated) => {
+        AppStateMachine.handleState(message);
+        setSelector(message.selector || 'p');
+        setSelectors([...new Set(selectors.concat([message.selector as string]))])
+        setSaved(true);
+    }
+
     const onGo = () => {
         setGoing(true);
 
-        newSyncObject<Options>(Options, "options", Options.getDefaultOptions(), (result) => {
-            result.going = true;
-            setSyncObject("options", result)
+        settingsService.updateCurrentSettings((options) => {
+            options.going = true;
+            setSelectors(options.selectors);
             // use workboots and send message with wave params to interpolate css
-            startPageCss(result.wave);
-        });
+            startPageCss(options.wave);
+            return options;
+        })
     }
 
-    // [sm] stop waving
     const onStop = () => {
         setGoing(false);
         stopPageCss();
     }
 
-    // [sm] use selector / add selector
-    const selectorUpdated = (message: SelectorUpdated) => {
-        options.wave.update();
-        setSelector(message.selector || 'p');
-    }
 
-    // [sm] settings update / bootstrap
     useEffect(() => {
-        // TODO✅: this needs a revision to send a start or update message depending on the state of "going" in google sync
-        //          bootstrap condition now sets the state to the last setState or base, and delivers the start stop or update
-        //          per "going" which should provide nice backup measures, however we need to store the last message as a State
-
         //if (configured.mode === "production") {
         if (!isDevelopment) {
             window.onblur = () => {
@@ -422,9 +423,12 @@ const App: FunctionComponent = () => {
                 <SelectorInput
                     tab-name={"Selector"}
                     selector={selector}
+                    selectors={selectors}
                     saved={saved}
                     selectorClicked={selectorClicked}
-                    onSave={async (selector) => selectorUpdated(new SelectorUpdated({ selector }))}>
+                    onSave={async (selector) => selectorUpdated(new SelectorUpdated({ selector }))}
+                    selectorModeClicked={selectorModeClicked}
+                    selectorModeOn={selectorModeOn}>
                 </SelectorInput>
                 <Settings
                     tab-name={"Settings"}

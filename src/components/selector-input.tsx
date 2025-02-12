@@ -1,5 +1,7 @@
 import React, {FunctionComponent, useEffect, useRef, useState} from 'react'; // we need this to make JSX compile
 import styled from 'styled-components';
+import {Autocomplete, Button, TextField} from "@mui/material";
+import {DomainPaths} from "../services/settings";
 
 const SelectorTitle = styled.h3`
     display: inline;
@@ -33,13 +35,25 @@ const ClickableSelectorTextContainer = styled.div`
 // type ClickedCallback = () => void;
 type SelectorProps = {
     selector: string,
+    selectors: string[],
     saved: boolean,
     selectorClicked: () => void,
-    onSave: (selector: string) => void
+    onSave: (selector: string) => void,
+    selectorModeClicked: (selectorModeOn: boolean) => void,
+    selectorModeOn: boolean
 }
 
-const SelectorInput: FunctionComponent<SelectorProps> = ({ selector, saved, selectorClicked, onSave }: SelectorProps) => {
+const SelectorInput: FunctionComponent<SelectorProps> = ({
+    selector,
+    selectors,
+    saved,
+    selectorClicked,
+    onSave,
+    selectorModeClicked,
+    selectorModeOn = false
+}: SelectorProps) => {
     const [ selectorText, setSelectorText ] = useState(selector);
+    const [ displaySelectors, setDisplaySelectors ] = useState([... new Set(selectors)])
 
     const selectorRef = useRef<HTMLInputElement>(null);
 
@@ -57,19 +71,43 @@ const SelectorInput: FunctionComponent<SelectorProps> = ({ selector, saved, sele
 
     const saveClicked = () => {
         if (onSave) {
-          onSave(selectorRef.current?.value || selector);
+            const newSelector = selectorRef.current?.value || selector
+            onSave(newSelector);
+            setDisplaySelectors([... new Set(selectors.concat([newSelector]))])
         }
     };
+
+    const onPathChange = (event: any, newValue: string | null) => {
+        if (newValue) {
+            setSelectorText(newValue);
+            onSave(newValue);
+        }
+    }
+
+    const onSelectorModeClicked = () => {
+        selectorModeClicked(selectorModeOn)
+    }
 
     return (
         <div>
             <SelectorTitle>Text Selector </SelectorTitle>
-            <ClickableSelectorTextContainer onClick={_selectorClicked}>
+            <ClickableSelectorTextContainer data-testid={"clickable-selector-label"} onClick={_selectorClicked}>
                 <SelectorTextDisplay visible={saved}>{ selectorText }</SelectorTextDisplay>
                 <SelectorNote visible={saved}>&nbsp;(click to set selector)</SelectorNote>
             </ClickableSelectorTextContainer>
             <SelectorTextInput visible={!saved} type="text" defaultValue={selectorText} ref={selectorRef} />
             <SaveButton visible={!saved} type="button" value={"Save"} onClick={saveClicked} />
+            <Button onClick={onSelectorModeClicked}>{!selectorModeOn ? "Activate Selector Mode! 🌙" : "Deactivate Selector Mode 🌚"}</Button>
+            <Autocomplete id="selector-dropdown"
+                          className={"item"}
+                          disablePortal
+                          value={selector}
+                          onChange={onPathChange}
+                          options={displaySelectors || []}
+                          sx={{ width: "50%" }}
+                          renderInput={(params) => <TextField {...params} label={selector} />} />
+            {/* todo: a remove button for selectors in this control might be cool */}
+
         </div>
     );
 }
