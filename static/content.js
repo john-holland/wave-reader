@@ -21,8 +21,8 @@ import SelectionModeMessage from "../src/models/messages/selection-mode";
 import {MountOrFindSelectorHierarchyComponent} from "../src/components/selector-hierarchy";
 import {ColorGeneratorService, SelectorHierarchy} from "../src/services/selector-hierarchy";
 import SelectionMadeMessage from "../src/models/messages/selection-made";
-import { clientForLocation } from "./config/robotcopy";
-import { ClientLocation } from "./util/state-machine";
+import { clientForLocation } from "../src/config/robotcopy";
+import { ClientLocation } from "../src/util/state-machine";
 import {ReactMachine} from "../src/util/react-machine";
 
 const ContentClient = clientForLocation(ClientLocation.CONTENT)

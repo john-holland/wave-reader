@@ -284,7 +284,7 @@ export const ReactStateMachineRenderTarget: FunctionComponent<ReactStateMachineR
     </context.Provider>);
 }
 
-export type ReactMachineFunction<TProps = {}> = { (props: TProps): ReactStateMachine<TProps> };
+export type ReactMachineFunction<TProps = any> = { (props: TProps): ReactStateMachine<TProps> };
 // const declaration definition didn't work for generics... :( weird :(
 export function ReactMachine<TProps>(machineProps: ReactStateMachineProps<TProps>): ReactMachineFunction<TProps> {
     return (props: TProps) => new ReactStateMachine<TProps>({ props, ...machineProps } as unknown as ReactStateMachineConstructorProps<TProps>)

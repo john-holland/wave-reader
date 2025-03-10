@@ -8,8 +8,8 @@
 import p, { guardLastError } from "../src/util/util";
 import StartMessage from "../src/models/messages/start";
 
-import { clientForLocation } from "./config/robotcopy";
-import { ClientLocation } from "./util/state-machine";
+import { clientForLocation } from "../src/config/robotcopy";
+import { ClientLocation } from "../src/util/state-machine";
 
 const BackgroundClient = clientForLocation(ClientLocation.BACKGROUND)
 const APIClient = clientForLocation(ClientLocation.API)

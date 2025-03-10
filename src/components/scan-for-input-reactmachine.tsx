@@ -67,7 +67,9 @@ const ClickableScanTextContainer = styled.div`
   display: inline;
 `;
 
-const ScanForInput = styled.div``;
+const ScanForInput = styled.div`
+  background-color: blue
+`;
 
 type EventListener = {(event: KeyboardEvent): void} | undefined;
 
