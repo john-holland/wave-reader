@@ -143,7 +143,6 @@ type WindowLike = Window & typeof globalThis;
 //     removeEventListener: (eventName: string, listener: EventListener) => { console.error("window mock was instantiated during runtime"); }
 // } as unknown as WindowMock;
 const _window = window as unknown as WindowLike
-
 const StateMachineMap = new Map<ActionType, StateMachine>()
 // todo: service discovery for clients to prevent duplication
 const PopupClient = new Client<Message<any>>()

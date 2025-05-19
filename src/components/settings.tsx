@@ -1,8 +1,7 @@
-import { FunctionComponent, useEffect, useState } from "react";
+import React, { FunctionComponent, useEffect, useState } from "react";
 import {WaveAnimationControl, WindowDocumentWidth} from "../models/defaults";
 import Options, {WaveToggleConfig} from "../models/options";
 import Text from "../models/text";
-
 import {
     Autocomplete,
     Button,
@@ -10,12 +9,12 @@ import {
     Checkbox,
     FormControl,
     FormControlLabel,
-    FormLabel, Radio,
+    FormLabel,
+    Radio,
     RadioGroup,
     TextField
 } from "@mui/material";
 import Wave from "../models/wave";
-import * as React from "react";
 import styled from "styled-components";
 import ScanForInputField from "./scan-for-input-field";
 import {KeyChord} from "./util/user-input";
@@ -91,7 +90,7 @@ const eventVal = (fn: {(e: any): void}) =>
  * @param settingsService self described
  * @constructor
  */
-export const Settings: FunctionComponent<SettingsProps> = ({
+export const Settings: React.FunctionComponent<SettingsProps> = ({
     initialSettings,
     onUpdateSettings,
     domain,
@@ -100,34 +99,34 @@ export const Settings: FunctionComponent<SettingsProps> = ({
     settingsService = new SettingsService()
 }: SettingsProps) => {
 
-    const [settings, setSettings] = useState(new Options(initialSettings));
+    const [settings, setSettings] = React.useState(new Options(initialSettings));
     const typedSetSettings = (deltaSettings: Partial<Options> = settings) => setSettings(new Options(deltaSettings));
-    const [saved, setSaved] = useState(true);
+    const [saved, setSaved] = React.useState(true);
 
-    const [domainPaths, setDomainPaths] = useState<DomainPaths[]>([])
-    const [currentPath, setCurrentPath] = useState(path)
-    const [currentDomain, setCurrentDomain] = useState(domain)
-    const [editingDomain, setEditingDomain] = useState(domain)
+    const [domainPaths, setDomainPaths] = React.useState<DomainPaths[]>([])
+    const [currentPath, setCurrentPath] = React.useState(path)
+    const [currentDomain, setCurrentDomain] = React.useState(domain)
+    const [editingDomain, setEditingDomain] = React.useState(domain)
 
-    const [waveAnimationControl, setWaveAnimationControl] = useState(initialSettings.waveAnimationControl)
-    const [textColor, setTextColor] = useState(initialSettings.wave.text.color);
-    const [textSize, setTextSize] = useState(initialSettings.wave.text.size);
-    const [selector, setSelector] = useState(initialSettings.wave.selector);
-    const [cssTemplate, setCssTemplate] = useState(initialSettings.wave.cssTemplate);
-    const [cssMouseTemplate, setCssMouseTemplate] = useState(initialSettings.wave.cssMouseTemplate);
-    const [waveSpeed, setWaveSpeed] = useState(initialSettings.wave.waveSpeed);
-    const [axisTranslateAmountXMax, setAxisTranslateAmountXMax] = useState(initialSettings.wave.axisTranslateAmountXMax);
-    const [axisTranslateAmountXMin, setAxisTranslateAmountXMin] = useState(initialSettings.wave.axisTranslateAmountXMin);
-    const [axisRotationAmountYMax, setAxisRotationAmountYMax] = useState(initialSettings.wave.axisRotationAmountYMax);
-    const [axisRotationAmountYMin, setAxisRotationAmountYMin] = useState(initialSettings.wave.axisRotationAmountYMin);
-    const [showNotifications, setShowNotifications] = useState(initialSettings.showNotifications);
-    const [toggleKeys, setToggleKeys] = useState(initialSettings.toggleKeys)
+    const [waveAnimationControl, setWaveAnimationControl] = React.useState(initialSettings.waveAnimationControl)
+    const [textColor, setTextColor] = React.useState(initialSettings.wave.text.color);
+    const [textSize, setTextSize] = React.useState(initialSettings.wave.text.size);
+    const [selector, setSelector] = React.useState(initialSettings.wave.selector);
+    const [cssTemplate, setCssTemplate] = React.useState(initialSettings.wave.cssTemplate);
+    const [cssMouseTemplate, setCssMouseTemplate] = React.useState(initialSettings.wave.cssMouseTemplate);
+    const [waveSpeed, setWaveSpeed] = React.useState(initialSettings.wave.waveSpeed);
+    const [axisTranslateAmountXMax, setAxisTranslateAmountXMax] = React.useState(initialSettings.wave.axisTranslateAmountXMax);
+    const [axisTranslateAmountXMin, setAxisTranslateAmountXMin] = React.useState(initialSettings.wave.axisTranslateAmountXMin);
+    const [axisRotationAmountYMax, setAxisRotationAmountYMax] = React.useState(initialSettings.wave.axisRotationAmountYMax);
+    const [axisRotationAmountYMin, setAxisRotationAmountYMin] = React.useState(initialSettings.wave.axisRotationAmountYMin);
+    const [showNotifications, setShowNotifications] = React.useState(initialSettings.showNotifications);
+    const [toggleKeys, setToggleKeys] = React.useState(initialSettings.toggleKeys)
 
-    useEffect(() => {
+    React.useEffect(() => {
         settingsService.getDomainsAndPaths().then(setDomainPaths)
     }, [])
 
-    useEffect(() => {
+    React.useEffect(() => {
         if (domainPaths.length == 0) {
             return;
         }

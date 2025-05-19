@@ -79,8 +79,10 @@ const getSettingsRegistry = (callback: {(settingsRegistry: SettingsRegistry): vo
     getSyncObject(SettingsRegistryStorageKey, defaultSettingsRegistry, callback);
 }
 
-const saveSettingsRegistry = (settingsRegistry: SettingsRegistry, callback?: {(): void}) => {
-    setSyncObject(SettingsRegistryStorageKey, settingsRegistry, callback)
+const saveSettingsRegistry = (settingsRegistry: SettingsRegistry): Promise<void> => {
+    return new Promise((resolve) => {
+        setSyncObject(SettingsRegistryStorageKey, settingsRegistry, resolve)
+    });
 }
 
 /*
@@ -130,13 +132,12 @@ export default class SettingsService implements SettingsDAOInterface {
     }
 
     async addSettingsForDomain(domain: string, path: string, settings: Options): Promise<void> {
-        return new Promise(async (resolve, reject) => {
-           const registry: SettingsRegistry = await this.getSettingsRegistryForDomain(domain, true)
-               .catch(reject) as unknown as SettingsRegistry;
-
-           registry[domain]?.pathSettings?.set(path, settings);
-           resolve();
-        })
+        const registry = await this.getSettingsRegistryForDomain(domain, true);
+        if (!registry) {
+            throw new Error(`Failed to get settings registry for domain: ${domain}`);
+        }
+        registry[domain]?.pathSettings?.set(path, settings);
+        await this.saveSettingsRegistryProvider(registry);
     }
 
     /**
@@ -287,40 +288,37 @@ export default class SettingsService implements SettingsDAOInterface {
      */
     async removeSettingsForDomain(domain: string): Promise<boolean> {
         const hostname = new URL(guardUrlWithProtocol(domain)).hostname;
-        return new Promise((resolve) => {
-            this.settingsRegistryProvider(settingsRegistry => {
-                if (hostname in settingsRegistry) {
-                    delete settingsRegistry[hostname];
-                    this.saveSettingsRegistryProvider(settingsRegistry, () => {
-                        resolve(true);
-                    })
-                    return;
-                }
-                resolve(false);
-            })
-        })
+        const settingsRegistry = await new Promise<SettingsRegistry>((resolve) => {
+            this.settingsRegistryProvider(resolve);
+        });
+        
+        if (hostname in settingsRegistry) {
+            delete settingsRegistry[hostname];
+            await this.saveSettingsRegistryProvider(settingsRegistry);
+            return true;
+        }
+        return false;
     }
 
     async removeSettingsForDomainPath(domain: string, path: string, deleteDomainIfEmpty: boolean = true): Promise<boolean> {
         const hostname = new URL(guardUrlWithProtocol(domain)).hostname;
-        return new Promise((resolve) => {
-            this.settingsRegistryProvider(settingsRegistry => {
-                if (hostname in settingsRegistry) {
-                    const domainSettings = settingsRegistry[hostname];
-                    if (domainSettings.pathSettings.has(path)) {
-                        settingsRegistry[hostname].pathSettings.delete(path)
-                    }
+        const settingsRegistry = await new Promise<SettingsRegistry>((resolve) => {
+            this.settingsRegistryProvider(resolve);
+        });
+        
+        if (hostname in settingsRegistry) {
+            const domainSettings = settingsRegistry[hostname];
+            if (domainSettings.pathSettings.has(path)) {
+                settingsRegistry[hostname].pathSettings.delete(path)
+            }
 
-                    if (deleteDomainIfEmpty && domainSettings.pathSettings.size === 0) {
-                        delete settingsRegistry[hostname]
-                    }
+            if (deleteDomainIfEmpty && domainSettings.pathSettings.size === 0) {
+                delete settingsRegistry[hostname]
+            }
 
-                    this.saveSettingsRegistryProvider(settingsRegistry, () => {
-                        resolve(true);
-                    })
-                }
-                resolve(false);
-            })
-        })
+            await this.saveSettingsRegistryProvider(settingsRegistry);
+            return true;
+        }
+        return false;
     }
 }

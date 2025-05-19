@@ -1,6 +1,8 @@
-import React, {FunctionComponent, useEffect, useRef, useState} from 'react'; // we need this to make JSX compile
+import React, {FunctionComponent, useEffect, useRef, useState} from 'react';
 import styled from 'styled-components';
 import {Autocomplete, Button, TextField} from "@mui/material";
+// @ts-ignore
+// TODO: {score!} Remove if not needed for future domain path implementation
 import {DomainPaths} from "../services/settings";
 
 const SelectorTitle = styled.h3`

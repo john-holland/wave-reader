@@ -12,6 +12,11 @@ const config = merge(common, {
         alias: {
             config: path.join(__dirname, "./src/config/config.develop.js")
         }
+    },
+    optimization: {
+        usedExports: true,
+        sideEffects: true,
+        minimize: false // Disable minification in development
     }
 });
 

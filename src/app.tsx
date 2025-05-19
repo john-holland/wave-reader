@@ -10,35 +10,30 @@ import {getSyncObject, GetSyncObjectFunction, newSyncObject, setSyncObject} from
 import StopMessage from "./models/messages/stop";
 import {fromMessage} from "./util/messages";
 import SelectorUpdated from "./models/messages/selector-updated";
-// todo: this should work, but jest returns a config is not defined
 import configured from './config/config';
-// todo: slightly less data driven shim
-const isDevelopment = configured.mode !== 'production'; //process.env.NODE_ENV !== 'production';
 import { guardLastError } from "./util/util";
 import UpdateWaveMessage from "./models/messages/update-wave";
 import { Settings } from "./components/settings";
-
 import WaveTabs from './components/wave-tabs';
 import InstalledDetails = chrome.runtime.InstalledDetails;
 import {CState, NameAccessMapInterface, Named, State, StateNames} from "./util/state";
 import StateMachine from "./util/state-machine";
-
 import SettingsService from "./services/settings";
-//import SelectorService from "./services/selector";
 import {Observer} from "rxjs";
 import RemoveSelectorMessage from "./models/messages/remove-selector";
 import StartSelectorChooseMessage from "./models/messages/start-selection-choose";
 import {SelectorsDefaultFactory} from "./models/defaults";
-import stateMachine from "./util/state-machine";
+// @ts-ignore
+// TODO: {score!} Remove if not needed for future selector hierarchy implementation
 import {Selector} from "./services/selector-hierarchy";
 import SelectionModeActivateMessage from "./models/messages/selection-mode-activate";
 import SelectionModeDeactivateMessage from "./models/messages/selection-mode-deactivate";
 import EndSelectorChooseMessage from "./models/messages/end-selection-choose";
 import AddSelectorMessage from "./models/messages/add-selector";
 import SelectionMadeMessage from "./models/messages/selection-made";
-
 import { clientForLocation } from "./config/robotcopy";
 import { ClientLocation } from "./util/state-machine";
+import Donation from './components/donation';
 
 const PopupClient = clientForLocation(ClientLocation.POPUP)
 
@@ -47,7 +42,6 @@ const WaveReader = styled.div`
 `;
 
 const settingsService = new SettingsService();
-//const selectorService = new SelectorService(settingsService);
 
 const startPageCss = (wave: Wave) => {
     newSyncObject<Options>(Options,'options', Options.getDefaultOptions(), (options) => {
@@ -403,11 +397,10 @@ const App: FunctionComponent = () => {
 
 
     useEffect(() => {
-        //if (configured.mode === "production") {
-        if (!isDevelopment) {
+        if (configured.mode !== 'production') {
             window.onblur = () => {
                 window.close();
-            }
+            };
         }
     }, []);
 
@@ -438,6 +431,7 @@ const App: FunctionComponent = () => {
                     settingsService={settingsService}
                     onDomainPathChange={onDomainPathChange}>
                 </Settings>
+                <Donation tab-name={"Support"} />
             </WaveTabs>
         </WaveReader>
     );

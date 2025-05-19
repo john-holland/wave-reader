@@ -8,6 +8,10 @@ const ESLintPlugin = require('eslint-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
+const CompressionPlugin = require('compression-webpack-plugin');
+const CircularDependencyPlugin = require('circular-dependency-plugin');
+const ProgressBarPlugin = require('progress-bar-webpack-plugin');
 
 //config: path.join(__dirname, "./src/config/config.common.js")
 const config = {
@@ -20,17 +24,22 @@ const config = {
     },
     output: {
         path: path.resolve(__dirname, "./build"),
-        filename: "[name].js"
+        filename: "[name].js",
+        chunkFilename: '[name].chunk.js'
     },
     resolve: {
         extensions: [".tsx", ".ts", ".js", ".jsx", ".*"],
         alias: {
-            config: path.join(__dirname, "./src/config/config.common.js")
+            config: path.join(__dirname, "./src/config/config.common.js"),
+            robotcopy: path.join(__dirname, "./src/config/robotcopy.ts")
         }
     },
     plugins: [
         new webpack.ProvidePlugin({
             'config': 'config'
+        }),
+        new webpack.DefinePlugin({
+            'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
         }),
         new HtmlWebpackPlugin({
             title: "boilerplate", // change this to your app title
@@ -51,7 +60,12 @@ const config = {
             chunkFilename: '[id].css'
         }),
         new CleanWebpackPlugin(),
-        new ForkTsCheckerWebpackPlugin(),
+        new ForkTsCheckerWebpackPlugin({
+            typescript: {
+                configFile: path.resolve(__dirname, 'tsconfig.json'),
+                mode: 'write-references'
+            }
+        }),
         new CopyPlugin({
             patterns: [
                 {
@@ -68,8 +82,52 @@ const config = {
         new ESLintPlugin({
             extensions: ['.tsx', '.ts', '.js'],
             exclude: 'node_modules'
-        })
+        }),
+        // Add progress bar
+        new ProgressBarPlugin({
+            format: '  build [:bar] :percent (:elapsed seconds)',
+            clear: false
+        }),
+        // Detect circular dependencies
+        new CircularDependencyPlugin({
+            exclude: /node_modules/,
+            failOnError: true,
+            allowAsyncCycles: false,
+            cwd: process.cwd()
+        }),
+        // Only add these plugins in production
+        ...(process.env.NODE_ENV === 'production' ? [
+            // Analyze bundle size
+            new BundleAnalyzerPlugin({
+                analyzerMode: 'static',
+                reportFilename: 'bundle-report.html',
+                openAnalyzer: false
+            }),
+            // Compress assets
+            new CompressionPlugin({
+                test: /\.(js|css|html|svg)$/,
+                algorithm: 'gzip',
+                threshold: 10240,
+                minRatio: 0.8
+            })
+        ] : [])
     ],
+    optimization: {
+        usedExports: true,
+        sideEffects: true,
+        minimize: true,
+        moduleIds: 'deterministic',
+        runtimeChunk: 'single',
+        splitChunks: {
+            cacheGroups: {
+                vendor: {
+                    test: /[\\/]node_modules[\\/]/,
+                    name: 'vendors',
+                    chunks: 'all',
+                },
+            },
+        },
+    },
     module: {
         rules: [
             {
@@ -84,13 +142,15 @@ const config = {
             {
                 test: /\.(ts|tsx)$/,
                 exclude: /node_modules/,
-                use: {
-                    loader: 'ts-loader',
-                    options: {
-                        // disable type checker - we will use it in fork plugin
-                        transpileOnly: true
+                use: [
+                    {
+                        loader: 'ts-loader',
+                        options: {
+                            transpileOnly: true,
+                            configFile: path.resolve(__dirname, 'tsconfig.json')
+                        }
                     }
-                }
+                ]
             },
             {
                 test: /\.(scss|css)$/,
@@ -98,11 +158,20 @@ const config = {
                     process.env.NODE_ENV !== 'production'
                         ? 'style-loader'
                         : MiniCssExtractPlugin.loader,
-                    'css-loader',
+                    {
+                        loader: 'css-loader',
+                        options: {
+                            sourceMap: true,
+                            importLoaders: 1
+                        }
+                    },
                     {
                         loader: 'sass-loader',
                         options: {
-                            sourceMap: true
+                            sourceMap: true,
+                            sassOptions: {
+                                outputStyle: 'compressed'
+                            }
                         }
                     }
                 ]
