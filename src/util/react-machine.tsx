@@ -1,7 +1,8 @@
-import StateMachine, {Client} from "./state-machine";
+import StateMachine, {Client, ClientMessage, Success, LogViewStateMachine} from "./state-machine";
 import React, {Dispatch, FunctionComponent, ReactElement, SetStateAction, useEffect, useState} from "react";
 import Message from "../models/message";
 import {CState, NameAccessMapInterface, Named, State} from "./state";
+import { StateMachineError } from "../models/state-machine-error";
 
 export type MachineComponentProps = {
     state: UseStateProxy<any>
@@ -105,7 +106,7 @@ export type ReactStateMachineComponentProps = {
     setState: { (state: string, value: any): void }
 }
 
-export class ReactStateMachine<TProps> {
+export class ReactStateMachine<TProps> implements LogViewStateMachine<Message<any>> {
     private states: { [key: string]: StateComponentFunction };
     private renderTarget?: React.ReactElement<any, any> | null;
     private stateMachine: StateMachine = new StateMachine()
@@ -153,7 +154,7 @@ export class ReactStateMachine<TProps> {
         this.initialState = initialState;
     }
 
-    initialize() {
+    async initialize(): Promise<void> {
         const machine = this;
         const map = new Map<string, State>();
 
@@ -229,16 +230,57 @@ export class ReactStateMachine<TProps> {
         })
     }
 
-    handleMessage(message: Named) {
-        this.stateMachine.handleState(message);
+    getCurrentState(): string {
+        return this.logView.state;
     }
 
-    getStateMachine(): StateMachine {
-        return this.stateMachine;
+    getAvailableTransitions(): string[] {
+        return this.logView.states;
     }
 
     getLogView(): ComponentLogView {
         return this.logView;
+    }
+
+    async updateLogView(view: ComponentLogView): Promise<void> {
+        this.logView = view;
+        this.renderTarget = ReactStateMachineRenderTarget({
+            useStateProxy: this.state,
+            logView: this.logView,
+            stateMachine: this.stateMachine
+        });
+    }
+
+    async clearLogView(): Promise<void> {
+        this.logView.views = [];
+        this.logView.states = [];
+        this.renderTarget = ReactStateMachineRenderTarget({
+            useStateProxy: this.state,
+            logView: this.logView,
+            stateMachine: this.stateMachine
+        });
+    }
+
+    async handleMessage(message: ClientMessage<Message<any>>): Promise<Success | State> {
+        const result = await this.stateMachine.handleState({ name: message.path } as Named);
+        return result || { success: true } as Success;
+    }
+
+    async transitionTo(state: string): Promise<void> {
+        await this.stateMachine.handleState({ name: state } as Named);
+    }
+
+    canTransitionTo(state: string): boolean {
+        return this.logView.states.includes(state);
+    }
+
+    async handleError(error: StateMachineError): Promise<void> {
+        this.errorView.push(error.message);
+        await this.stateMachine.handleState({ name: "error" } as Named);
+    }
+
+    getStateMachine(): StateMachine {
+        return this.stateMachine;
     }
 
     getRenderTarget(): ReactElement<any, any> | whatever {

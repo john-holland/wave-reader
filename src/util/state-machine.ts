@@ -8,6 +8,8 @@ import {fromMessage} from "./messages";
 import BootstrapMessage from "../models/messages/bootstrap";
 import BootstrapResultMessage from "../models/messages/bootstrap-result";
 import HeartbeatResultMessage from "../models/messages/heartbeat-result";
+import { ComponentLogView } from './react-machine';
+import { StateMachineError } from '../models/state-machine-error';
 // import {BaseVentures} from "./venture-states";
 
 export class ClientMessage<T extends Message<any>> {
@@ -22,7 +24,16 @@ export class ClientMessage<T extends Message<any>> {
     }
 }
 
-export type Success = boolean;
+export interface Success {
+    success: boolean;
+    message?: string;
+}
+
+export const createSuccess = (success: boolean, message?: string): Success => ({
+    success,
+    message
+});
+
 export type ClientID = string
 
 export interface IClientMessengerService<T extends Message<any>> {
@@ -365,6 +376,9 @@ export class FirefoxSyncClientMessengerService<T extends Message<any>> implement
         throw new Error("TODO: implement firefox!.");
     }
 
+    async sendMessage(path: string, clientId: ClientID, message: T): Promise<Success> {
+        return createSuccess(true);
+    }
 }
 
 export interface IClient<T extends Message<any>> {
@@ -458,47 +472,20 @@ export class Client<T extends Message<any>> implements IClient<T> {
         })
     }
 
-    sendMessage(message: ClientMessage<T>): Promise<Success | State> {
-
-        // send a message to the specific client, then descend the state machines
-        //  finding the appropriate machine starting at the root (usually "content" or "popup")
-        //  once descended, we deliver the message
-        // path examples:
-        //  * 'app#settings' 'extensionid321' 'save' { ... data }
-        //  * 'background/api#ga' 'ga' 'page' { ... data }
-        //  * 'content#wave' 'tab123' 'start' { ... data }
-        const clients = message.path.split('/')
-        const machines = message.path.split('#')
-        const machine = machines[machines.length - 1];
-
-        if (machines.length > 1) {
-            console.log("machines " + machines.slice(1).join(', '))
+    async sendMessage(message: ClientMessage<T>): Promise<Success | State> {
+        const result = await this.messengerClient.sendMessage(message.path, message.clientId, message.message);
+        if (result.success) {
+            return result;
         }
-        const client = clients[0];
-        // given the message.from & the host location, send to the next hope, or pizza down to the next message
-
-        return new Promise((resolve, reject) => {
-            if (client === this.clientId) {
-                if (!this.stateMachineMap.has(machine)) {
-                    throw new Error(`statemachine missing from client, ${client} for machine, ${machine}`)
-                }
-
-                // message sent!
-                this.stateMachineMap.get(machine)?.handleState(message.message).then((p) => resolve(p || false)).catch(reject)
-            } else {
-                // otherwise, we use the from and client to send appropriately
-                const newPath = (clients.length > 1 ? clients.slice(1) : clients).join('/');
-
-                // the graph here isn't very big, you're either on a client, and sending a message to another part of the client
-                // or on the correct client and sending a message to an api client
-                // so if you're message is from the popup sending to background, then
-                if (this.messengerClient.getApiMap().has(client)) {
-                    this.messengerClient.getApiMap().get(client)?.sendMessage(newPath, message.clientId, message.message).then(p => resolve(p || false)).catch(reject)
-                } else {
-                    this.messengerClient.sendMessage(newPath, message.clientId, message.message).then(p => resolve(p || false)).catch(reject);
-                }
-            }
-        });
+        
+        const machine = message.path.split('#')[1];
+        const stateMachine = this.stateMachineMap.get(machine);
+        if (!stateMachine) {
+            return createSuccess(false, `State machine not found for path: ${message.path}`);
+        }
+        
+        const state = await stateMachine.handleState({ name: message.path } as Named);
+        return state || createSuccess(false, `No state returned for path: ${message.path}`);
     }
 
     private onReceiveMessage(clientId: string): Promise<Observable<ClientMessage<T>>> {
@@ -673,3 +660,25 @@ class StateMachine {
 }
 
 export default StateMachine;
+
+export interface LogViewStateMachine<T extends Message<any>> {
+    // Core state machine operations
+    initialize(): Promise<void>;
+    getCurrentState(): string;
+    getAvailableTransitions(): string[];
+    
+    // Log view specific operations
+    getLogView(): ComponentLogView;
+    updateLogView(view: ComponentLogView): Promise<void>;
+    clearLogView(): Promise<void>;
+    
+    // Message handling
+    handleMessage(message: ClientMessage<T>): Promise<Success | State>;
+    
+    // State transitions
+    transitionTo(state: string): Promise<void>;
+    canTransitionTo(state: string): boolean;
+    
+    // Error handling
+    handleError(error: StateMachineError): Promise<void>;
+}

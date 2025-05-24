@@ -18,7 +18,10 @@
     "dev": "NODE_ENV=development webpack --mode development --config webpack.develop.js --watch",
     "build": "NODE_ENV=production webpack --mode production --config webpack.prod.js",
     "production": "NODE_ENV=production webpack --mode production --config webpack.prod.js --watch",
-    "test": "npx jest"
+    "test": "npx jest",
+    "clean": "rimraf dist",
+    "clean:docker": "docker rmi roguescroll roguescroll:dev",
+    "clean:all": "npm run clean && npm run clean:docker"
   },
   "devDependencies": {
     "@babel/core": "^7.17.5",
@@ -52,6 +55,8 @@
     "eslint": "^8.45.0",
     "eslint-webpack-plugin": "^4.0.1",
     "file-loader": "^6.2.0",
+    "nodemon": "^2.0.22",
+    "rimraf": "^5.0.1",
     "fork-ts-checker-webpack-plugin": "^8.0.0",
     "global-jsdom": "^9.1.0",
     "html-webpack-plugin": "^5.5.3",
@@ -59,7 +64,7 @@
     "jest-environment-jsdom": "^29.6.4",
     "jsdom": "^22.1.0",
     "mini-css-extract-plugin": "^2.7.6",
-    "node-sass": "^9.0.0",
+    "sass": "^1.69.5",
     "progress-bar-webpack-plugin": "^2.1.0",
     "react-is": "^18.2.0",
     "react-shallow-renderer": "^16.15.0",
