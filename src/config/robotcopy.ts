@@ -98,6 +98,16 @@ const CopyConfig: RobotCopyConfig = {
                 // todo: implement: down meaning to background.js usually
                 throw new Error("implement api client from REST API communication")
             }
+        },
+        "auth": {
+            up: () => {
+                // todo: implement: auth client for authentication
+                throw new Error("implement auth client for authentication")
+            },
+            down: () => {
+                // todo: implement: auth client for authentication
+                throw new Error("implement auth client for authentication")
+            }
         }
     }
 }

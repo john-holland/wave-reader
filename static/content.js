@@ -1,3 +1,4 @@
+import "regenerator-runtime/runtime";
 import { guardLastError } from "../src/util/util";
 import { mousePos } from "../src/util/mouse";
 import { replaceAnimationVariables } from "../src/models/wave";
@@ -25,9 +26,32 @@ import { clientForLocation } from "../src/config/robotcopy";
 import { ClientLocation } from "../src/util/state-machine";
 import {ReactMachine} from "../src/util/react-machine";
 
+console.log("🌊 Wave Reader content script is loading on:", window.location.href);
+
 const ContentClient = clientForLocation(ClientLocation.CONTENT)
 
-// ContentClient.up().sendMessage("upate-wave", ClientLocation.POPUP, new UpdateWaveMessage({}))
+// Content script runs in MAIN world, so chrome APIs are not available
+// We'll use a different approach for communication
+console.log("🌊 Content script running in MAIN world - chrome APIs not available");
+
+// Set up a message listener that works in MAIN world
+window.addEventListener('message', (event) => {
+    // Only handle messages from our extension
+    if (event.source !== window || !event.data || event.data.source !== 'wave-reader-extension') {
+        return;
+    }
+
+    const message = event.data.message;
+    console.log(`Content script received message: ${JSON.stringify(message)}`);
+
+    try {
+        console.log(`Processing message: ${message.name}`);
+        stateMachine.handleState(message);
+        console.log(`Message processed successfully`);
+    } catch (e) {
+        console.error(`Failed to process message: ${JSON.stringify(message)}, error: ${e.message}`);
+    }
+});
 
 const stateMachineMap = new Map();
 stateMachineMap.set("base", Base);
@@ -244,7 +268,8 @@ function StateNameMap(map = new Map()) {
             //     return options;
             // })
 
-            chrome.runtime.sendMessage(new SelectionMadeMessage(message?.selector))
+            // Chrome APIs not available in MAIN world, so we can't send messages back
+            // The selection will be handled by the popup directly
 
             return Promise.resolve(map.get('end-selection-choose'))
         }, false),
@@ -281,30 +306,37 @@ const ContentReactMachine = ReactMachine({
     
 })
 
-chrome.runtime.onMessage.addListener( (message, sender, sendResponse) => {
-        console.log(`message: ${JSON.stringify(message)}`)
+// Check if chrome.runtime is available before setting up message listener
+if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener( (message, sender, sendResponse) => {
+        console.log(`Content script received message: ${JSON.stringify(message)}`)
 
         if (guardLastError()) {
+            console.log('Guard last error returned true, ignoring message');
             return false;
         }
 
         if (message.from !== "popup") {
+            console.log(`Message not from popup, ignoring. From: ${message.from}`);
             return false;
         }
 
         try {
+            console.log(`Processing message: ${message.name}`);
             stateMachine.handleState(message);
+            console.log(`Message processed successfully`);
         } catch (e) {
-            throw new Error(`Failed with message: ${JSON.stringify(message)}, and error, ${e.message}`);
+            console.error(`Failed to process message: ${JSON.stringify(message)}, error: ${e.message}`);
+            throw new Error(`Failed to process message: ${e.message}`);
         }
 
-        sendResponse(true);
+        return true;
+    });
+} else {
+    console.warn("🌊 Chrome runtime not available in content script context");
+}
 
-    return true;
-});
-chrome.runtime.connect().onDisconnect.addListener(function() {
-    // clean up when content script gets disconnected
-    // todo implement
-})
+// Content script runs in MAIN world, so chrome APIs are not available
+// No need for chrome.runtime.connect() or disconnect listener
 
 // maybe a nyan cat easter egg?

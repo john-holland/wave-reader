@@ -1,3 +1,4 @@
+import "regenerator-runtime/runtime";
 // chrome.runtime.onInstalled?.addListener(() => {
 //     chrome.declarativeContent.onPageChanged.removeRules(undefined, () => {
 //       ...
@@ -64,13 +65,28 @@ const initializeContentInterchange = () => {
 
         //debugger;
         if (message.from === 'popup') {
-            chrome.windows.getCurrent(w => {
-                chrome.tabs.query({active: true, windowId: w.id}).then((tabs) => {
-                    chrome.tabs.sendMessage(tabs[0].id, message);
-                    guardLastError()
-                    callback(true);
-                })
-            })
+            // Get the tab that the popup was opened from
+            chrome.tabs.query({active: true, lastFocusedWindow: true}).then((tabs) => {
+                console.log(`🌊 Background script sending message to tab:`, tabs[0].url);
+                
+                // Use window.postMessage to communicate with content script in MAIN world
+                chrome.scripting.executeScript({
+                    target: { tabId: tabs[0].id },
+                    func: (messageData) => {
+                        window.postMessage({
+                            source: 'wave-reader-extension',
+                            message: messageData
+                        }, '*');
+                    },
+                    args: [{
+                        ...message,
+                        from: 'popup'
+                    }]
+                });
+                
+                guardLastError();
+                callback(true);
+            });
         } else if (message.from === 'content') {
             chrome.runtime.sendMessage(message, callback);
             guardLastError()
@@ -84,62 +100,8 @@ const initializeContentInterchange = () => {
     });
 }
 
-//const CONTENT_SCRIPT_ID = 'content_script_wave_reader';
+// Initialize the message listener immediately
+initializeContentInterchange();
 
-
-chrome.scripting.getRegisteredContentScripts().then((scripts) => {
-    console.log(`registered scripts: ${scripts}`);
-
-    return p(resolve => {
-        currentTab().then((tabs) => {
-            chrome.scripting.executeScript({
-                target: {tabId: tabs[0].id, allFrames: true},
-                files: ['content.js']
-            }, resolve);
-        }).catch(guardLastError);
-    })
-
-}).then(initializeContentInterchange);
-
-    // if (scripts.some(script => script.id === CONTENT_SCRIPT_ID)) {
-    //     return Promise.resolve()
-    // } else {
-    //     return p(resolve => {
-    //
-    //return chrome.scripting.registerContentScripts([{
-    //id: CONTENT_SCRIPT_ID,
-    //  matches: ['*://*/*'],
-    //runAt: 'document_start',
-
-     //   });
-   // }
-    // chrome.runtime.onConnect.addListener((port) => {
-    //
-    //     const popupPort = chrome.runtime.connect({ name: "popup" });
-    //     const contentPort = chrome.runtime.connect({ name: "content" });
-    //
-    //     popupPort.onMessage.addListener((message, sender, sendResponse) => {
-    //         debugger;
-    //         if (message.from === 'content') {
-    //             chrome.runtime.sendMessage(message, sendResponse)
-    //         } else {
-    //             throw new Error("popupPort has inbound message not directed to content")
-    //         }
-    //
-    //         return true;
-    //     });
-    //
-    //     contentPort.onMessage.addListener((message, sender, sendResponse) => {
-    //         if (message.from === 'popup') {
-    //             currentTab((tabs) => {
-    //                 return chrome.tabs.sendMessage(tabs[0].id, message, sendResponse);
-    //             })
-    //         } else {
-    //             throw new Error("contentPort has inbound message not directed to popup")
-    //         }
-    //
-    //         return true;
-    //     });
-    // });
-
-    // });
+// The content script is loaded automatically by the manifest
+// No need for manual injection

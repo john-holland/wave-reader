@@ -39,6 +39,7 @@ export const DeepEquals = (a: unknown, b: unknown): boolean => {
 
     if (typeof a !== typeof b) {
         console.log("array mismatch for property: aString: " + aString + ", bString: " + bString);
+        
         return false;
     }
 

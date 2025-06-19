@@ -39,7 +39,10 @@ export type ComponentLog = {
 
 export type ComponentLogView = {
     states: string[]
+
+
     state: string
+
     views: MachineComponent[]
 }
 

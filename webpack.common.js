@@ -23,14 +23,14 @@ const config = {
         filename: "[name].js"
     },
     resolve: {
-        extensions: [".tsx", ".ts", ".js", ".jsx", ".*"],
-        alias: {
-            config: path.join(__dirname, "./src/config/config.common.js")
-        }
+        extensions: [".tsx", ".ts", ".js", ".jsx", ".*"]
     },
     plugins: [
         new webpack.ProvidePlugin({
             'config': 'config'
+        }),
+        new webpack.DefinePlugin({
+            'regeneratorRuntime': 'regeneratorRuntime'
         }),
         new HtmlWebpackPlugin({
             title: "boilerplate", // change this to your app title
