@@ -67,6 +67,12 @@ const initializeContentInterchange = () => {
         if (message.from === 'popup') {
             // Get the tab that the popup was opened from
             chrome.tabs.query({active: true, lastFocusedWindow: true}).then((tabs) => {
+                if (!tabs || tabs.length === 0) {
+                    console.error('🌊 No active tabs found');
+                    callback(false);
+                    return;
+                }
+                
                 console.log(`🌊 Background script sending message to tab:`, tabs[0].url);
                 
                 // Use window.postMessage to communicate with content script in MAIN world
@@ -86,10 +92,18 @@ const initializeContentInterchange = () => {
                 
                 guardLastError();
                 callback(true);
+            }).catch(error => {
+                console.error('🌊 Error querying tabs:', error);
+                callback(false);
             });
         } else if (message.from === 'content') {
             chrome.runtime.sendMessage(message, callback);
             guardLastError()
+        } else if (message.name === 'update-going-state') {
+            // Handle going state updates from content script
+            chrome.storage.sync.set({ going: { going: message.going } });
+            guardLastError();
+            callback(true);
         } else {
             console.log('unknown source!');
         }

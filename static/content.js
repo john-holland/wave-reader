@@ -200,10 +200,28 @@ function StateNameMap(map = new Map()) {
         }, true),
         "toggle start": CState("toggle start", StartVentures, false, async (message, state, previousState) => {
             loadCSSTemplate(latestOptions.wave.cssTemplate)
+            going = true;
+            // Send message to background script to update sync storage
+            window.postMessage({
+                source: 'wave-reader-extension',
+                message: {
+                    name: 'update-going-state',
+                    going: true
+                }
+            }, '*');
             return map.get('waving')
         }, false),
         "toggle stop": CState("toggle stop", StopVentures, false, async (message, state, previousState) => {
             unloadCSS()
+            going = false;
+            // Send message to background script to update sync storage
+            window.postMessage({
+                source: 'wave-reader-extension',
+                message: {
+                    name: 'update-going-state',
+                    going: false
+                }
+            }, '*');
             return map.get('base')
         }, false),
         "start mouse": CState("start mouse", StartVentures, false, async (message, state, previousState) => {
