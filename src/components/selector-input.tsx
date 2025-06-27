@@ -1,7 +1,6 @@
 import React, {FunctionComponent, useEffect, useRef, useState} from 'react'; // we need this to make JSX compile
 import styled from 'styled-components';
 import {Autocomplete, Button, TextField} from "@mui/material";
-import {DomainPaths} from "../services/settings";
 
 const SelectorTitle = styled.h3`
     display: inline;
@@ -40,7 +39,8 @@ type SelectorProps = {
     selectorClicked: () => void,
     onSave: (selector: string) => void,
     selectorModeClicked: (selectorModeOn: boolean) => void,
-    selectorModeOn: boolean
+    selectorModeOn: boolean,
+    children?: React.ReactNode
 }
 
 const SelectorInput: FunctionComponent<SelectorProps> = ({

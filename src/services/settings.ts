@@ -3,19 +3,32 @@ import {currentTab, Tab} from "../util/util";
 import {getSyncObject, setSyncObject} from "../util/sync";
 
 const guardUrlWithProtocol = (url: string) => {
+    if (!url || url.trim() === "") {
+        return "https://example.com";
+    }
     const colonIndex = url.indexOf(":");
     return colonIndex > -1 && colonIndex < url.indexOf(".") ? url : "https://" + url;
 }
 
 const tabUrl = (): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        (currentTab() as unknown as Promise<Tab[]>).then((tabs: Tab[]) => {
-            if (tabs.length === 0) {
-                reject(0)
-            } else {
-                resolve(tabs[0]?.url as string)
-            }
-        });
+    return new Promise((resolve) => {
+        try {
+            (currentTab() as unknown as Promise<Tab[]>).then((tabs: Tab[]) => {
+                if (tabs.length === 0 || !tabs[0]?.url) {
+                    // Fallback to a default URL if no tabs are available
+                    console.warn("No active tab found, using fallback URL");
+                    resolve("https://example.com");
+                } else {
+                    resolve(tabs[0].url as string);
+                }
+            }).catch((error) => {
+                console.warn("Error getting current tab, using fallback URL:", error);
+                resolve("https://example.com");
+            });
+        } catch (error) {
+            console.warn("Chrome APIs not available, using fallback URL:", error);
+            resolve("https://example.com");
+        }
     })
 }
 

@@ -15,7 +15,6 @@ import {SelectorsDefaultFactory} from "../models/defaults";
 import {Button} from "@mui/material";
 import {_ClearViews_, _View_, ComponentLog, log, MachineComponentProps, ReactMachine} from "../util/react-machine";
 import Robotcopy, {ClientDiscoveryConfig} from "../config/robotcopy";
-import {ClientDiscovery} from "../util/state-machine";
 
 type SelectorHierarchyMountProps = {
     doc: Document,
@@ -140,46 +139,6 @@ const Panel = styled.div`
 //   use provided selector and default text selectors to select each available branch
 //   it may be easier to just replicate each feature allowing for duplicates
 
-type ColorSelectorV2 = {
-    root: HtmlElement, // from body element or the overlay div element
-    tree: HtmlElement[], // a duplicate of the [HtmlElement]'s tree
-    color: Hex,
-    element: HtmlElement
-}
-
-const HierarchySelectorReactMachine = ReactMachine<HierarchySelectorComponentProps>({
-    client: (Robotcopy.clients.popup as ClientDiscoveryConfig).up(),
-    initialState: "bootstrap",
-    states: {
-        "bootstrap": ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
-            const [selections, setSelections] = state?.useState<ColorSelectorV2[]>("selections", []) || [undefined, undefined]
-            const [dimmed, setDimmed] = state?.useState<ColorSelectorV2[]>("dimmed", []) || [undefined, undefined]
-
-            // fill selections from props
-            // store trees pruned to the current element
-            // present with base
-
-            return Promise.resolve(log("base", _ClearViews_))
-        },
-        "base":({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
-            const selections = state?.getState<ColorSelectorV2[]>("selections");
-            const dimmed = state?.getState<ColorSelectorV2[]>("dimmed");
-            const confirmed = state?.getState<ColorSelectorV2[]>("confirmed");
-
-            return Promise.resolve(log("base",
-                <SelectorHierarchyMount doc={state?.props?.doc} visible={!confirmed}>
-            </SelectorHierarchyMount>))
-        },
-        "add":({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
-
-            return Promise.resolve(log("base", _View_));
-        },
-        "remove":({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> => {
-            return Promise.resolve(log("base", _View_));
-        }
-    }
-})
-
 const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentProps> = ({
     selectorHierarchyService = new SelectorHierarchy({ } as unknown as ColorGeneratorServiceInterface),
     currentSelector,
@@ -190,7 +149,7 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
     const [selector, setSelector] = useState(currentSelector);
     const [latestSelector, setLatestSelector] = useState<HtmlSelection | undefined>(undefined);
     const [activeSelectorColorPanels, setActiveSelectorColorPanels] = useState<ColorSelectorPanel[]>([])
-    const [htmlHierarchy, setHtmlHierarchy] = useState(doc);
+    const [htmlHierarchy] = useState(doc);
     const [dimmedPanels, setDimmedPanels] = useState<ColorSelection[]>([])
     const [confirmed, setConfirmed] = useState(false);
 
@@ -253,13 +212,13 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
                 {activeSelectorColorPanels.length}<span className={"floating-shelf"}>{selector}</span>
                 <input type={"button"} value={"confirm"} onClick={() => confirmSelector(selector)} />
                 {dimmedPanels.map((panel: ColorSelection, i: number) => {
-                    return panel.selector.elem.forEach((element: HtmlElement) => {
-                        return <Panel className={"panel-decorator"} color={panel.color.toHexString()} element={element} key={i}>
+                    return panel.selector.elem.map((element: HtmlElement) => {
+                        return <Panel className={"panel-decorator"} color={panel.color.toHexString()} element={element} key={`${i}-${element}`}>
                             <SelectorButton key={'+'+i} style={{
                                 backgroundColor: "#333",
                                 color: "#eee"
-                            }} onClick={(e) => {
-                                addPanelIslandClicked.call(this, element)
+                            }} onClick={() => {
+                                addPanelIslandClicked(element)
                             }}>+</SelectorButton>
                         </Panel>
                     })
@@ -275,8 +234,8 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
                         }}
                     >
                         {/* maybe hypertext or something? */}
-                        <SelectorButton key={'-'+i} onClick={(e) => {
-                            removePanelIslandClicked.call(this, panel.element)
+                        <SelectorButton key={'-'+i} onClick={() => {
+                            removePanelIslandClicked(panel.element)
                         }}>-</SelectorButton>
                     </Panel>
                 })}

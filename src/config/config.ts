@@ -1,13 +1,12 @@
-/* globals config */
-
 type Config = {
     mode: string;
 }
 
-const unset: Config = { mode: "unset" };
+// Import the development config directly
+import developConfig from './config.develop.js';
 
-// @ts-ignore
-const configured: Config = typeof config === "object" ? global.config?.default || unset : unset;
+const configured: Config = developConfig;
+
 if (configured.mode === "unset") {
     console.log("unset configuration mode! " + JSON.stringify(configured));
 }

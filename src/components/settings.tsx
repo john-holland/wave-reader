@@ -27,7 +27,8 @@ type SettingsProps = {
     domain: string,
     path: string,
     onDomainPathChange: {(domain: string, path: string): void}
-    settingsService: SettingsDAOInterface
+    settingsService: SettingsDAOInterface,
+    children?: React.ReactNode
 }
 
 const SettingsStyleContainer = styled.div`

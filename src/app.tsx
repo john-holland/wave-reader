@@ -29,18 +29,11 @@ import {Observer} from "rxjs";
 import RemoveSelectorMessage from "./models/messages/remove-selector";
 import StartSelectorChooseMessage from "./models/messages/start-selection-choose";
 import {SelectorsDefaultFactory} from "./models/defaults";
-import stateMachine from "./util/state-machine";
-import {Selector} from "./services/selector-hierarchy";
 import SelectionModeActivateMessage from "./models/messages/selection-mode-activate";
 import SelectionModeDeactivateMessage from "./models/messages/selection-mode-deactivate";
 import EndSelectorChooseMessage from "./models/messages/end-selection-choose";
 import AddSelectorMessage from "./models/messages/add-selector";
 import SelectionMadeMessage from "./models/messages/selection-made";
-
-import { clientForLocation } from "./config/robotcopy";
-import { ClientLocation } from "./util/state-machine";
-
-const PopupClient = clientForLocation(ClientLocation.POPUP)
 
 const WaveReader = styled.div`
   width: 800px;
@@ -50,30 +43,46 @@ const settingsService = new SettingsService();
 //const selectorService = new SelectorService(settingsService);
 
 const startPageCss = (wave: Wave) => {
-    newSyncObject<Options>(Options,'options', Options.getDefaultOptions(), (options) => {
-        if (options.showNotifications) {
-            const notifOptions = {
-                type: "basic",
-                iconUrl: "icons/waver48.png",
-                title: "wave reader",
-                message: "reading",
-            };
+    try {
+        newSyncObject<Options>(Options,'options', Options.getDefaultOptions(), (options) => {
+            if (options.showNotifications) {
+                try {
+                    const notifOptions = {
+                        type: "basic",
+                        iconUrl: "icons/waver48.png",
+                        title: "wave reader",
+                        message: "reading",
+                    };
 
-            // @ts-ignore
-            chrome.notifications.create("", notifOptions, guardLastError);
-        }
-        options.wave = wave.update();
-        chrome.runtime.sendMessage(new StartMessage({
-            options: options
-        }));
+                    // @ts-ignore
+                    chrome.notifications.create("", notifOptions, guardLastError);
+                } catch (error) {
+                    console.warn("Could not create notification:", error);
+                }
+            }
+            options.wave = wave.update();
+            try {
+                chrome.runtime.sendMessage(new StartMessage({
+                    options: options
+                }));
+            } catch (error) {
+                console.warn("Could not send start message:", error);
+            }
 
-        setSyncObject("going", { going: true });
-    })
+            setSyncObject("going", { going: true });
+        })
+    } catch (error) {
+        console.warn("Error in startPageCss:", error);
+    }
 }
 
 const stopPageCss = () => {
-    chrome.runtime.sendMessage(new StopMessage());
-    setSyncObject("going", { going: false });
+    try {
+        chrome.runtime.sendMessage(new StopMessage());
+        setSyncObject("going", { going: false });
+    } catch (error) {
+        console.warn("Error in stopPageCss:", error);
+    }
 }
 
 const bootstrapConditionSettingsSetState = (going: boolean): Promise<Options> => {
@@ -83,13 +92,25 @@ const bootstrapConditionSettingsSetState = (going: boolean): Promise<Options> =>
             setTimeout(() => {
                 if (going && options) {
                     options.wave = options.wave.update();
-                    chrome.runtime.sendMessage(new StartMessage({
-                        options: options
-                    }));
+                    try {
+                        chrome.runtime.sendMessage(new StartMessage({
+                            options: options
+                        }));
+                    } catch (error) {
+                        console.warn("Could not send start message in bootstrap:", error);
+                    }
                 } else if (!going && options) {
-                    chrome.runtime.sendMessage(new UpdateWaveMessage({ options }))
+                    try {
+                        chrome.runtime.sendMessage(new UpdateWaveMessage({ options }))
+                    } catch (error) {
+                        console.warn("Could not send update message in bootstrap:", error);
+                    }
                 } else {
-                    chrome.runtime.sendMessage(new StopMessage())
+                    try {
+                        chrome.runtime.sendMessage(new StopMessage())
+                    } catch (error) {
+                        console.warn("Could not send stop message in bootstrap:", error);
+                    }
                 }
                 resolve(options);
             }, 100);
@@ -255,14 +276,16 @@ export const AppStates = ({
         }),
         "selection mode active": CState("selection mode active", ["selection made", "selection error report", "settings updated"], false, (message, state, previousState): Promise<State> => {
             //  (disable settings tab)
-            return Promise.resolve(machine?.getState("selection mode active")!)
+            const stateResult = machine?.getState("selection mode active");
+            return Promise.resolve(stateResult || machine?.getState("base") as State)
 
             // return states.get("selection made (enable settings tab)")
         }),
         "selection made": CState("selection made (enable settings tab)", ["base"], false, (message, state, previousState): Promise<State> => {
             //setSettingsEnabled(true);
             machine?.handleState(new AddSelectorMessage({ selector: (message as SelectionMadeMessage)?.selector}))
-            return Promise.resolve(machine?.getState("base")!)
+            const stateResult = machine?.getState("base");
+            return Promise.resolve(stateResult || machine?.getState("base") as State)
         }),
         "selection error report (user error, set red selection error note, revert to previous selector)": CState("selection error report (user error, set red selection error note, revert to previous selector)", ["base"], false, (message, state, previousState) => {
             // todo: maybe this isn't necessary -- it would be neat to have super states so the
@@ -282,7 +305,8 @@ export const AppStates = ({
         }),
         // remove
         "remove selector": CState("remove selector", ["confirm remove selector", "cancel remove selector"], false, (message, state, previousState): Promise<State> => {
-            return Promise.resolve(machine?.getState("confirm remove selector")!)
+            const stateResult = machine?.getState("confirm remove selector");
+            return Promise.resolve(stateResult || machine?.getState("base") as State)
         }),
         "confirm remove selector": CState("confirm remove selector", ["base"], false, (message, state, previousState): Promise<State> => {
             if (window.confirm("Are you sure you wish to remove this selector?")) {
@@ -292,21 +316,26 @@ export const AppStates = ({
                     return options;
                 })
             }
-            return Promise.resolve(machine?.getState("base")!)
+            const stateResult = machine?.getState("base");
+            return Promise.resolve(stateResult || machine?.getState("base") as State)
         }),
         // use
         "use selector": CState("use selector", ["base"], false, (message, state, previousState): Promise<State> => {
-            return Promise.resolve(machine?.getState("base")!)
+            const stateResult = machine?.getState("base");
+            return Promise.resolve(stateResult || machine?.getState("base") as State)
         }),
         // ~~ waves ~~
         "start waving": CState("start waving", ["base"], true, (message, state, previousState): Promise<State> => {
-            return Promise.resolve(machine?.getState("waving")!)
+            const stateResult = machine?.getState("waving");
+            return Promise.resolve(stateResult || machine?.getState("base") as State)
         }),
         "waving": CState("start waving", ["stop wave", "settings updated"], false, (message, state, previousState): Promise<State> => {
-            return Promise.resolve(machine?.getState("waving")!)
+            const stateResult = machine?.getState("waving");
+            return Promise.resolve(stateResult || machine?.getState("base") as State)
         }),
         "stop waving": CState("stop waving", ["base"], false, (message, state, previousState): Promise<State> => {
-            return Promise.resolve(machine?.getState("base")!)
+            const stateResult = machine?.getState("base");
+            return Promise.resolve(stateResult || machine?.getState("base") as State)
         }),
     };
 
@@ -428,16 +457,16 @@ const App: FunctionComponent = () => {
                     selectorClicked={selectorClicked}
                     onSave={async (selector) => selectorUpdated(new SelectorUpdated({ selector }))}
                     selectorModeClicked={selectorModeClicked}
-                    selectorModeOn={selectorModeOn}>
-                </SelectorInput>
+                    selectorModeOn={selectorModeOn}
+                />
                 <Settings
                     tab-name={"Settings"}
                     initialSettings={options}
                     onUpdateSettings={onSaved}
                     domain={domain} path={path}
                     settingsService={settingsService}
-                    onDomainPathChange={onDomainPathChange}>
-                </Settings>
+                    onDomainPathChange={onDomainPathChange}
+                />
             </WaveTabs>
         </WaveReader>
     );
