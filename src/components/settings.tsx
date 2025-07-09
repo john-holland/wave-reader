@@ -176,34 +176,63 @@ export const Settings: FunctionComponent<SettingsProps> = ({
     ]);
 
     const resetSettings = () => {
+        console.log("🌊 Reset button clicked!");
         if (window.confirm("Are you sure you want to reset the settings?")) {
+            console.log("🌊 User confirmed reset, getting default settings...");
             const defaultSettings = Options.getDefaultOptions();
+            console.log("🌊 Default settings:", defaultSettings);
             saveSettings(defaultSettings);
+            console.log("🌊 Reset settings saved");
+        } else {
+            console.log("🌊 User cancelled reset");
         }
     }
 
     const saveSettings = (deltaSettings?: Partial<Options>) => {
+        // If deltaSettings is provided (like during reset), use those values
+        // Otherwise use the current local state values
         const settingsToSave: Options = new Options({
-                    showNotifications,
-                    going: settings.going || false,
-                    waveAnimationControl,
-                    toggleKeys,
-                    wave: new Wave({
-                        text: new Text({
-                            color: textColor,
-                            size: textSize
-                        }),
-                        selector,
-                        cssTemplate, cssMouseTemplate,
-                        waveSpeed,
-                        axisTranslateAmountXMax,
-                        axisTranslateAmountXMin,
-                        axisRotationAmountYMax,
-                        axisRotationAmountYMin,
-                    }),
-            ...deltaSettings});
+            showNotifications: deltaSettings?.showNotifications ?? showNotifications,
+            going: deltaSettings?.going ?? (settings.going || false),
+            waveAnimationControl: deltaSettings?.waveAnimationControl ?? waveAnimationControl,
+            toggleKeys: deltaSettings?.toggleKeys ?? toggleKeys,
+            wave: deltaSettings?.wave ?? new Wave({
+                text: new Text({
+                    color: deltaSettings?.wave?.text?.color ?? textColor,
+                    size: deltaSettings?.wave?.text?.size ?? textSize
+                }),
+                selector: deltaSettings?.wave?.selector ?? selector,
+                cssTemplate: deltaSettings?.wave?.cssTemplate ?? cssTemplate,
+                cssMouseTemplate: deltaSettings?.wave?.cssMouseTemplate ?? cssMouseTemplate,
+                waveSpeed: deltaSettings?.wave?.waveSpeed ?? waveSpeed,
+                axisTranslateAmountXMax: deltaSettings?.wave?.axisTranslateAmountXMax ?? axisTranslateAmountXMax,
+                axisTranslateAmountXMin: deltaSettings?.wave?.axisTranslateAmountXMin ?? axisTranslateAmountXMin,
+                axisRotationAmountYMax: deltaSettings?.wave?.axisRotationAmountYMax ?? axisRotationAmountYMax,
+                axisRotationAmountYMin: deltaSettings?.wave?.axisRotationAmountYMin ?? axisRotationAmountYMin,
+            }),
+            ...deltaSettings
+        });
 
+        // Update local state with the new settings
         setSettings(settingsToSave);
+        
+        // Update all the individual state variables to match the new settings
+        if (deltaSettings) {
+            setShowNotifications(settingsToSave.showNotifications);
+            setWaveAnimationControl(settingsToSave.waveAnimationControl);
+            setToggleKeys(settingsToSave.toggleKeys);
+            setTextColor(settingsToSave.wave.text.color);
+            setTextSize(settingsToSave.wave.text.size);
+            setSelector(settingsToSave.wave.selector);
+            setCssTemplate(settingsToSave.wave.cssTemplate);
+            setCssMouseTemplate(settingsToSave.wave.cssMouseTemplate);
+            setWaveSpeed(settingsToSave.wave.waveSpeed);
+            setAxisTranslateAmountXMax(settingsToSave.wave.axisTranslateAmountXMax);
+            setAxisTranslateAmountXMin(settingsToSave.wave.axisTranslateAmountXMin);
+            setAxisRotationAmountYMax(settingsToSave.wave.axisRotationAmountYMax);
+            setAxisRotationAmountYMin(settingsToSave.wave.axisRotationAmountYMin);
+        }
+        
         onUpdateSettings(settingsToSave);
         setSaved(true);
     }

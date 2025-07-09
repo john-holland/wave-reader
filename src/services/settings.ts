@@ -3,11 +3,15 @@ import {currentTab, Tab} from "../util/util";
 import {getSyncObject, setSyncObject} from "../util/sync";
 
 const guardUrlWithProtocol = (url: string) => {
-    if (!url || url.trim() === "") {
-        return "https://example.com";
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+        return url;
+    } else if (url.startsWith('file://')) {
+        // For file URLs, use a special domain for local files
+        return 'file://localhost';
+    } else {
+        // For other protocols or no protocol, assume it's a web URL
+        return `https://${url}`;
     }
-    const colonIndex = url.indexOf(":");
-    return colonIndex > -1 && colonIndex < url.indexOf(".") ? url : "https://" + url;
 }
 
 const tabUrl = (): Promise<string> => {
@@ -46,6 +50,18 @@ export class DomainSettings {
     getDomainPaths() {
         return new DomainPaths(this.domain, [...this.pathSettings.keys()])
     }
+
+    // Make the class serializable by converting Map to plain object
+    toJSON() {
+        const pathSettingsObj: any = {};
+        for (const [path, options] of this.pathSettings.entries()) {
+            pathSettingsObj[path] = options;
+        }
+        return {
+            domain: this.domain,
+            pathSettings: pathSettingsObj
+        };
+    }
 }
 
 export interface SettingsRegistry {
@@ -74,7 +90,7 @@ export interface SettingsDAOInterface {
      * @returns [Options] the options for the current tab or default
      */
     getCurrentSettings(): Promise<Options>;
-    updateCurrentSettings(update: { (options: Options): Options }): Promise<void>;
+    updateCurrentSettings(updatedSettings: Options | null, update: { (options: Options): Options }): Promise<void>;
     getSettingsForDomain(domain: string): Promise<DomainSettings | undefined>;
     addSettingsForDomain(domain: string, path: string, settings: Options): Promise<void>;
     getPathOptionsForDomain(domain: string, path: string): Promise<Options | undefined>;
@@ -89,10 +105,48 @@ const getSettingsRegistry = (callback: {(settingsRegistry: SettingsRegistry): vo
     const defaultSettingsRegistry: SettingsRegistry = {
         "initial": new DomainSettings("", new Map<string, Options>([[ "", Options.getDefaultOptions() ]]))
     };
-    getSyncObject(SettingsRegistryStorageKey, defaultSettingsRegistry, callback);
+    getSyncObject(SettingsRegistryStorageKey, defaultSettingsRegistry, (storedRegistry: any) => {
+        console.log(`🌊 Settings: Raw stored registry:`, storedRegistry);
+        
+        // Reconstruct the registry with proper DomainSettings objects and Map objects
+        const reconstructedRegistry: SettingsRegistry = {};
+        
+        for (const [domain, domainData] of Object.entries(storedRegistry)) {
+            console.log(`🌊 Settings: Processing domain ${domain}:`, domainData);
+            
+            if (domainData && typeof domainData === 'object' && 'domain' in domainData && 'pathSettings' in domainData) {
+                // Reconstruct the pathSettings Map from the plain object
+                const pathSettingsMap = new Map<string, Options>();
+                const pathSettingsData = (domainData as any).pathSettings;
+                
+                console.log(`🌊 Settings: PathSettings data for ${domain}:`, pathSettingsData);
+                
+                if (pathSettingsData && typeof pathSettingsData === 'object') {
+                    // Convert plain object back to Map
+                    for (const [path, options] of Object.entries(pathSettingsData)) {
+                        console.log(`🌊 Settings: Adding path ${path} with options:`, options);
+                        const newOptions = new Options(options as Partial<Options>);
+                        pathSettingsMap.set(path, newOptions);
+                    }
+                }
+                
+                console.log(`🌊 Settings: Final pathSettingsMap for ${domain}:`, pathSettingsMap);
+                
+                // Create the DomainSettings object
+                reconstructedRegistry[domain] = new DomainSettings(
+                    (domainData as any).domain,
+                    pathSettingsMap
+                );
+            }
+        }
+        
+        console.log(`🌊 Settings: Reconstructed registry:`, reconstructedRegistry);
+        callback(reconstructedRegistry);
+    });
 }
 
 const saveSettingsRegistry = (settingsRegistry: SettingsRegistry, callback?: {(): void}) => {
+    console.log(`🌊 Settings: Saving registry:`, settingsRegistry);
     setSyncObject(SettingsRegistryStorageKey, settingsRegistry, callback)
 }
 
@@ -143,13 +197,25 @@ export default class SettingsService implements SettingsDAOInterface {
     }
 
     async addSettingsForDomain(domain: string, path: string, settings: Options): Promise<void> {
+        let key = domain;
+        try {
+            const urlobj = new URL(guardUrlWithProtocol(domain));
+            if (urlobj.protocol === 'file:') {
+                key = urlobj.href;
+            } else {
+                key = urlobj.hostname;
+            }
+        } catch (e) {
+            // fallback
+        }
         return new Promise(async (resolve, reject) => {
-           const registry: SettingsRegistry = await this.getSettingsRegistryForDomain(domain, true)
+           const registry: SettingsRegistry = await this.getSettingsRegistryForDomain(key, true)
                .catch(reject) as unknown as SettingsRegistry;
-
-           registry[domain]?.pathSettings?.set(path, settings);
-           resolve();
-        })
+           registry[key]?.pathSettings?.set(path, settings);
+           this.saveSettingsRegistryProvider(registry, () => {
+               resolve();
+           });
+        });
     }
 
     /**
@@ -178,16 +244,17 @@ export default class SettingsService implements SettingsDAOInterface {
         return new Promise((resolve) => {
             this.tabUrlProvider().then(value => {
                 try {
-                    return new URL(guardUrlWithProtocol(value));
+                    const urlobj = new URL(guardUrlWithProtocol(value));
+                    // For file URLs, use the full URI as the domain and path
+                    if (urlobj.protocol === 'file:') {
+                        resolve(new DomainPaths(urlobj.href, [urlobj.pathname]));
+                    } else {
+                        resolve(new DomainPaths(urlobj.hostname, [urlobj.pathname]));
+                    }
                 } catch (e) {
-                    throw e
+                    resolve(new DomainPaths('', ['']));
                 }
-            }).then((url: URL) => {
-                return {
-                    domain: url.hostname,
-                    paths: [url.pathname]
-                } as DomainPaths
-            }).then(resolve);
+            });
         });
     }
 
@@ -197,7 +264,6 @@ export default class SettingsService implements SettingsDAOInterface {
     async getCurrentSettings(): Promise<Options> {
         return new Promise<Options>((resolve, reject) => {
             this.tabUrlProvider().then((url) => {
-                // an odd note: new URL was throwing an exception in the constructor of URL and blew up the chain
                 let urlobj: URL;
                 try {
                     urlobj = new URL(guardUrlWithProtocol(url));
@@ -205,41 +271,57 @@ export default class SettingsService implements SettingsDAOInterface {
                     reject(e);
                     return;
                 }
-
+                let domain: string;
+                let path: string;
+                if (urlobj.protocol === 'file:') {
+                    domain = urlobj.href;
+                    path = urlobj.pathname;
+                } else {
+                    domain = urlobj.hostname;
+                    path = urlobj.pathname;
+                }
                 this.settingsRegistryProvider(settingsRegistry => {
-                    if (!(urlobj.hostname in settingsRegistry)) {
-                        settingsRegistry[urlobj.hostname] = new DomainSettings(urlobj.hostname, new Map<string, Options>());
+                    if (!(domain in settingsRegistry)) {
+                        settingsRegistry[domain] = new DomainSettings(domain, new Map<string, Options>([[path, Options.getDefaultOptions()]]));
                     }
-
-                    const domainSettings = settingsRegistry[urlobj.hostname];
-
-                    if (!domainSettings.pathSettings.has(urlobj.pathname)) {
-                        const availableOptions: Options = domainSettings.pathSettings.values().next()?.value || Options.getDefaultOptions();
-
-                        console.log(`defaulting options for ${urlobj.hostname} with path: ${urlobj.pathname}`)
-                        domainSettings.pathSettings.set(urlobj.pathname, availableOptions)
+                    const domainSettings = settingsRegistry[domain];
+                    if (!domainSettings.pathSettings.has(path)) {
+                        // Use existing settings as defaults if available
+                        const existingSettings = Array.from(domainSettings.pathSettings.values());
+                        const availableOptions = existingSettings.length > 0 ? existingSettings[0] : Options.getDefaultOptions();
+                        domainSettings.pathSettings.set(path, new Options(availableOptions));
                     }
-
-                    resolve(domainSettings.pathSettings.get(urlobj.pathname)!)
-                })
+                    resolve(domainSettings.pathSettings.get(path) as Options);
+                });
             });
         });
     }
 
     async getSettingsRegistryForDomain(domain: string, defaultUndefined: boolean = true): Promise<SettingsRegistry | undefined> {
-        const hostname = new URL(guardUrlWithProtocol(domain)).hostname;
+        let key = domain;
+        try {
+            const urlobj = new URL(guardUrlWithProtocol(domain));
+            if (urlobj.protocol === 'file:') {
+                key = urlobj.href;
+            } else {
+                key = urlobj.hostname;
+            }
+        } catch (e) {
+            // fallback
+        }
         return new Promise((resolve) => {
             this.settingsRegistryProvider(settingsRegistry => {
-                if (!(hostname in settingsRegistry)) {
+                if (!(key in settingsRegistry)) {
                     if (defaultUndefined) {
-                        console.log(`defaulting options for ${hostname} with path:`)
-                        settingsRegistry[hostname] = new DomainSettings(hostname, new Map<string, Options>([["", Options.getDefaultOptions()]]))
+                        console.log(`🌊 Settings: Creating new domain ${key} with default options`);
+                        settingsRegistry[key] = new DomainSettings(key, new Map<string, Options>([
+                            ["", Options.getDefaultOptions()] // Root path gets default options
+                        ]));
                     } else {
-                        console.log("no entry for domain in the settings registry matched the desired DomainSettings")
+                        console.log("🌊 Settings: No entry for domain in the settings registry matched the desired DomainSettings");
                         resolve(undefined);
                     }
                 }
-
 
                 resolve(settingsRegistry)
             })
@@ -258,38 +340,76 @@ export default class SettingsService implements SettingsDAOInterface {
     }
 
     async getSettingsForDomain(domain: string, defaultUndefined: boolean = true): Promise<DomainSettings | undefined> {
-        const hostname = new URL(guardUrlWithProtocol(domain)).hostname;
-        const settingsRegistry: SettingsRegistry = (await this.getSettingsRegistryForDomain(hostname, defaultUndefined)) as SettingsRegistry
-
-        if (!defaultUndefined && settingsRegistry && !(hostname in settingsRegistry)) {
-            return Promise.resolve(undefined)
+        let key = domain;
+        try {
+            const urlobj = new URL(guardUrlWithProtocol(domain));
+            if (urlobj.protocol === 'file:') {
+                key = urlobj.href;
+            } else {
+                key = urlobj.hostname;
+            }
+        } catch (e) {
+            // fallback
         }
-
-        return Promise.resolve(settingsRegistry[hostname]);
+        const settingsRegistry: SettingsRegistry = (await this.getSettingsRegistryForDomain(key, defaultUndefined)) as SettingsRegistry;
+        if (!defaultUndefined && settingsRegistry && !(key in settingsRegistry)) {
+            return undefined;
+        }
+        return settingsRegistry[key];
     }
 
     async getPathOptionsForDomain(domain: string, path: string, defaultUndefined = true, useExistingInsteadOfNew = true): Promise<Options | undefined> {
-        const hostname = new URL(guardUrlWithProtocol(domain)).hostname;
-        const domainSettings = await this.getSettingsForDomain(hostname, defaultUndefined);
-
+        let key = domain;
+        try {
+            const urlobj = new URL(guardUrlWithProtocol(domain));
+            if (urlobj.protocol === 'file:') {
+                key = urlobj.href;
+            } else {
+                key = urlobj.hostname;
+            }
+        } catch (e) {
+            // fallback
+        }
+        const domainSettings = await this.getSettingsForDomain(key, defaultUndefined);
         if (domainSettings === undefined || !defaultUndefined && !domainSettings?.pathSettings.has(path)) {
             return Promise.resolve(undefined);
         } else if (!domainSettings?.pathSettings.has(path)) {
-            const availableOptions = useExistingInsteadOfNew ? domainSettings?.pathSettings.values().next()?.value || Options.getDefaultOptions() : Options.getDefaultOptions();
-
-            console.log(`defaulting options for ${domain} with path: ${path}`)
-            domainSettings?.pathSettings.set(path, availableOptions)
+            // Get existing settings from the same domain as defaults
+            const existingSettings = Array.from(domainSettings?.pathSettings.values() || []);
+            const availableOptions = useExistingInsteadOfNew && existingSettings.length > 0 
+                ? existingSettings[0] : Options.getDefaultOptions();
+            domainSettings?.pathSettings.set(path, new Options(availableOptions));
         }
-
         return Promise.resolve(domainSettings?.pathSettings.get(path));
     }
 
-    async updateCurrentSettings(update: { (options: Options): Options }): Promise<void> {
+    async updateCurrentSettings(updatedSettings: Options | null, update: { (options: Options): Options }): Promise<void> {
         return this.tabUrlProvider().then(async (url) => {
-            const tab = new URL(guardUrlWithProtocol(url));
+            const urlobj = new URL(guardUrlWithProtocol(url));
+            
+            // Handle file URLs specially
+            let domain: string;
+            let path: string;
+            
+            if (urlobj.protocol === 'file:') {
+                domain = urlobj.href;
+                path = urlobj.pathname;
+            } else {
+                domain = urlobj.hostname;
+                path = urlobj.pathname;
+            }
+            
+            console.log(`🌊 Settings: Updating settings for ${domain}${path}`);
 
-            const domainSettings = await this.getCurrentSettings();
-            return this.addSettingsForDomain(tab.hostname, tab.pathname, update(domainSettings))
+            const domainSettings = updatedSettings || await this.getCurrentSettings();
+            console.log(`🌊 Settings: Current settings before update:`, domainSettings);
+            
+            const updated = update(domainSettings);
+            console.log(`🌊 Settings: Updated settings:`, updated);
+            
+            const result = await this.addSettingsForDomain(domain, path, updated);
+            console.log(`🌊 Settings: Settings saved successfully`);
+            return result;
         });
     }
 
@@ -299,11 +419,21 @@ export default class SettingsService implements SettingsDAOInterface {
      * @returns [Promise<boolean>] if true, removed, false, not present, catch, internal error
      */
     async removeSettingsForDomain(domain: string): Promise<boolean> {
-        const hostname = new URL(guardUrlWithProtocol(domain)).hostname;
+        let key = domain;
+        try {
+            const urlobj = new URL(guardUrlWithProtocol(domain));
+            if (urlobj.protocol === 'file:') {
+                key = urlobj.href;
+            } else {
+                key = urlobj.hostname;
+            }
+        } catch (e) {
+            // fallback
+        }
         return new Promise((resolve) => {
             this.settingsRegistryProvider(settingsRegistry => {
-                if (hostname in settingsRegistry) {
-                    delete settingsRegistry[hostname];
+                if (key in settingsRegistry) {
+                    delete settingsRegistry[key];
                     this.saveSettingsRegistryProvider(settingsRegistry, () => {
                         resolve(true);
                     })
@@ -315,17 +445,27 @@ export default class SettingsService implements SettingsDAOInterface {
     }
 
     async removeSettingsForDomainPath(domain: string, path: string, deleteDomainIfEmpty: boolean = true): Promise<boolean> {
-        const hostname = new URL(guardUrlWithProtocol(domain)).hostname;
+        let key = domain;
+        try {
+            const urlobj = new URL(guardUrlWithProtocol(domain));
+            if (urlobj.protocol === 'file:') {
+                key = urlobj.href;
+            } else {
+                key = urlobj.hostname;
+            }
+        } catch (e) {
+            // fallback
+        }
         return new Promise((resolve) => {
             this.settingsRegistryProvider(settingsRegistry => {
-                if (hostname in settingsRegistry) {
-                    const domainSettings = settingsRegistry[hostname];
+                if (key in settingsRegistry) {
+                    const domainSettings = settingsRegistry[key];
                     if (domainSettings.pathSettings.has(path)) {
-                        settingsRegistry[hostname].pathSettings.delete(path)
+                        settingsRegistry[key].pathSettings.delete(path)
                     }
 
                     if (deleteDomainIfEmpty && domainSettings.pathSettings.size === 0) {
-                        delete settingsRegistry[hostname]
+                        delete settingsRegistry[key]
                     }
 
                     this.saveSettingsRegistryProvider(settingsRegistry, () => {

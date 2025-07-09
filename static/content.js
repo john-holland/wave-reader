@@ -42,14 +42,14 @@ window.addEventListener('message', (event) => {
     }
 
     const message = event.data.message;
-    console.log(`Content script received message: ${JSON.stringify(message)}`);
+    console.log(`🌊 Content script received message: ${JSON.stringify(message)}`);
 
     try {
-        console.log(`Processing message: ${message.name}`);
+        console.log(`🌊 Processing message: ${message.name}`);
         stateMachine.handleState(message);
-        console.log(`Message processed successfully`);
+        console.log(`🌊 Message processed successfully`);
     } catch (e) {
-        console.error(`Failed to process message: ${JSON.stringify(message)}, error: ${e.message}`);
+        console.error(`🌊 Failed to process message: ${JSON.stringify(message)}, error: ${e.message}`);
     }
 });
 
@@ -267,6 +267,7 @@ function StateNameMap(map = new Map()) {
                 selector,
                 passSetSelector: (modifier) => { setHierarchySelector = modifier; },
                 onConfirmSelector: (selector) => {
+                    console.log("🌊 onConfirmSelector called with selector:", selector);
                     stateMachine.handleState(new SelectionMadeMessage({
                         selector
                     }))
@@ -280,16 +281,92 @@ function StateNameMap(map = new Map()) {
             return map.get('selection mode')
         }, false),
         "selection made": CState("selection made", ["end-selection-choose"], true, async (message, state, previousState) => {
-            // await settingsService.updateCurrentSettings((options) => {
-            //     options.selectors.push(message?.selector)
-            //     options.wave.selector = message?.selector;
-            //     return options;
-            // })
-
-            // Chrome APIs not available in MAIN world, so we can't send messages back
-            // The selection will be handled by the popup directly
-
-            return Promise.resolve(map.get('end-selection-choose'))
+            console.log("🌊 Selection made state triggered with selector:", message?.selector);
+            
+            // Send the selection back to the popup through the background script
+            console.log("🌊 Sending selection back to popup via background script...");
+            
+            return new Promise((resolve) => {
+                let messageSent = false;
+                let timeoutId;
+                
+                // Set up a timeout to handle cases where the message isn't received
+                timeoutId = setTimeout(() => {
+                    if (!messageSent) {
+                        console.warn("🌊 Timeout: Selection message not confirmed, trying alternative method...");
+                        
+                        // Try alternative method - send directly to background script
+                        try {
+                            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                                chrome.runtime.sendMessage({
+                                    from: 'content-script',
+                                    name: 'selection-made',
+                                    selector: message?.selector
+                                }).then(() => {
+                                    console.log('🌊 Selection sent via Chrome runtime');
+                                }).catch(error => {
+                                    console.log('🌊 Failed to send via Chrome runtime:', error);
+                                });
+                            }
+                        } catch (error) {
+                            console.error("🌊 Failed to send selection via Chrome runtime:", error);
+                        }
+                        
+                        // Resolve anyway after timeout
+                        resolve(map.get('end-selection-choose'));
+                    }
+                }, 2000); // 2 second timeout
+                
+                // Listen for confirmation that the message was received
+                const handleConfirmation = (event) => {
+                    if (event.source === window && event.data && event.data.source === 'wave-reader-extension') {
+                        if (event.data.message && event.data.message.name === 'selection-confirmed') {
+                            console.log("🌊 Selection confirmed by background script");
+                            messageSent = true;
+                            clearTimeout(timeoutId);
+                            window.removeEventListener('message', handleConfirmation);
+                            resolve(map.get('end-selection-choose'));
+                        }
+                    }
+                };
+                
+                // Add listener for confirmation
+                window.addEventListener('message', handleConfirmation);
+                
+                // Send the message via Chrome runtime
+                if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                    chrome.runtime.sendMessage({
+                        from: 'content-script',
+                        name: 'selection-made',
+                        selector: message?.selector
+                    }).then(() => {
+                        console.log("🌊 Selection message sent via Chrome runtime");
+                    }).catch(error => {
+                        console.error("🌊 Failed to send selection via Chrome runtime:", error);
+                        // Try window.postMessage as fallback
+                        window.postMessage({
+                            source: 'wave-reader-extension',
+                            message: {
+                                from: 'content-script',
+                                name: 'selection-made',
+                                selector: message?.selector
+                            }
+                        }, '*');
+                    });
+                } else {
+                    // Fallback to window.postMessage if Chrome runtime not available
+                    window.postMessage({
+                        source: 'wave-reader-extension',
+                        message: {
+                            from: 'content-script',
+                            name: 'selection-made',
+                            selector: message?.selector
+                        }
+                    }, '*');
+                }
+                
+                console.log("🌊 Selection message sent, waiting for confirmation...");
+            });
         }, false),
         "end-selection-choose": CState("end-selection-choose", BaseVentures, true, async (message, state, previousState) => {
             hierarchySelectorMount.remove()
@@ -314,7 +391,9 @@ function StateNameMap(map = new Map()) {
 
 let going = false;
 
+console.log("🌊 Initializing state machine...");
 stateMachine.initialize(new StateNameMap(stateMachineMap), Base);
+console.log("🌊 State machine initialized with base state");
 
 // settingsService.getCurrentSettings().then(settings => {
 //     stateMachine.handleState(new UpdateWaveMessage({ options: settings }))
@@ -324,27 +403,30 @@ const ContentReactMachine = ReactMachine({
     
 })
 
+console.log("🌊 Content script setup complete, ready to receive messages");
+
 // Check if chrome.runtime is available before setting up message listener
 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener( (message, sender, sendResponse) => {
-        console.log(`Content script received message: ${JSON.stringify(message)}`)
+        console.log(`🌊 Content script received message: ${JSON.stringify(message)}`)
 
         if (guardLastError()) {
-            console.log('Guard last error returned true, ignoring message');
+            console.log('🌊 Guard last error returned true, ignoring message');
             return false;
         }
 
-        if (message.from !== "popup") {
-            console.log(`Message not from popup, ignoring. From: ${message.from}`);
+        // Accept messages from both popup and background-script
+        if (message.from !== "popup" && message.from !== "background-script") {
+            console.log(`🌊 Message not from popup or background-script, ignoring. From: ${message.from}`);
             return false;
         }
 
         try {
-            console.log(`Processing message: ${message.name}`);
+            console.log(`🌊 Processing message: ${message.name}`);
             stateMachine.handleState(message);
-            console.log(`Message processed successfully`);
+            console.log(`🌊 Message processed successfully`);
         } catch (e) {
-            console.error(`Failed to process message: ${JSON.stringify(message)}, error: ${e.message}`);
+            console.error(`🌊 Failed to process message: ${JSON.stringify(message)}, error: ${e.message}`);
             throw new Error(`Failed to process message: ${e.message}`);
         }
 

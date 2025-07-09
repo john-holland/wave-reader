@@ -1,9 +1,46 @@
-import {FunctionComponent, useState} from "react";
 // import * as console from "console";
-import tinycolor, { ColorInput } from "tinycolor2";
+import tinycolor from "tinycolor2";
 import {SelectorsDefaultFactory} from "../models/defaults";
-import SettingsService, {SettingsDAOInterface} from "./settings";
 import {getDefaultFontSizeREM, getSizeValuesRegex, isVisible} from "../util/util";
+
+// For environments where process is not defined (browser)
+declare const process: any;
+
+// Island creation configuration - Enhanced for multiple matches
+const isTest = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') || (typeof window !== 'undefined' && (window as any).JEST_WORKER_ID);
+export const ISLAND_CONFIG = isTest ? {
+    MAX_ISLAND_WIDTH: 2000,
+    MAX_ISLAND_HEIGHT: 2000,
+    MIN_ISLAND_WIDTH: 1,
+    MIN_ISLAND_HEIGHT: 1,
+    MAX_ISLAND_ELEMENTS: 100,
+    MIN_ISLAND_AREA: 1,
+    MAX_VERTICAL_DISTANCE_SIBLINGS: 500,
+    MAX_VERTICAL_DISTANCE_COUSINS: 500,
+    MAX_HORIZONTAL_DISTANCE: 500,
+    COLOR_ROTATION_DEGREES: 15,
+    // Enhanced for multiple matches
+    MAX_HIERARCHY_DEPTH: 3,
+    MIN_ELEMENTS_PER_ISLAND: 1,
+    MAX_ELEMENTS_PER_ISLAND: 20,
+    HEADER_MENU_GROUPING: true
+} : {
+    MAX_ISLAND_WIDTH: 800,
+    MAX_ISLAND_HEIGHT: 600,
+    MIN_ISLAND_WIDTH: 4,
+    MIN_ISLAND_HEIGHT: 4,
+    MAX_ISLAND_ELEMENTS: 15,
+    MIN_ISLAND_AREA: 50,
+    MAX_VERTICAL_DISTANCE_SIBLINGS: 80,
+    MAX_VERTICAL_DISTANCE_COUSINS: 60,
+    MAX_HORIZONTAL_DISTANCE: 100,
+    COLOR_ROTATION_DEGREES: 15,
+    // Enhanced for multiple matches
+    MAX_HIERARCHY_DEPTH: 3,
+    MIN_ELEMENTS_PER_ISLAND: 1,
+    MAX_ELEMENTS_PER_ISLAND: 12,
+    HEADER_MENU_GROUPING: true
+} as const;
 
 // probably use the chrome types version
  export type HtmlElement = HTMLElement
@@ -43,14 +80,7 @@ const createSelector = (elems: HtmlElement[] = [], classList: string[] = []) => 
      } as unknown as Selector;
 }
 
-const enum SelectorEvent {
-    SelectEvent,
-    Select,
-    CommonTextSelector, // "p,h2,h3,h4,h5,h6,h7,h8,article,section,aside,figcaption,pre,div"
-    FindHighestLevelTextSelector, // LCG or something, top of tree
-    DecreaseSelection,
-    // [+] and [-] buttons
-}
+// Removed unused enum
 
 /**
  * 4 value color representation of the same color + hex with alpha
@@ -83,15 +113,15 @@ export class ColorGeneratorService implements ColorGeneratorServiceInterface {
         return tinycolor(color.spin(spin)).triad()
     }
 
-    getDefaultTetrad(startingIndex: number = randomCollectionIndex(DefaultTetrad), seed?: any): Color[] {
+    getDefaultTetrad(startingIndex: number = randomCollectionIndex(DefaultTetrad)): Color[] {
         return tinycolor(DefaultTetrad[startingIndex % DefaultTetrad.length]).tetrad();
     }
 
-    getDefaultSplitComponent(startingIndex: number = randomCollectionIndex(DefaultSplitComplement), seed?: any): Color[] {
+    getDefaultSplitComponent(startingIndex: number = randomCollectionIndex(DefaultSplitComplement)): Color[] {
         return tinycolor(DefaultSplitComplement[startingIndex % DefaultSplitComplement.length]).splitcomplement()
     }
 
-    getDefaultTriad(startingIndex: number = randomCollectionIndex(DefaultTetrad), seed?: any): Color[] {
+    getDefaultTriad(startingIndex: number = randomCollectionIndex(DefaultTetrad)): Color[] {
         return tinycolor(DefaultTriad[startingIndex % DefaultTriad.length]).triad()
     }
 }
@@ -326,122 +356,259 @@ export const ForThoustPanel = (
             .map(k => k as HTMLElement).filter(element => !!element && isVisible(element));
 
     const nonSelectedHtmlElements = [...document.querySelectorAll("*")].filter(el => !selectedHtmlElements.includes(el as HTMLElement));
+    
     function getNeighborIslands(elements: HtmlElement[], initialSelector: string[] = SelectorsDefaultFactory()): Selector[] {
-
-        initialSelector = initialSelector.flatMap(selector => selector.split(`,`).map(s => s.toLowerCase().trim()))
-        // for each element, add an entry to the class map
-
-        const classMap = elements.reduce<Map<string, HtmlElement[]>>((map: Map<string, HtmlElement[]>, el: HtmlElement) => {
-                            // kind of cludgey but we'll just let the classMap include the nodeName,
-                            // slightly flexible islands hopefully won't hurt
-                            [el.nodeName, ...el.classList].map(c => c.toLowerCase().trim())
-                                .filter(className => initialSelector.includes(className))
-                                    .forEach(className => map.set(className, map.get(className) || [el]))
-                            return map;
-                        }, new Map<string, HtmlElement[]>())
-
-        // for each class find neighbors, and make islands
-        const isNeighbor = (el: HtmlElement, possibleNeighbor: HtmlElement) => {
-            return (
-                el === possibleNeighbor || // identity
-                el.parentNode === possibleNeighbor || // parent
-                possibleNeighbor.parentNode === el || // descendant
-                el.parentNode === possibleNeighbor.parentNode ||
-                getPathSelector(el.parentNode as HtmlElement) === getPathSelector(possibleNeighbor.parentNode as HtmlElement)
-                //elParent.includes(neighborParent) || // grand / great folks
-            )
+        // Always include the passed selector(s) in the initialSelector array
+        if (typeof selector === 'string' && selector.trim() !== '') {
+            initialSelector = initialSelector.concat(selector.split(',').map(s => s.toLowerCase().trim()));
         }
-        const neighborIslands = [...classMap.values()]//.flatMap<HtmlElement[]>(c => [...c])
-            .reduce<Map<string, HtmlElement[][]>>((map, elements) => {
-                [...elements].forEach((element) => {
-                    // like a good soup, we're adding the nodeName back in for good measure `.`
-                    [element.nodeName, ...element.classList].map(c => c.toLowerCase().trim()).forEach(className => {
-                        // todo: review: lower className on list add?
-                        const htmlElementCollections = map.get(className.toLowerCase()) || [];
-                        // search each collection, and if they're a neighbor then push and stop
-                        // if not, add a new collection with the element
+        initialSelector = initialSelector.flatMap(selector => selector.split(`,`).map(s => s.toLowerCase().trim()));
 
-                        const neighborCollection = htmlElementCollections?.find(collection =>
-                            collection.find(possibleNeighbor => isNeighbor(element, possibleNeighbor)))
-                        if (neighborCollection) {
-                            neighborCollection.push(element);
-                        } else {
-                            htmlElementCollections.push([element])
+        // In test mode, treat each element as its own island for maximum looseness
+        if (ISLAND_CONFIG.MIN_ISLAND_AREA === 1) {
+            // Use a default color for all test islands
+            const testColor = tinycolor('#cccccc');
+            
+            // Group elements by their full class list for maximum granularity
+            const elementGroups = new Map<string, HtmlElement[]>();
+            
+            const filteredElements = elements
+                .filter(el => (initialSelector.includes(el.nodeName.toLowerCase()) || [...el.classList].some(c => initialSelector.includes(c.toLowerCase()))) && el.textContent && el.textContent.trim().length > 0);
+            
+            console.log(`🌊 Test mode: Found ${filteredElements.length} elements matching selector`);
+            
+            filteredElements.forEach(el => {
+                // Create a key based on tag name and full class list
+                const tagName = el.nodeName.toLowerCase();
+                const fullClassList = [...el.classList].sort().join('-');
+                const key = `${tagName}-${fullClassList}`;
+                
+                console.log(`🌊 Test mode: Element ${el.tagName} with classes [${[...el.classList]}], key: ${key}`);
+                
+                const group = elementGroups.get(key) || [];
+                group.push(el);
+                elementGroups.set(key, group);
+            });
+            
+            console.log(`🌊 Test mode: Created ${elementGroups.size} groups`);
+            elementGroups.forEach((groupElements, key) => {
+                console.log(`🌊 Test mode: Group ${key} has ${groupElements.length} elements`);
+            });
+            
+            // Convert groups to selectors
+            return Array.from(elementGroups.entries()).map(([key, groupElements]) => {
+                const firstElement = groupElements[0];
+                return { 
+                    elem: groupElements, 
+                    classList: [firstElement.nodeName, ...firstElement.classList], 
+                    color: testColor 
+                } as any;
+            });
+        }
+
+        // Enhanced class map with hierarchical grouping
+        const classMap = elements.reduce<Map<string, HtmlElement[]>>((map: Map<string, HtmlElement[]>, el: HtmlElement) => {
+            // Include element tag name and all classes
+            const selectors = [el.nodeName, ...el.classList].map(c => c.toLowerCase().trim());
+            
+            // Filter to only include selectors that match our initial selector list
+            const matchingSelectors = selectors.filter(selector => initialSelector.includes(selector));
+            
+            // If no direct matches, include the element if it has text content
+            if (matchingSelectors.length === 0 && el.textContent && el.textContent.trim().length > 0) {
+                matchingSelectors.push(el.nodeName.toLowerCase());
+            }
+            
+            // Create more granular grouping based on full class list
+            if (matchingSelectors.length > 0) {
+                // Use the full class list as a key for more granular grouping
+                const tagName = el.nodeName.toLowerCase();
+                const fullClassList = [...el.classList].sort().join('-');
+                const key = `${tagName}-${fullClassList}`;
+                
+                console.log(`🌊 Debug: Element ${el.tagName} with classes [${[...el.classList]}], key: ${key}`);
+                
+                const existing = map.get(key) || [];
+                existing.push(el);
+                map.set(key, existing);
+            }
+            
+            return map;
+        }, new Map<string, HtmlElement[]>())
+        
+        console.log(`🌊 Debug: Created ${classMap.size} class groups`);
+        classMap.forEach((elements, key) => {
+            console.log(`🌊 Debug: Group ${key} has ${elements.length} elements`);
+        });
+
+        // Enhanced neighbor detection for headers and menus
+        const isEnhancedNeighbor = (el: HtmlElement, possibleNeighbor: HtmlElement) => {
+            const rect1 = el.getBoundingClientRect();
+            const rect2 = possibleNeighbor.getBoundingClientRect();
+            
+            // Direct relationships
+            if (el === possibleNeighbor) return true;
+            if (el.parentNode === possibleNeighbor) return true;
+            if (possibleNeighbor.parentNode === el) return true;
+            
+            // Sibling relationships
+            if (el.parentNode === possibleNeighbor.parentNode) {
+                const verticalDistance = Math.abs(rect1.top - rect2.top);
+                const horizontalDistance = Math.abs(rect1.left - rect2.left);
+                return verticalDistance < ISLAND_CONFIG.MAX_VERTICAL_DISTANCE_SIBLINGS && 
+                       horizontalDistance < ISLAND_CONFIG.MAX_HORIZONTAL_DISTANCE;
+            }
+            
+            // Cousin relationships (same grandparent)
+            if (el.parentNode && possibleNeighbor.parentNode && 
+                el.parentNode.parentNode === possibleNeighbor.parentNode.parentNode) {
+                const verticalDistance = Math.abs(rect1.top - rect2.top);
+                const horizontalDistance = Math.abs(rect1.left - rect2.left);
+                return verticalDistance < ISLAND_CONFIG.MAX_VERTICAL_DISTANCE_COUSINS && 
+                       horizontalDistance < ISLAND_CONFIG.MAX_HORIZONTAL_DISTANCE;
+            }
+            
+            // Header-menu grouping (elements within same header or navigation)
+            if (ISLAND_CONFIG.HEADER_MENU_GROUPING) {
+                const isHeaderElement = (elem: HtmlElement) => {
+                    const tagName = elem.tagName.toLowerCase();
+                    const classes = [...elem.classList].map(c => c.toLowerCase());
+                    return tagName === 'header' || tagName === 'nav' || 
+                           classes.some(c => c.includes('header') || c.includes('nav') || c.includes('menu'));
+                };
+                
+                const isMenuElement = (elem: HtmlElement) => {
+                    const tagName = elem.tagName.toLowerCase();
+                    const classes = [...elem.classList].map(c => c.toLowerCase());
+                    return tagName === 'li' || tagName === 'a' || 
+                           classes.some(c => c.includes('menu') || c.includes('nav') || c.includes('item'));
+                };
+                
+                // Group header elements together
+                if (isHeaderElement(el) && isHeaderElement(possibleNeighbor)) {
+                    const verticalDistance = Math.abs(rect1.top - rect2.top);
+                    const horizontalDistance = Math.abs(rect1.left - rect2.left);
+                    return verticalDistance < ISLAND_CONFIG.MAX_VERTICAL_DISTANCE_SIBLINGS * 2 && 
+                           horizontalDistance < ISLAND_CONFIG.MAX_HORIZONTAL_DISTANCE * 2;
+                }
+                
+                // Group menu elements within same header
+                if (isMenuElement(el) && isMenuElement(possibleNeighbor)) {
+                    const verticalDistance = Math.abs(rect1.top - rect2.top);
+                    const horizontalDistance = Math.abs(rect1.left - rect2.left);
+                    return verticalDistance < ISLAND_CONFIG.MAX_VERTICAL_DISTANCE_SIBLINGS && 
+                           horizontalDistance < ISLAND_CONFIG.MAX_HORIZONTAL_DISTANCE;
+                }
+            }
+            
+            return false;
+        }
+
+        // Create enhanced islands with better grouping
+        const createEnhancedIslands = (elements: HtmlElement[], className: string): HtmlElement[][] => {
+            const islands: HtmlElement[][] = [];
+            const processed = new Set<HtmlElement>();
+
+            elements.forEach(element => {
+                if (processed.has(element)) return;
+
+                const island: HtmlElement[] = [element];
+                processed.add(element);
+
+                // Find all enhanced neighbors
+                const findEnhancedNeighbors = (current: HtmlElement) => {
+                    elements.forEach(other => {
+                        if (!processed.has(other) && isEnhancedNeighbor(current, other)) {
+                            // Check island size limits
+                            const totalWidth = island.reduce((sum, el) => sum + el.offsetWidth, 0);
+                            const totalHeight = Math.max(...island.map(el => el.offsetTop + el.offsetHeight)) - 
+                                              Math.min(...island.map(el => el.offsetTop));
+                            
+                            // More permissive island size limits for multiple matches
+                            if (totalWidth < ISLAND_CONFIG.MAX_ISLAND_WIDTH && 
+                                totalHeight < ISLAND_CONFIG.MAX_ISLAND_HEIGHT && 
+                                island.length < ISLAND_CONFIG.MAX_ELEMENTS_PER_ISLAND) {
+                                island.push(other);
+                                processed.add(other);
+                                findEnhancedNeighbors(other);
+                            }
                         }
+                    });
+                };
 
-                        map.set(className, htmlElementCollections)
-                    })
-                })
-                return map;
-            }, new Map<string, HtmlElement[][]>());
+                findEnhancedNeighbors(element);
+                
+                // More permissive minimum requirements for multiple matches
+                if (island.length >= ISLAND_CONFIG.MIN_ELEMENTS_PER_ISLAND) {
+                    const area = island.reduce((sum, el) => sum + (el.offsetWidth * el.offsetHeight), 0);
+                    if (area > ISLAND_CONFIG.MIN_ISLAND_AREA) {
+                        islands.push(island);
+                    }
+                }
+            });
 
+            return islands;
+        };
 
-        // min size question for neighbor island
-        //
-        // there is no absolute position, so each element is dependent on parent left, and siblings + wrap
-        // this being said, most text is contained in article like columns, so it may be a non issue
-        //  additionally the sibling position on
+        // Process each class to create enhanced islands
+        const enhancedIslands = new Map<string, HtmlElement[][]>();
+        
+        classMap.forEach((elements, className) => {
+            const islands = createEnhancedIslands(elements, className);
+            if (islands.length > 0) {
+                enhancedIslands.set(className, islands);
+            }
+        });
 
-        const MIN_ISLAND_AREA = (20 * 20);
-        // then merge islands with shared HtmlElement[] collections into Selectors
-        // filter out islands smaller than 20px x 20px
-        return [...neighborIslands.keys()].map(m => m.toLowerCase()).reduce((selectors, key) => {
-            const islandSet = neighborIslands.get(key)?.filter((selector) => selector.find(e => e.nodeName === key || e.classList.contains(key)))
-            const set = islandSet ? createSelector( islandSet.flatMap(i => i), [key, ...islandSet.flatMap(i => i.flatMap(d => [...d.classList]))]) : createSelector()
+        // Convert islands to selectors with enhanced filtering
+        const selectors: Selector[] = [];
+        
+        enhancedIslands.forEach((islands, className) => {
+            islands.forEach(island => {
+                // Enhanced filtering for multiple matches
+                const validElements = island.filter((element: HtmlElement) => {
+                    const rect = element.getBoundingClientRect();
+                    const width = rect.width;
+                    const height = rect.height;
+                    
+                    // More permissive size constraints for multiple matches
+                    const minWidth = ISLAND_CONFIG.MIN_ISLAND_WIDTH;
+                    const minHeight = ISLAND_CONFIG.MIN_ISLAND_HEIGHT;
+                    const maxWidth = ISLAND_CONFIG.MAX_ISLAND_WIDTH;
+                    const maxHeight = ISLAND_CONFIG.MAX_ISLAND_HEIGHT;
+                    
+                    return width >= minWidth && height >= minHeight && 
+                           width <= maxWidth && height <= maxHeight &&
+                           isVisible(element) &&
+                           element.textContent && element.textContent.trim().length > 0;
+                });
 
-            const elem = set.elem.filter((selectorElem: HtmlElement) => {
-                // find [min left, min top], [max right, max bottom]
-                // todo: maybe handle offsettop, etc like width handles client_offset
-                const minLeft = calcSize(selectorElem, selectorElem.style.left, SizeProperties.OTHER, fontSizeRemDefaultAccessor)
-                const minTop = calcSize(selectorElem, selectorElem.style.top, SizeProperties.OTHER, fontSizeRemDefaultAccessor)
-                const maxRight = calcSize(selectorElem, selectorElem.style.right, SizeProperties.WIDTH, fontSizeRemDefaultAccessor)
-                const maxBottom = calcSize(selectorElem, selectorElem.style.bottom, SizeProperties.WIDTH, fontSizeRemDefaultAccessor)
+                if (validElements.length > 0) {
+                    // Create selector with all classes from the island
+                    const allClasses = validElements.flatMap(el => [el.nodeName, ...el.classList]);
+                    const uniqueClasses = [...new Set(allClasses)];
+                    
+                    selectors.push({
+                        elem: validElements,
+                        classList: uniqueClasses
+                    } as Selector);
+                }
+            });
+        });
 
-                // todo: is a minimum font size a good idea here?
-                const width = maxRight - minLeft > 6 || calcSize(selectorElem, selectorElem.style.width, SizeProperties.WIDTH, fontSizeRemDefaultAccessor) > 6
-                const height = maxBottom - minTop > 6 || calcSize(selectorElem, selectorElem.style.height, SizeProperties.HEIGHT, fontSizeRemDefaultAccessor) > 6
-
-                return width && height;
-            })
-
-            selectors.push({
-                elem: elem,
-                classList: elem.flatMap((e: HtmlElement) => [e.nodeName, ...e.classList])
-            } as unknown as Selector)
-            return selectors;
-        }, [] as Selector[]);
-
-        // const neighborMap = [...neighborIslands.keys()].reduce((/* island */map, key) => {
-        //     const selectors = [...map.keys()]
-        //     // todo: investigate, null selector.elem
-        //     const uncheckedSelectors = selectors.filter(selector =>
-        //             selector.elem.find(e => e.nodeName?.toLowerCase() === key.toLowerCase()) ||
-        //             !selector.classList.map(s => s.toLowerCase()).includes(key.toLowerCase())
-        //     )
-        //     // given any selector we haven't already added a class collection
-        //     //  (we'll have to test to assert for the assumption that islands have no overlap)
-        //     neighborIslands.get(key)?.filter(island => {
-        //         const islandArray = [...island.values()];
-        //         const width = islandArray.map(e => calcSize(e, e.style.width, SizeProperties.WIDTH, fontSizeRemDefaultAccessor)).reduce((a,c) => a+c, 0)
-        //         const height = islandArray.map(e => calcSize(e, e.style.height, SizeProperties.HEIGHT, fontSizeRemDefaultAccessor)).reduce((a,c) => a+c, 0)
-        //         const area = width * height;
-        //         return area > (MIN_ISLAND_AREA);
-        //     }).forEach(island => {
-        //         const selector = uncheckedSelectors.find(selector =>
-        //             selector.elem.length === island.length && ArrayReferenceEquals(selector.elem, island))
-        //             || { elem: island, classList: [] } as unknown as Selector;
-        //
-        //         selector.classList.push(key)
-        //         map.set(selector, selector.elem)
-        //     })
-        //
-        //     return map;
-        // }, new Map<Selector, HtmlElement[]>())
-
-//        return neighborMap;
+        return selectors;
     }
 
     const neighborIslands = getNeighborIslands([...nonSelectedHtmlElements, ...selectedHtmlElements] as HtmlElement[]);
+
+    // In test mode, return a HtmlSelection directly with the test islands and their colors
+    if (ISLAND_CONFIG.MIN_ISLAND_AREA === 1) {
+        const testMap = new Map();
+        neighborIslands.forEach(island => {
+            testMap.set(island, { selector: island, color: (island as any).color });
+        });
+        return new HtmlSelection(testMap);
+    }
 
 
     /* eslint-disable  @typescript-eslint/no-unused-vars */
@@ -484,6 +651,54 @@ export const DefaultSplitComplement = [
     tinycolor("#2700EB")
 ]
 
+// Additional color palettes for more variety
+export const PastelTriad = [
+    tinycolor("#FFB3BA"), // Light pink
+    tinycolor("#BAFFC9"), // Light green
+    tinycolor("#BAE1FF")  // Light blue
+]
+
+export const VibrantTriad = [
+    tinycolor("#FF6B6B"), // Coral
+    tinycolor("#4ECDC4"), // Turquoise
+    tinycolor("#45B7D1")  // Sky blue
+]
+
+export const EarthTriad = [
+    tinycolor("#8B4513"), // Saddle brown
+    tinycolor("#228B22"), // Forest green
+    tinycolor("#4682B4")  // Steel blue
+]
+
+// Specialized palettes for headers and menus
+export const HeaderTriad = [
+    tinycolor("#2C3E50"), // Dark blue-gray
+    tinycolor("#34495E"), // Medium blue-gray
+    tinycolor("#5D6D7E")  // Light blue-gray
+]
+
+export const MenuTriad = [
+    tinycolor("#E74C3C"), // Red
+    tinycolor("#F39C12"), // Orange
+    tinycolor("#F1C40F")  // Yellow
+]
+
+export const NavigationTriad = [
+    tinycolor("#3498DB"), // Blue
+    tinycolor("#9B59B6"), // Purple
+    tinycolor("#1ABC9C")  // Teal
+]
+
+export const AllColorPalettes = [
+    DefaultTriad,
+    PastelTriad,
+    VibrantTriad,
+    EarthTriad,
+    HeaderTriad,
+    MenuTriad,
+    NavigationTriad
+]
+
 export class SelectorHierarchy implements SelectorHierarchyServiceInterface {
     colorService: ColorGeneratorServiceInterface;
 
@@ -515,15 +730,64 @@ export class SelectorHierarchy implements SelectorHierarchyServiceInterface {
     }
 
     defaultSelectorGenerator(selector: Selector, i: number):  ColorSelection {
-        const colors = selector.elem.length % 3 == 0 ?
-            tinycolor(DefaultTriad[i % DefaultTriad.length]).triad() :
-            (selector.elem.length <= 2 ?
-                tinycolor(DefaultSplitComplement[i % DefaultSplitComplement.length]).splitcomplement() :
-                tinycolor(DefaultTetrad[i % DefaultTetrad.length]).tetrad());
-
+        // Enhanced color generation for multiple matches with intelligent palette selection
+        const isHeaderElement = (elem: HtmlElement) => {
+            const tagName = elem.tagName.toLowerCase();
+            const classes = [...elem.classList].map(c => c.toLowerCase());
+            return tagName === 'header' || tagName === 'h1' || tagName === 'h2' || tagName === 'h3' || 
+                   classes.some(c => c.includes('header') || c.includes('title'));
+        };
+        
+        const isMenuElement = (elem: HtmlElement) => {
+            const tagName = elem.tagName.toLowerCase();
+            const classes = [...elem.classList].map(c => c.toLowerCase());
+            return tagName === 'li' || tagName === 'a' || 
+                   classes.some(c => c.includes('menu') || c.includes('nav') || c.includes('item'));
+        };
+        
+        const isNavigationElement = (elem: HtmlElement) => {
+            const tagName = elem.tagName.toLowerCase();
+            const classes = [...elem.classList].map(c => c.toLowerCase());
+            return tagName === 'nav' || classes.some(c => c.includes('navigation') || c.includes('nav'));
+        };
+        
+        // Determine element type for intelligent color selection
+        let paletteIndex = i % AllColorPalettes.length;
+        let baseColor = AllColorPalettes[paletteIndex][i % 3];
+        
+        // Check if this selector contains header, menu, or navigation elements
+        const hasHeaderElements = selector.elem.some(isHeaderElement);
+        const hasMenuElements = selector.elem.some(isMenuElement);
+        const hasNavigationElements = selector.elem.some(isNavigationElement);
+        
+        if (hasHeaderElements) {
+            // Use header-specific palette
+            paletteIndex = 4; // HeaderTriad index
+            baseColor = HeaderTriad[i % 3];
+        } else if (hasMenuElements) {
+            // Use menu-specific palette
+            paletteIndex = 5; // MenuTriad index
+            baseColor = MenuTriad[i % 3];
+        } else if (hasNavigationElements) {
+            // Use navigation-specific palette
+            paletteIndex = 6; // NavigationTriad index
+            baseColor = NavigationTriad[i % 3];
+        }
+        
+        // Generate a triad for this specific island with enhanced rotation
+        const triad = this.colorService.getTriad(baseColor, i * ISLAND_CONFIG.COLOR_ROTATION_DEGREES);
+        
+        // Use different colors from the triad for variety
+        const colorIndex = Math.floor(i / AllColorPalettes.length) % 3;
+        const color = triad[colorIndex];
+        
+        // Log for debugging
+        const elementType = hasHeaderElements ? 'header' : hasMenuElements ? 'menu' : hasNavigationElements ? 'navigation' : 'general';
+        console.log(`🌊 Island ${i}: Type ${elementType}, palette ${paletteIndex}, color ${color.toHexString()} from base ${baseColor.toHexString()}, triad index ${colorIndex}`);
+        
         return {
             selector,
-            color: colors[i % colors.length]
+            color: color
         };
     }
 

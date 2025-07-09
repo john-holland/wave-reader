@@ -1,6 +1,7 @@
 import { getSyncObject, setSyncObject } from '../util/sync'
 import {SettingsDAOInterface} from "./settings";
 import { SelectorDefault } from "../models/defaults"
+import Options from "../models/options";
 
 export interface SelectorServiceInterface {
     addSelector(selector: string): Promise<void>;
@@ -20,7 +21,7 @@ export default class SelectorService implements SelectorServiceInterface {
     async addSelector(selector: string): Promise<void> {
         // TODO: validate selector? because of how loose the selector protocol is, i'm not sure it's worth it, other than to
         // todo:  callout possibly sus selector characters, like the quotes copied in
-        return this.settings.updateCurrentSettings(options => {
+        return this.settings.updateCurrentSettings(null, (options: Options) => {
             options.selectors.push(selector);
             return options;
         })
@@ -31,7 +32,7 @@ export default class SelectorService implements SelectorServiceInterface {
     }
 
     async removeSelector(selector: string): Promise<void> {
-        return this.settings.updateCurrentSettings(options => {
+        return this.settings.updateCurrentSettings(null, (options: Options) => {
             options.selectors.splice(options.selectors.indexOf(selector), 1);
 
             // if the currect selector is the one we want to remove, default gracefully
@@ -43,7 +44,7 @@ export default class SelectorService implements SelectorServiceInterface {
     }
 
     async useSelector(selector: string): Promise<void> {
-        return this.settings.updateCurrentSettings(options => {
+        return this.settings.updateCurrentSettings(null, (options: Options) => {
             if (!options.selectors.includes(selector)) {
                 options.selectors.push(selector);
             }

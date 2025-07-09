@@ -1,20 +1,14 @@
-import React, {FunctionComponent, useEffect, useState} from "react";
-import {
-    ColorGeneratorServiceInterface,
-    ColorSelection,
-    ForThoustPanel,
-    HtmlElement, HtmlSelection, Selector,
-    SelectorHierarchy,
-    SelectorHierarchyServiceInterface,
-    SizeFunctions,
-    SizeProperties
-} from "../services/selector-hierarchy";
-import styled, {StyledComponent} from "styled-components";
+import React, { FunctionComponent, useEffect, useState } from 'react'
+import styled from "styled-components";
+import { SelectorHierarchyServiceInterface } from "../services/selector-hierarchy";
+import { SelectorHierarchy } from "../services/selector-hierarchy";
+import { ColorGeneratorServiceInterface, ColorSelection, HtmlElement, HtmlSelection, SizeFunctions, SizeProperties } from "../services/selector-hierarchy";
+import { ForThoustPanel } from "../services/selector-hierarchy";
+import { SelectorsDefaultFactory } from "../models/defaults";
+import { Button } from "@mui/material";
 import ReactDOM from "react-dom";
-import {SelectorsDefaultFactory} from "../models/defaults";
-import {Button} from "@mui/material";
-import {_ClearViews_, _View_, ComponentLog, log, MachineComponentProps, ReactMachine} from "../util/react-machine";
-import Robotcopy, {ClientDiscoveryConfig} from "../config/robotcopy";
+import getSelector from "../util/generate-selector";
+import { isVisible } from "../util/util";
 
 type SelectorHierarchyMountProps = {
     doc: Document,
@@ -122,22 +116,53 @@ class ColorSelectorPanel implements ColorSelectorPanelInterface {
     }
 }
 
-const Panel = styled.div`
-  .panel-decorator {
-    background-color: ${({color}) => color};
-    position: relative;
-    min-width: 20px;
-    min-height: 20px;
-    left: ${(props: ColorSelectorPanel) => SizeFunctions.calcLeft(props.element)}px !important;
-    top: ${(props: ColorSelectorPanel) => SizeFunctions.calcTop(props.element)}px !important;
-    width: ${(props: ColorSelectorPanel) => SizeFunctions.calcSize(props.element, props.element?.style?.width, SizeProperties.WIDTH)}px !important;
-    height: ${(props: ColorSelectorPanel) => SizeFunctions.calcSize(props.element, props.element?.style?.height, SizeProperties.HEIGHT)}px !important;
-  }
-` as StyledComponent<"div", any, ColorSelectorPanel, never>
-
 // find selectable text, and copy structural elements entirely pruning branches
 //   use provided selector and default text selectors to select each available branch
 //   it may be easier to just replicate each feature allowing for duplicates
+
+const REFRESH_CORNERS = [
+  { style: { top: 10, left: 10 }, key: 'tl' },
+  { style: { top: 10, right: 10 }, key: 'tr' },
+  { style: { bottom: 10, left: 10 }, key: 'bl' },
+  { style: { bottom: 10, right: 10 }, key: 'br' },
+];
+
+const isMainElement = (el: HTMLElement) => {
+  if (!el.offsetParent || !isVisible(el)) return false;
+  const rect = el.getBoundingClientRect();
+  const docWidth = window.innerWidth;
+  const docHeight = document.documentElement.scrollHeight;
+
+  // Exclude elements that are nearly the full page
+  const isNearlyFullWidth = rect.width > 0.98 * docWidth;
+  const isNearlyFullHeight = rect.height > 0.95 * docHeight;
+  if (isNearlyFullWidth && isNearlyFullHeight) return false;
+
+  // Exclude <body>, <html>, and elements with no content
+  if (["BODY", "HTML"].includes(el.tagName)) return false;
+  if (rect.width < 20 || rect.height < 10) return false;
+
+  // Much less restrictive - allow most elements
+  // Only exclude obvious non-content elements
+  const excludedTags = ["SCRIPT", "STYLE", "NOSCRIPT", "META", "LINK", "TITLE"];
+  if (excludedTags.includes(el.tagName)) return false;
+
+  // Allow small, full-width elements (e.g., headers, navigation)
+  const isSmall = rect.height < 150;
+  if (isNearlyFullWidth && isSmall) return true;
+
+  // Allow most elements, just exclude very deeply nested ones
+  const parent = el.parentElement;
+  if (parent && parent !== document.body && parent.offsetParent) {
+    const parentRect = parent.getBoundingClientRect();
+    // Only exclude if this element is almost the same size as its parent
+    if (parentRect.width - rect.width < 5 && parentRect.height - rect.height < 5) {
+      return false;
+    }
+  }
+
+  return true;
+};
 
 const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentProps> = ({
     selectorHierarchyService = new SelectorHierarchy({ } as unknown as ColorGeneratorServiceInterface),
@@ -152,122 +177,187 @@ const HierarchySelectorComponent: FunctionComponent<HierarchySelectorComponentPr
     const [htmlHierarchy] = useState(doc);
     const [dimmedPanels, setDimmedPanels] = useState<ColorSelection[]>([])
     const [confirmed, setConfirmed] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(0);
 
     // ;const [brambles] = useWilliamTate();
     // 'const [someDafadilTypeShiz] = ['#eea']
 
     const updateThoustPanels = () => {
+        // Find main elements for overlays
+        const allElements = Array.from(doc.querySelectorAll("body *"));
+        const mainElements = allElements.filter(el => isMainElement(el as HTMLElement));
+        // Use ForThoustPanel for color logic, but override the elements
         const selection = ForThoustPanel(htmlHierarchy, selector || SelectorsDefaultFactory()[0], selectorHierarchyService);
-        console.log(JSON.stringify(selection));
         setLatestSelector(selection)
-        const activePanels = [...selection.htmlSelectors.values()].flatMap(s => {
-            return s.selector.elem.map(e => new ColorSelectorPanel( e, s.color.toHexString() ));
-        })
-        // todo: change to, select from selectors for "*" minus active selection
-        setDimmedPanels([...selectorHierarchyService.getDimmedPanelSelectors(htmlHierarchy, activePanels.map(s => s.element)).htmlSelectors.values()]);
-        setActiveSelectorColorPanels(activePanels)
+        // Only use panels for main elements
+        const activePanels = [...selection.htmlSelectors.values()].flatMap(s =>
+            s.selector.elem.filter(e => mainElements.includes(e)).map(e => new ColorSelectorPanel(e, s.color.toHexString()))
+        );
+        
+        // Sort active panels by z-index (ascending)
+        const sortedActivePanels = activePanels.sort((a, b) => {
+            const zIndexA = parseInt(window.getComputedStyle(a.element).zIndex) || 0;
+            const zIndexB = parseInt(window.getComputedStyle(b.element).zIndex) || 0;
+            console.log(`🌊 Sorting active panels: ${a.element.tagName} (z-index: ${zIndexA}) vs ${b.element.tagName} (z-index: ${zIndexB})`);
+            return zIndexA - zIndexB;
+        });
+        
+        setActiveSelectorColorPanels(sortedActivePanels)
+        
+        // Get dimmed panels and sort them by z-index too
+        const dimmedPanelSelectors = selectorHierarchyService.getDimmedPanelSelectors(htmlHierarchy, activePanels.map(s => s.element));
+        const dimmedPanelsArray = [...dimmedPanelSelectors.htmlSelectors.values()];
+        
+        // Sort dimmed panels by z-index (ascending)
+        const sortedDimmedPanels = dimmedPanelsArray.sort((a, b) => {
+            const zIndexA = parseInt(window.getComputedStyle(a.selector.elem[0]).zIndex) || 0;
+            const zIndexB = parseInt(window.getComputedStyle(b.selector.elem[0]).zIndex) || 0;
+            console.log(`🌊 Sorting dimmed panels: ${a.selector.elem[0].tagName} (z-index: ${zIndexA}) vs ${b.selector.elem[0].tagName} (z-index: ${zIndexB})`);
+            return zIndexA - zIndexB;
+        });
+        
+        setDimmedPanels(sortedDimmedPanels);
     }
 
     useEffect(() => {
         passSetSelector(setSelector)
         updateThoustPanels()
-    }, [])
+    }, [refreshKey])
 
     useEffect(() => {
-        console.log(selector + " changed!")
         updateThoustPanels()
     }, [selector])
 
+    const refreshPanels = () => setRefreshKey(k => k + 1);
+
     const addPanelIslandClicked = (element: HtmlElement) => {
-        const colorPanel = activeSelectorColorPanels.find(p => p.element === element);
+        // Find the panel selector that contains this element
+        const panelSelector = [...(latestSelector?.htmlSelectors?.keys() || [])].find(selector => 
+            selector.elem.find(e => e === element)
+        );
 
-        const panelSelector = [...(latestSelector?.htmlSelectors?.keys() || [])].filter(selector => selector.elem.find(e => e === colorPanel?.element))
-
-        setSelector((selector ? selector + ", " : "") + [...new Set(panelSelector.flatMap(s => s.classList))].join(", "))
+        if (panelSelector) {
+            // Get the CSS selector for this element
+            const elementSelector = getSelector(element);
+            const currentSelector = selector || "";
+            let newSelector = "";
+            
+            if (currentSelector && elementSelector) {
+                newSelector = currentSelector + ", " + elementSelector;
+            } else if (elementSelector) {
+                newSelector = elementSelector;
+            }
+            
+            // Update the selector string
+            setSelector(newSelector);
+            
+            // Automatically apply the selector to start animation
+            if (newSelector) {
+                onConfirmSelector(newSelector);
+            }
+        }
     }
 
     const removePanelIslandClicked = (element: HtmlElement) => {
-        const colorPanel = activeSelectorColorPanels.find(p => p.element === element);
-
-        // using the current selector, remove get a classList from the colorPanel and remove any then setSelector
-        // also filter the latestSelector for mentions of the colorPanel element islands
-
-        const entries = [...(latestSelector?.htmlSelectors?.entries() || [])].filter(([key]) => {
-            return !key.elem.find(e => e === colorPanel?.element);
-        });
-
-        setLatestSelector(new HtmlSelection(new Map<Selector, ColorSelection>(entries)))
-        setSelector(selector.split(",").map(s => s.trim()).filter(s => colorPanel?.element !== element &&
-            !colorPanel?.element.classList.contains(s)).join(", "))
+        // Remove the panel from active panels
+        setActiveSelectorColorPanels(prev => prev.filter(panel => panel.element !== element));
+        
+        // Update the selector by removing the specific element's selector
+        if (selector) {
+            const elementSelector = getSelector(element);
+            const selectorParts = selector.split(",").map(s => s.trim());
+            const filteredParts = selectorParts.filter(part => 
+                part !== elementSelector && part !== ""
+            );
+            const newSelector = filteredParts.join(", ");
+            setSelector(newSelector);
+            
+            // Automatically apply the updated selector
+            if (newSelector) {
+                onConfirmSelector(newSelector);
+            }
+        }
     }
 
     const confirmSelector = (selector: string) => {
-        setConfirmed(true)
-        onConfirmSelector(selector)
+        console.log("🌊 Selector confirmed:", selector);
+        setConfirmed(true);
+        onConfirmSelector(selector);
     }
 
     return (
-        <SelectorHierarchyMount doc={doc} visible={!confirmed}>
-            <div className={"selector-hierarchy-mount-container"}>
-                {activeSelectorColorPanels.length}<span className={"floating-shelf"}>{selector}</span>
-                <input type={"button"} value={"confirm"} onClick={() => confirmSelector(selector)} />
-                {dimmedPanels.map((panel: ColorSelection, i: number) => {
-                    return panel.selector.elem.map((element: HtmlElement) => {
-                        return <Panel className={"panel-decorator"} color={panel.color.toHexString()} element={element} key={`${i}-${element}`}>
-                            <SelectorButton key={'+'+i} style={{
-                                backgroundColor: "#333",
-                                color: "#eee"
-                            }} onClick={() => {
-                                addPanelIslandClicked(element)
-                            }}>+</SelectorButton>
-                        </Panel>
-                    })
-                })}
-
-                {activeSelectorColorPanels.flatMap((panel: ColorSelectorPanel, i: number) => {
-                    return <Panel className={"panel-decorator"} color={panel.color} element={panel.element}  key={i}
-                        style={{
-                            left: `${SizeFunctions.calcLeft(panel.element)}px !important`,
-                            top: `${SizeFunctions.calcTop(panel.element)}px !important`,
-                            width: `${SizeFunctions.calcSize(panel.element, panel.element?.style?.width, SizeProperties.WIDTH)}px !important`,
-                            height: `${SizeFunctions.calcSize(panel.element, panel.element?.style?.height, SizeProperties.HEIGHT)}px !important`
-                        }}
+        <SelectorHierarchyMount doc={doc} visible={!confirmed} style={{ pointerEvents: 'none' }}>
+            <div className={"selector-hierarchy-mount-container"} style={{ pointerEvents: 'none' }}>
+                {/* Refresh buttons at corners */}
+                {REFRESH_CORNERS.map(corner => (
+                  <button
+                    key={corner.key}
+                    style={{ position: 'fixed', zIndex: 10000, ...corner.style, pointerEvents: 'auto', background: '#fff8', border: '1px solid #ccc', borderRadius: 8, padding: 4, margin: 4 }}
+                    onClick={refreshPanels}
+                  >⟳</button>
+                ))}
+                {/* Overlay panes for selectable elements */}
+                {dimmedPanels.map((panel: ColorSelection, i: number) =>
+                  panel.selector.elem.map((element: HtmlElement) => (
+                    <div
+                      key={`dimmed-${i}-${element}`}
+                      style={{
+                        position: 'absolute',
+                        left: element.getBoundingClientRect().left + window.scrollX,
+                        top: element.getBoundingClientRect().top + window.scrollY,
+                        width: element.getBoundingClientRect().width,
+                        height: element.getBoundingClientRect().height,
+                        background: panel.color.setAlpha(0.25).toRgbString(),
+                        border: '2px dashed #888',
+                        zIndex: 9998,
+                        pointerEvents: 'auto',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'box-shadow 0.2s',
+                      }}
                     >
-                        {/* maybe hypertext or something? */}
-                        <SelectorButton key={'-'+i} onClick={() => {
-                            removePanelIslandClicked(panel.element)
-                        }}>-</SelectorButton>
-                    </Panel>
-                })}
-                {/* maybe maybe maybe
-                maaaaaayyyyybee some day we'll
-                seeee essss veee gheee
-                gheee'
-                gheee
-                ghee-e-e ...,,,---~~~````~~~~----````____`````---
-                pixels, pixels sometimes changes
-                full screen scrolling device independent pixels threw
-                many software engineers for a loop,
-                em and rem providing a bastion,
-                but for too many deviceRatio is a weird concept
-                and we struggle randomly scoping hard coded values
-                or disappearing into vaults to learn the secrets of the HTML/svg specification and how to use the viewport.
-
-                You are a lone self educator, in a loan filled wasteland of dread and pixel conversions,
-                will you embrace your change of basis? Will you end the suffering of the pixelated wastes in your mind?
-                Or will you simply set everything to pixels like i did, and hope rem works well enough?
-
-                // todo: hookup svg panels and make sure to validate deviceRatio and viewport usage for perfect screen fit,
-                // todo:   if possible
-
-                // todo: start, stop, choose, add panel, remove panel
-                */}
-                {/*<svg>*/}
-                {/*<Cover>*/}
-                {/*    <Mask></Mask>*/}
-                {/*</Cover>*/}
-                {/*</svg>*/}
-                {/* [...maybe, maybe, maybe] */}
+                      <SelectorButton
+                        style={{ pointerEvents: 'auto', background: '#333', color: '#eee', borderRadius: 4, fontSize: 18 }}
+                        onClick={() => addPanelIslandClicked(element)}
+                      >+</SelectorButton>
+                    </div>
+                  ))
+                )}
+                {activeSelectorColorPanels.map((panel: ColorSelectorPanel, i: number) => (
+                  <div
+                    key={`active-${i}-${panel.element}`}
+                    style={{
+                      position: 'absolute',
+                      left: panel.element.getBoundingClientRect().left + window.scrollX,
+                      top: panel.element.getBoundingClientRect().top + window.scrollY,
+                      width: panel.element.getBoundingClientRect().width,
+                      height: panel.element.getBoundingClientRect().height,
+                      background: panel.color,
+                      border: '3px solid #005AE9',
+                      zIndex: 9999,
+                      pointerEvents: 'auto',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 0 8px #005AE9',
+                      transition: 'box-shadow 0.2s',
+                    }}
+                  >
+                    <SelectorButton
+                      style={{ pointerEvents: 'auto', background: '#005AE9', color: '#fff', borderRadius: 4, fontSize: 18 }}
+                      onClick={() => removePanelIslandClicked(panel.element)}
+                    >-</SelectorButton>
+                  </div>
+                ))}
+                {/* Docked control panel */}
+                <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 10000, background: '#fff', border: '1px solid #ccc', borderRadius: 8, padding: 16, pointerEvents: 'auto', minWidth: 240 }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: 8 }}>Selector Mode</div>
+                  <div style={{ marginBottom: 8, fontSize: 12, color: '#333' }}>Click + to add, - to remove. Click ⟳ to refresh.</div>
+                  <div style={{ marginBottom: 8, fontSize: 12, color: '#005AE9', wordBreak: 'break-all' }}>{selector}</div>
+                  <input type={"button"} value={"Confirm"} onClick={() => confirmSelector(selector)} style={{ marginRight: 8 }} />
+                  <input type={"button"} value={"Deactivate Selector Mode"} onClick={() => setConfirmed(true)} />
+                </div>
             </div>
         </SelectorHierarchyMount>
     )

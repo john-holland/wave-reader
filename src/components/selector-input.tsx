@@ -72,6 +72,7 @@ const SelectorInput: FunctionComponent<SelectorProps> = ({
     const saveClicked = () => {
         if (onSave) {
             const newSelector = selectorRef.current?.value || selector
+            console.log("🌊 SelectorInput: saveClicked called with selector:", newSelector);
             onSave(newSelector);
             setDisplaySelectors([... new Set(selectors.concat([newSelector]))])
         }
@@ -79,6 +80,7 @@ const SelectorInput: FunctionComponent<SelectorProps> = ({
 
     const onPathChange = (event: any, newValue: string | null) => {
         if (newValue) {
+            console.log("🌊 SelectorInput: onPathChange called with selector:", newValue);
             setSelectorText(newValue);
             onSave(newValue);
         }

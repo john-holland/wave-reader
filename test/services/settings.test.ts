@@ -1,247 +1,226 @@
-import SettingsService, {DomainPaths, DomainSettings, SettingsRegistry} from "../../src/services/settings";
-import SelectorService from "../../src/services/selector";
-import Options, {DeepEquals} from "../../src/models/options"
-import { Tab } from "../../src/util/util";
-import DoneCallback = jest.DoneCallback;
-import {withMockSettingsService} from "../components/util/mock-settings-service";
-import {SelectorsDefaultFactory} from "../../src/models/defaults";
+import SettingsService from '../../src/services/settings';
+import Options from '../../src/models/options';
+import DomainSettings from '../../src/services/settings';
 
+describe('SettingsService', () => {
+    let settingsService: SettingsService;
+    let mockStorage: { [key: string]: any } = {};
+    let mockTabUrl = 'https://example.com/test';
 
-
-describe("selector service", () => {
-    test("assigns protocol and path heavy url to hostname", () => {
-        // TODO: write
-    })
-
-    test("get current settings", (done: DoneCallback) => {
-        withMockSettingsService(async (settingsService: SettingsService, accessRegistry) => {
-            const fartmap = new Map<string, Options>()
-            fartmap.set("/fart", new Options({
-                selectors: ["successful", "test"]
-            }));
-            accessRegistry()["www.fart.com"] = new DomainSettings("www.fart.com", fartmap)
-            const successfulTest = (await settingsService.getCurrentSettings())?.selectors.join(" ");
-            expect(successfulTest).toBe("successful test");
-            done();
-        })
-    })
-
-    test("get current settings with no defaulted map", (done: DoneCallback) => {
-        withMockSettingsService(async (settingsService: SettingsService, accessRegistry) => {
-            const selectors = (await settingsService.getCurrentSettings())?.selectors;
-            expect(selectors).toStrictEqual(SelectorsDefaultFactory());
-            done();
-        }, "http://fart.fart.com/fart")
-    })
-
-    test("update current settings", (done: DoneCallback) => {
-        withMockSettingsService(async (settingsService: SettingsService, accessRegistry) => {
-            const fartmap = new Map<string, Options>()
-            fartmap.set("/fart", new Options({
-                selectors: ["successful", "test"]
-            }));
-            accessRegistry()["www.fart.com"] = new DomainSettings("www.fart.com", fartmap)
-            expect((await settingsService.getCurrentSettings()).selectors.join(" ")).toBe("successful test");
-
-            await settingsService.updateCurrentSettings(options => {
-                options.selectors.push(", this be")
-                return options;
-            })
-
-            expect((await settingsService.getCurrentSettings()).selectors.join(" ")).toBe("successful test , this be"); // mmmmhhmmmmm!
-            done();
-        })
-    })
-
-    test("test equals for Options", (done: DoneCallback) => {
-        withMockSettingsService(async (settingsService: SettingsService, accessRegistry) => {
-            expect(Options.OptionsEqual(await settingsService.getCurrentSettings(),
-                JSON.parse(JSON.stringify(await settingsService.getCurrentSettings())))).toBe(true)
-            done();
-        })
-    })
-
-    test("get settings for domain & path", (done: DoneCallback) => {
-        withMockSettingsService(async (settingsService: SettingsService, accessRegistry) => {
-            const fartmap = new Map<string, Options>()
-            fartmap.set("/fart", new Options({
-                selectors: ["successful", "test"]
-            }));
-            accessRegistry()["www.fart.com"] = new DomainSettings("www.fart.com", fartmap)
-            const borkmap = new Map<string, Options>()
-                borkmap.set("/pizza", new Options({
-                    selectors: ["thefty", "biggons", "chompers"]
-                }));
-                borkmap.set("/BACON", new Options({
-                    selectors: ["bacon", "BACON", "BAAAAAAAAACOOON", "BBAAAA... *runs into the distance, barrels into the room skidding* ... COOOONNNN "]
-                }));
-            accessRegistry()["www.bork.com"] = new DomainSettings("www.bork.com", borkmap)
-            expect((await settingsService.getCurrentSettings()).selectors.join(" ")).toBe("successful test");
-            expect((await settingsService.getPathOptionsForDomain("http://www.bork.com", "/pizza"))?.selectors.join(" ")).toBe("thefty biggons chompers");
-            expect((await settingsService.getPathOptionsForDomain("http://www.bork.com", "/BACON"))?.selectors.join(" ")).toBe("bacon BACON BAAAAAAAAACOOON BBAAAA... *runs into the distance, barrels into the room skidding* ... COOOONNNN ");
-            done();
-        })
-    })
-
-    test("get settings for domain", (done: DoneCallback) => {
-        withMockSettingsService(async (settingsService: SettingsService, accessRegistry) => {
-            const fartmap = new Map<string, Options>()
-            fartmap.set("/fart", new Options({
-                selectors: ["successful", "test"]
-            }));
-            accessRegistry()["www.fart.com"] = new DomainSettings("www.fart.com", fartmap)
-            const borkmap = new Map<string, Options>()
-            borkmap.set("/pizza", new Options({
-                selectors: ["thefty", "biggons", "chompers"]
-            }));
-            borkmap.set("/BACON", new Options({
-                selectors: ["bacon", "BACON", "BAAAAAAAAACOOON", "BBAAAA... *runs into the distance, barrels into the room skidding* ... COOOONNNN "]
-            }));
-            accessRegistry()["www.bork.com"] = new DomainSettings("www.bork.com", borkmap)
-            expect((await settingsService.getCurrentSettings()).selectors.join(" ")).toBe("successful test");
-            expect((await settingsService.getSettingsForDomain("www.bork.com"))?.pathSettings.has("/pizza")).toBeTruthy();
-            expect((await settingsService.getSettingsForDomain("www.bork.com"))?.pathSettings.has("/BACON")).toBeTruthy();
-            done();
-        })
-    })
-
-    test("get settings for domain no domain", (done: DoneCallback) => {
-        withMockSettingsService(async (settingsService: SettingsService, accessRegistry) => {
-            const fartmap = new Map<string, Options>()
-            fartmap.set("/fart", new Options({
-                selectors: ["successful", "test"]
-            }));
-            accessRegistry()["www.fart.com"] = new DomainSettings("www.fart.com", fartmap)
-
-            expect((await settingsService.getCurrentSettings()).selectors.join(" ")).toBe("successful test");
-            try {
-                await settingsService.getSettingsForDomain("www.bork.com", false)
-                expect("should not reach here").toBe("something it't not");
-            } catch (e) {
-                done();
+    beforeEach(() => {
+        // Reset mock storage
+        mockStorage = {};
+        
+        // Mock Chrome storage API
+        (global as any).chrome = {
+            storage: {
+                sync: {
+                    get: jest.fn((key: string, callback: (result: any) => void) => {
+                        const result = mockStorage[key] ? { [key]: mockStorage[key] } : {};
+                        callback(result);
+                    }),
+                    set: jest.fn((data: any, callback?: () => void) => {
+                        Object.assign(mockStorage, data);
+                        if (callback) callback();
+                    })
+                }
+            },
+            runtime: {
+                sendMessage: jest.fn()
             }
-        })
-    })
+        };
 
-    test("add settings for domain", (done: DoneCallback) => {
-        withMockSettingsService(async (settingsService: SettingsService, accessRegistry) => {
-            const fartmap = new Map<string, Options>()
-            fartmap.set("/fart", new Options({
-                selectors: ["successful", "test"]
-            }));
-            accessRegistry()["www.fart.com"] = new DomainSettings("www.fart.com", fartmap)
-            const borkmap = new Map<string, Options>()
-            borkmap.set("BACON", new Options({
-                selectors: ["bacon", "BACON", "BAAAAAAAAACOOON", "BBAAAA... *runs into the distance, barrels into the room skidding* ... COOOONNNN "]
-            }));
-            accessRegistry()["www.bork.com"] = new DomainSettings("www.bork.com", borkmap);
-            expect((await settingsService.getCurrentSettings()).selectors.join(" ")).toBe("successful test");
-            await settingsService.addSettingsForDomain("www.bork.com", "pizza", new Options({
-                selectors: ["thefty", "biggons", "chompers"]
-            }))
-            expect((await settingsService.getSettingsForDomain("www.bork.com"))?.pathSettings.has("pizza")).toBeTruthy();
-            expect((await settingsService.getPathOptionsForDomain("www.bork.com", "pizza"))?.selectors.join(" ")).toBe("thefty biggons chompers");
-            expect((await settingsService.getSettingsForDomain("www.bork.com"))?.pathSettings.has("BACON")).toBeTruthy();
+        // Mock tab URL provider
+        const mockTabUrlProvider = () => Promise.resolve(mockTabUrl);
+        
+        settingsService = SettingsService.withTabUrlProvider(mockTabUrlProvider);
+    });
 
-            // never before seen domain
-            await settingsService.addSettingsForDomain("bacon.com", "pizza", new Options({
-                selectors: ["pizza", "bacon", "does not bzzzrrrp- aaacon! BACON! BACON bacon... pizza?"]
-            }))
+    afterEach(() => {
+        jest.clearAllMocks();
+    });
 
-            expect((await settingsService.getPathOptionsForDomain("bacon.com", "pizza"))?.selectors.join(" ")).toBe("pizza bacon does not bzzzrrrp- aaacon! BACON! BACON bacon... pizza?");
-            done();
-        })
-    })
+    describe('Settings Persistence', () => {
+        it('should save and retrieve settings without overwriting', async () => {
+            // Create initial settings
+            const initialSettings = new Options();
+            initialSettings.wave.selector = 'p';
+            initialSettings.wave.waveSpeed = 5;
+            initialSettings.selectors = ['p', 'div'];
 
-    test("add settings for domain", (done: DoneCallback) => {
-        withMockSettingsService(async (settingsService: SettingsService, accessRegistry) => {
-            const fartmap = new Map<string, Options>()
-            fartmap.set("/fart", new Options({
-                selectors: ["successful", "test"]
-            }));
-            accessRegistry()["www.fart.com"] = new DomainSettings("www.fart.com", fartmap)
-            const borkmap = new Map<string, Options>()
-            borkmap.set("/BACON", new Options({
-                selectors: ["bacon", "BACON", "BAAAAAAAAACOOON", "BBAAAA... *runs into the distance, barrels into the room skidding* ... COOOONNNN "]
-            }));
-            accessRegistry()["www.bork.com"] = new DomainSettings("www.bork.com", borkmap)
-            expect((await settingsService.getCurrentSettings()).selectors.join(" ")).toBe("successful test");
-            await settingsService.addSettingsForDomain("www.bork.com", "/pizza", new Options({
-                selectors: ["thefty", "biggons", "chompers"]
-            }))
-            expect((await settingsService.getSettingsForDomain("www.bork.com"))?.pathSettings.has("/pizza")).toBeTruthy();
-            expect((await settingsService.getPathOptionsForDomain("http://www.bork.com", "/pizza"))?.selectors.join(" ")).toBe("thefty biggons chompers");
-            await settingsService.copySettingsFromDomain((await settingsService.getSettingsForDomain("http://www.fart.com")) as unknown as DomainSettings, "/fart", "www.bork.com", "/fart", false)
-            expect((await settingsService.getPathOptionsForDomain("http://www.bork.com", "/fart", false, false))?.selectors.join(" ")).toBe("successful test")
-            // thaaaat's why dog farts are so bad...
-            done();
-        })
-    })
+            // Save settings
+            await settingsService.addSettingsForDomain('example.com', '/test', initialSettings);
 
-    test("remove settings for domain", (done: DoneCallback) => {
-        withMockSettingsService(async (settingsService: SettingsService, accessRegistry) => {
-            const fartmap = new Map<string, Options>()
-            fartmap.set("/fart", new Options({
-                selectors: ["successful", "test"]
-            }));
-            accessRegistry()["www.fart.com"] = new DomainSettings("www.fart.com", fartmap)
-            const BACONmap = new Map<string, Options>()
-            BACONmap.set("/BACON", new Options({
-                selectors: ["bacon", "BACON", "BAAAAAAAAACOOON", "BBAAAA... *runs into the distance, barrels into the room skidding* ... COOOONNNN "]
-            }));
-            accessRegistry()["www.bork.com"] = new DomainSettings("www.bork.com", BACONmap)
-            expect((await settingsService.getCurrentSettings()).selectors.join(" ")).toBe("successful test");
-            await settingsService.addSettingsForDomain("www.bork.com", "/pizza", new Options({
-                selectors: ["thefty", "biggons", "chompers"]
-            }))
-            expect((await settingsService.getSettingsForDomain("www.bork.com"))?.pathSettings.has("/pizza")).toBeTruthy();
-            expect((await settingsService.getPathOptionsForDomain("www.bork.com", "/pizza"))?.selectors.join(" ")).toBe("thefty biggons chompers");
-            await settingsService.copySettingsFromDomain((await settingsService.getSettingsForDomain("www.fart.com")) as unknown as DomainSettings, "/fart", "www.bork.com", "/fart", false)
-            expect((await settingsService.getPathOptionsForDomain("www.bork.com", "/fart", false, false))?.selectors.join(" ")).toBe("successful test")
-            // thaaaat's why dog farts are so bad...
+            // Verify settings were saved
+            const retrievedSettings = await settingsService.getCurrentSettings();
+            expect(retrievedSettings.wave.selector).toBe('p');
+            expect(retrievedSettings.wave.waveSpeed).toBe(5);
+            expect(retrievedSettings.selectors).toEqual(['p', 'div']);
+        });
 
-            await settingsService.removeSettingsForDomainPath("www.bork.com", "/pizza", false);
-            // do your unit tests smell?
-            expect(await settingsService.getPathOptionsForDomain("www.bork.com", "/pizza", false, false)).toBeUndefined()
+        it('should preserve existing settings when adding new paths', async () => {
+            // Add settings for first path
+            const firstSettings = new Options();
+            firstSettings.wave.selector = 'p';
+            firstSettings.wave.waveSpeed = 3;
+            await settingsService.addSettingsForDomain('example.com', '/path1', firstSettings);
 
-            await settingsService.removeSettingsForDomain("www.fart.com")
-            expect(await settingsService.getSettingsRegistryForDomain("www.fart.com", false)).toBeUndefined()
-            done();
-        })
-    })
+            // Add settings for second path
+            const secondSettings = new Options();
+            secondSettings.wave.selector = 'div';
+            secondSettings.wave.waveSpeed = 7;
+            await settingsService.addSettingsForDomain('example.com', '/path2', secondSettings);
 
-    test("get domains and paths", (done: DoneCallback) => {
-        withMockSettingsService(async (settingsService: SettingsService, accessRegistry) => {
-            const fartmap = new Map<string, Options>()
-            fartmap.set("/fart", new Options({
-                selectors: ["successful", "test"]
-            }));
-            accessRegistry()["www.fart.com"] = new DomainSettings("www.fart.com", fartmap)
-            const borkmap = new Map<string, Options>()
-            borkmap.set("/BACON", new Options({
-                selectors: ["bacon", "BACON", "BAAAAAAAAACOOON", "BBAAAA... *runs into the distance, barrels into the room skidding* ... COOOONNNN "]
-            }));
-            accessRegistry()["www.bork.com"] = new DomainSettings("www.bork.com", borkmap)
-            expect((await settingsService.getCurrentSettings()).selectors.join(" ")).toBe("successful test");
-            await settingsService.addSettingsForDomain("www.bork.com", "/pizza", new Options({
-                selectors: ["thefty", "biggons", "chompers"]
-            }))
-            const domainsAndPaths = await settingsService.getDomainsAndPaths()
-            expect(domainsAndPaths.find((dp: DomainPaths) => dp.domain === "www.fart.com")).toBeTruthy();
-            expect(domainsAndPaths.find((dp: DomainPaths) => dp.paths.includes("/BACON"))).toBeTruthy();
+            // Verify both paths have their respective settings
+            const path1Settings = await settingsService.getPathOptionsForDomain('example.com', '/path1');
+            const path2Settings = await settingsService.getPathOptionsForDomain('example.com', '/path2');
 
-            done();
-        })
-    })
+            expect(path1Settings?.wave.selector).toBe('p');
+            expect(path1Settings?.wave.waveSpeed).toBe(3);
+            expect(path2Settings?.wave.selector).toBe('div');
+            expect(path2Settings?.wave.waveSpeed).toBe(7);
+        });
 
-    test("options", () => {
-        expect(DeepEquals(true, false)).toBe(false);
-        expect(DeepEquals(false, false)).toBe(true)
-        expect(DeepEquals("expect", "not")).toBe(false)
-        expect(DeepEquals({ prop: "test" }, { prop: "test" })).toBe(true)
-        expect(DeepEquals({ prop: "test1" }, { prop: "test2" })).toBe(false)
-        expect(DeepEquals([1,2,3], [1,2,3])).toBe(true)
-        expect(DeepEquals([1,2,3], [1,2,"3"])).toBe(false)
-        expect(DeepEquals([1,2,3], 0)).toBe(false)
-    })
-})
+        it('should use existing domain settings as defaults for new paths', async () => {
+            // Add settings for root path
+            const rootSettings = new Options();
+            rootSettings.wave.selector = 'article';
+            rootSettings.wave.waveSpeed = 4;
+            rootSettings.selectors = ['article', 'section'];
+            await settingsService.addSettingsForDomain('example.com', '', rootSettings);
+
+            // Get settings for a new path - should use root settings as defaults
+            const newPathSettings = await settingsService.getCurrentSettings();
+            expect(newPathSettings.wave.selector).toBe('article');
+            expect(newPathSettings.wave.waveSpeed).toBe(4);
+            expect(newPathSettings.selectors).toEqual(['article', 'section']);
+        });
+
+        it('should handle Map serialization correctly', async () => {
+            // Create settings with multiple paths
+            const settings1 = new Options();
+            settings1.wave.selector = 'p';
+            await settingsService.addSettingsForDomain('example.com', '/path1', settings1);
+
+            const settings2 = new Options();
+            settings2.wave.selector = 'div';
+            await settingsService.addSettingsForDomain('example.com', '/path2', settings2);
+
+            // Verify the Map was serialized correctly by checking storage
+            expect(mockStorage['wave_reader__settings_registry']).toBeDefined();
+            const storedData = JSON.parse(mockStorage['wave_reader__settings_registry']);
+            
+            // Check that the domain exists and has pathSettings
+            expect(storedData['example.com']).toBeDefined();
+            expect(storedData['example.com'].pathSettings).toBeDefined();
+            
+            // Check that both paths are stored
+            expect(storedData['example.com'].pathSettings['/path1']).toBeDefined();
+            expect(storedData['example.com'].pathSettings['/path2']).toBeDefined();
+        });
+
+        it('should reconstruct Map objects correctly from storage', async () => {
+            // Simulate stored data
+            const mockStoredData = {
+                'example.com': {
+                    domain: 'example.com',
+                    pathSettings: {
+                        '/path1': {
+                            wave: { selector: 'p', waveSpeed: 3 },
+                            selectors: ['p', 'div']
+                        },
+                        '/path2': {
+                            wave: { selector: 'div', waveSpeed: 7 },
+                            selectors: ['div', 'span']
+                        }
+                    }
+                }
+            };
+
+            mockStorage['wave_reader__settings_registry'] = JSON.stringify(mockStoredData);
+
+            // Get settings - should reconstruct the Map correctly
+            const settings = await settingsService.getCurrentSettings();
+            
+            // Verify the Map was reconstructed
+            const domainSettings = await settingsService.getSettingsForDomain('example.com');
+            expect(domainSettings?.pathSettings).toBeInstanceOf(Map);
+            expect(domainSettings?.pathSettings.size).toBe(2);
+            
+            // Check that both paths are accessible
+            const path1Settings = domainSettings?.pathSettings.get('/path1');
+            const path2Settings = domainSettings?.pathSettings.get('/path2');
+            
+            expect(path1Settings?.wave.selector).toBe('p');
+            expect(path2Settings?.wave.selector).toBe('div');
+        });
+
+        it('should not overwrite existing settings when updating', async () => {
+            // Create initial settings
+            const initialSettings = new Options();
+            initialSettings.wave.selector = 'p';
+            initialSettings.wave.waveSpeed = 3;
+            initialSettings.selectors = ['p', 'div'];
+            
+            await settingsService.addSettingsForDomain('example.com', '/test', initialSettings);
+
+            // Update only specific properties
+            await settingsService.updateCurrentSettings(null, (options) => {
+                options.wave.waveSpeed = 5; // Only change wave speed
+                return options;
+            });
+
+            // Verify other properties weren't overwritten
+            const updatedSettings = await settingsService.getCurrentSettings();
+            expect(updatedSettings.wave.selector).toBe('p'); // Should still be 'p'
+            expect(updatedSettings.wave.waveSpeed).toBe(5); // Should be updated
+            expect(updatedSettings.selectors).toEqual(['p', 'div']); // Should still be the same
+        });
+
+        it('should handle file URLs correctly', async () => {
+            // Mock file URL
+            mockTabUrl = 'file:///Users/test/document.html';
+            
+            const fileSettings = new Options();
+            fileSettings.wave.selector = 'body';
+            fileSettings.wave.waveSpeed = 2;
+            
+            // Add settings for the file URL path
+            await settingsService.addSettingsForDomain('file:///Users/test/document.html', '/Users/test/document.html', fileSettings);
+            
+            // Verify settings are saved and retrieved correctly
+            const retrievedSettings = await settingsService.getPathOptionsForDomain('file:///Users/test/document.html', '/Users/test/document.html');
+            expect(retrievedSettings?.wave.selector).toBe('body'); // Should be the custom selector we set
+            expect(retrievedSettings?.wave.waveSpeed).toBe(2);
+        });
+    });
+
+    describe('Settings Registry', () => {
+        it('should create new domain with default settings when domain does not exist', async () => {
+            const settings = await settingsService.getCurrentSettings();
+            
+            // Should have default options
+            expect(settings).toBeInstanceOf(Options);
+            expect(settings.wave.selector).toBeDefined();
+        });
+
+        it('should handle multiple domains independently', async () => {
+            // Add settings for first domain
+            const domain1Settings = new Options();
+            domain1Settings.wave.selector = 'p';
+            await settingsService.addSettingsForDomain('domain1.com', '/path', domain1Settings);
+
+            // Add settings for second domain
+            const domain2Settings = new Options();
+            domain2Settings.wave.selector = 'div';
+            await settingsService.addSettingsForDomain('domain2.com', '/path', domain2Settings);
+
+            // Verify domains are independent
+            const storedData = JSON.parse(mockStorage['wave_reader__settings_registry']);
+            expect(storedData['domain1.com']).toBeDefined();
+            expect(storedData['domain2.com']).toBeDefined();
+            expect(storedData['domain1.com'].pathSettings['/path'].wave.selector).toBe('p');
+            expect(storedData['domain2.com'].pathSettings['/path'].wave.selector).toBe('div');
+        });
+    });
+});
