@@ -512,12 +512,15 @@ const App: FunctionComponent = () => {
         setSaved(false);
     };
 
-    const selectorModeClicked = (selectorModeOn: boolean) => {
-        setSelectorModeOn(!selectorModeOn)
-        if (!selectorModeOn) {
-            AppStateMachine.handleState(new SelectionModeActivateMessage())
+    const selectorModeClicked = (newSelectorModeOn: boolean) => {
+        setSelectorModeOn(newSelectorModeOn);
+        
+        if (newSelectorModeOn) {
+            console.log("🌊 Popup: Activating selector mode");
+            AppStateMachine.handleState(new SelectionModeActivateMessage());
         } else {
-            AppStateMachine.handleState(new SelectionModeDeactivateMessage())
+            console.log("🌊 Popup: Deactivating selector mode");
+            AppStateMachine.handleState(new SelectionModeDeactivateMessage());
         }
     }
 

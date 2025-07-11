@@ -5,6 +5,6 @@ export default class SelectionModeMessage extends Message<SelectionModeMessage> 
 
     constructor(attributes: Partial<SelectionModeMessage> = {
     }) {
-        super('update', 'popup', attributes)
+        super('selector-mode', 'popup', attributes)
     }
 }

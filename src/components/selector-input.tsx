@@ -87,7 +87,7 @@ const SelectorInput: FunctionComponent<SelectorProps> = ({
     }
 
     const onSelectorModeClicked = () => {
-        selectorModeClicked(selectorModeOn)
+        selectorModeClicked(!selectorModeOn)
     }
 
     return (

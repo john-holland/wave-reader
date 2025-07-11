@@ -22,25 +22,39 @@
     ],
     "run_at": "document_end"
   },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+W",
+        "mac": "Command+Shift+W"
+      },
+      "description": "Toggle Wave Reader"
+    },
+    "toggle-wave-reader": {
+      "suggested_key": {
+        "default": "Alt+W",
+        "mac": "Alt+W"
+      },
+      "description": "Toggle Wave Reader on current page"
+    }
+  },
   "content_scripts": [
     {
       "matches": [
         "<all_urls>"
       ],
-      "js": ["content.js"],
-      "run_at": "document_end",
+      "js": ["shadowContent.js"],
+      "run_at": "document_start",
       "all_frames": true,
-      "world": "MAIN"
+      "world": "ISOLATED"
     }
   ],
   "web_accessible_resources": [{
-    "resources": ["content.js"],
+    "resources": ["content.js", "shadowContent.js"],
     "matches": ["<all_urls>"]
   }],
   "host_permissions": [
-    "<all_urls>",
-    "tabs",
-    "activeTab"
+    "<all_urls>"
   ],
   "permissions": [
     "scripting",

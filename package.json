@@ -18,7 +18,10 @@
     "build": "NODE_ENV=development webpack --mode development --config webpack.develop.js",
     "start": "npm run build && echo '🌊 Extension built! Now reload it in Chrome:' && echo '1. Go to chrome://extensions/' && echo '2. Find Wave Reader extension' && echo '3. Click the reload button (🔄)' && echo '4. Or toggle the extension off and on'",
     "production": "NODE_ENV=development webpack --mode development --config webpack.prod.js --watch",
-    "test": "npx jest"
+    "test": "npx jest",
+    "wxt:dev": "wxt",
+    "wxt:build": "wxt build",
+    "wxt:zip": "wxt zip"
   },
   "devDependencies": {
     "@babel/core": "^7.17.5",
@@ -68,7 +71,8 @@
     "webpack": "^5.69.1",
     "webpack-cli": "^5.1.4",
     "webpack-extension-manifest-plugin": "^0.8.0",
-    "webpack-merge": "^5.8.0"
+    "webpack-merge": "^5.8.0",
+    "wxt": "^0.20.7"
   },
   "name": "wave-reader",
   "version": "0.0.0",

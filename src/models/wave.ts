@@ -99,7 +99,6 @@ export default class Wave extends AttributeConstructor<Wave>{
 
     // mutates the wave if necessary to update the css
     public update(): Wave {
-        const css = defaultCssTemplate(this);
         if (!this.cssTemplate) {
             this.cssTemplate = defaultCssTemplate(this);
             this.cssMouseTemplate = defaultCssMouseTemplate(this);

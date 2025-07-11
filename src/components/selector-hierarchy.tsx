@@ -2,7 +2,7 @@ import React, { FunctionComponent, useEffect, useState } from 'react'
 import styled from "styled-components";
 import { SelectorHierarchyServiceInterface } from "../services/selector-hierarchy";
 import { SelectorHierarchy } from "../services/selector-hierarchy";
-import { ColorGeneratorServiceInterface, ColorSelection, HtmlElement, HtmlSelection, SizeFunctions, SizeProperties } from "../services/selector-hierarchy";
+import { ColorGeneratorServiceInterface, ColorSelection, HtmlElement, HtmlSelection } from "../services/selector-hierarchy";
 import { ForThoustPanel } from "../services/selector-hierarchy";
 import { SelectorsDefaultFactory } from "../models/defaults";
 import { Button } from "@mui/material";

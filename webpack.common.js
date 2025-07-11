@@ -16,7 +16,7 @@ const config = {
     entry: {
         app: path.join(__dirname, "./static/index.js"),
         background: path.join(__dirname, "./static/background.js"),
-        content: path.join(__dirname, "./static/content.js")
+        shadowContent: path.join(__dirname, "./static/shadow-content.js")
     },
     output: {
         path: path.resolve(__dirname, "./build"),
