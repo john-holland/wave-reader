@@ -5,6 +5,7 @@
     "@mui/material": "^5.8.4",
     "@types/tinycolor2": "^1.4.3",
     "content-scripts-register-polyfill": "^3.2.1",
+    "qrcode.react": "^4.2.0",
     "react": "^18.0.0",
     "react-dom": "^18.2.0",
     "regenerator-runtime": "^0.13.9",

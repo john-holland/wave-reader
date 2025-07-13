@@ -57,6 +57,10 @@ const config = {
                 {
                     from: path.resolve(__dirname, "./chrome/icons"),
                     to: path.resolve(__dirname, "./build/icons")
+                },
+                {
+                    from: path.resolve(__dirname, "./static/receive_eth.jpg"),
+                    to: path.resolve(__dirname, "./build/receive_eth.jpg")
                 }
             ]
         }),

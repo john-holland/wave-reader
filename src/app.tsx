@@ -19,6 +19,7 @@ import UpdateWaveMessage from "./models/messages/update-wave";
 import { Settings } from "./components/settings";
 
 import WaveTabs from './components/wave-tabs';
+import About from './components/about';
 import InstalledDetails = chrome.runtime.InstalledDetails;
 import {CState, NameAccessMapInterface, Named, State, StateNames} from "./util/state";
 import StateMachine from "./util/state-machine";
@@ -619,6 +620,7 @@ const App: FunctionComponent = () => {
                     settingsService={settingsService}
                     onDomainPathChange={onDomainPathChange}
                 />
+                <About tab-name={"About"} />
             </WaveTabs>
         </WaveReader>
     );
