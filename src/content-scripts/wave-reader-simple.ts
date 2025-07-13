@@ -19,7 +19,11 @@ class WaveReaderShadowDOM {
     private hierarchySelectorMount: any = undefined;
 
     constructor() {
-        this.hierarchySelectorService = new SelectorHierarchy(new SimpleColorServiceAdapter());
+        console.log("🌊 Creating SimpleColorServiceAdapter...");
+        const colorService = new SimpleColorServiceAdapter();
+        console.log("🌊 Color service created:", colorService);
+        this.hierarchySelectorService = new SelectorHierarchy(colorService);
+        console.log("🌊 SelectorHierarchy created with color service:", this.hierarchySelectorService);
         this.init();
     }
 
@@ -38,6 +42,12 @@ class WaveReaderShadowDOM {
         `;
         document.body.appendChild(container);
         this.shadowRoot = container.attachShadow({ mode: 'open' });
+
+        // Ensure shadow root is properly initialized
+        if (!this.shadowRoot) {
+            console.error("🌊 ERROR: Shadow root is null after creation");
+            return;
+        }
 
         // Create style element for Shadow DOM CSS injection
         this.shadowStyleElement = document.createElement('style');
@@ -62,7 +72,14 @@ class WaveReaderShadowDOM {
                 15% { transform: translateX(-1%) rotateY(2deg); }
             }
         `;
-        this.shadowRoot.appendChild(this.shadowStyleElement);
+        
+        // Ensure shadow root is available before appending
+        if (this.shadowRoot) {
+            this.shadowRoot.appendChild(this.shadowStyleElement);
+            console.log("🌊 Shadow DOM style element added successfully");
+        } else {
+            console.error("🌊 ERROR: Shadow root is null when trying to append style element");
+        }
 
         // Create style element for main document CSS injection
         this.mainDocumentStyleElement = document.createElement('style');
@@ -165,36 +182,62 @@ class WaveReaderShadowDOM {
     }
 
     mountSelectorUI(message: any) {
-        if (!this.selectorUiRoot) return;
+        console.log("🌊 Mounting selector UI...");
+        console.log("🌊 Shadow root:", this.shadowRoot);
+        console.log("🌊 Selector UI root:", this.selectorUiRoot);
+        
+        if (!this.shadowRoot) {
+            console.error("🌊 ERROR: Shadow root is null, cannot mount selector UI");
+            return;
+        }
+        
+        if (!this.selectorUiRoot) {
+            console.error("🌊 ERROR: Selector UI root is null, cannot mount selector UI");
+            return;
+        }
+        
         // Remove any previous UI
         this.unmountSelectorUI();
-        // Mount the selector hierarchy component inside the shadow root
-        const uiElement = MountOrFindSelectorHierarchyComponent({
-            service: this.hierarchySelectorService,
-            selector: message?.selector,
-            passSetSelector: (modifier: any) => {
-                this.setHierarchySelector = modifier;
-            },
-            onConfirmSelector: (selector: string) => {
-                // Send selection made message
-                chrome.runtime.sendMessage({
-                    from: 'content-script',
-                    name: 'selection-made',
-                    selector
-                });
-                this.unmountSelectorUI();
-            },
-            doc: this.selectorUiRoot.ownerDocument,
-            renderFunction: (mount: Element, component: React.ReactNode) => {
-                if (component) {
-                    ReactDOM.render(component as React.ReactElement, mount);
+        
+        try {
+            // Mount the selector hierarchy component inside the shadow root
+            const uiElement = MountOrFindSelectorHierarchyComponent({
+                service: this.hierarchySelectorService,
+                selector: message?.selector,
+                passSetSelector: (modifier: any) => {
+                    this.setHierarchySelector = modifier;
+                },
+                onConfirmSelector: (selector: string) => {
+                    // Send selection made message
+                    chrome.runtime.sendMessage({
+                        from: 'content-script',
+                        name: 'selection-made',
+                        selector
+                    });
+                    this.unmountSelectorUI();
+                },
+                doc: this.selectorUiRoot.ownerDocument,
+                uiRoot: this.shadowRoot,
+                renderFunction: (mount: Element, component: React.ReactNode) => {
+                    if (component && mount) {
+                        try {
+                            ReactDOM.render(component as React.ReactElement, mount);
+                            console.log("🌊 React component rendered successfully");
+                        } catch (error) {
+                            console.error("🌊 Error rendering React component:", error);
+                        }
+                    } else {
+                        console.warn("🌊 Component or mount element is null");
+                    }
                 }
+            });
+            if (uiElement) {
+                this.hierarchySelectorMount = uiElement;
             }
-        });
-        if (uiElement) {
-            this.hierarchySelectorMount = uiElement;
+            console.log("🌊 Selector UI mounted in shadow DOM");
+        } catch (error) {
+            console.error("🌊 Error mounting selector UI:", error);
         }
-        console.log("🌊 Selector UI mounted in shadow DOM");
     }
 
     unmountSelectorUI() {

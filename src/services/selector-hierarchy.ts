@@ -23,7 +23,8 @@ export const ISLAND_CONFIG = isTest ? {
     MAX_HIERARCHY_DEPTH: 3,
     MIN_ELEMENTS_PER_ISLAND: 1,
     MAX_ELEMENTS_PER_ISLAND: 20,
-    HEADER_MENU_GROUPING: true
+    HEADER_MENU_GROUPING: true,
+    MAX_ISLANDS: 100
 } : {
     MAX_ISLAND_WIDTH: 800,
     MAX_ISLAND_HEIGHT: 600,
@@ -39,7 +40,8 @@ export const ISLAND_CONFIG = isTest ? {
     MAX_HIERARCHY_DEPTH: 3,
     MIN_ELEMENTS_PER_ISLAND: 1,
     MAX_ELEMENTS_PER_ISLAND: 12,
-    HEADER_MENU_GROUPING: true
+    HEADER_MENU_GROUPING: true,
+    MAX_ISLANDS: 100
 } as const;
 
 // probably use the chrome types version
@@ -73,12 +75,7 @@ export type Selector = {
     // consider adding xpath
 }
 
-const createSelector = (elems: HtmlElement[] = [], classList: string[] = []) => {
-     return {
-         elem: [...elems],
-         classList: [...classList]
-     } as unknown as Selector;
-}
+// Removed unused createSelector function
 
 // Removed unused enum
 
@@ -175,32 +172,9 @@ export class HtmlSelection {
     }
 }
 
-// transparency is supported universally but there's a speed difference between adjusting
-// alpha on an overlay or setting
-const DimmPanelColor = "#eee"
-const DimmAlphaAmount = "0.30"
+// Removed unused constants and types
 
-type TC = {
-    triad: { (color: Color): Color[] }
-    quad: { (color: Color): Color[] }
-}
-
-type HtmlDocument = {
-    heyDoc: string
-    addElement(element: HtmlElement): void
-    querySelectorAll(query: string): HtmlElement[]
-}
-
-class SvgElement {
-    addElement(element: HtmlElement) {
-
-    }
-}
-
-// TODO: test!
-const ArrayReferenceEquals = <T> (array1: T[], array2: T[]) => {
-    return !array1.find(el => !array2.includes(el))
-}
+// Removed unused ArrayReferenceEquals function
 
 export const enum SizeProperties {
     OTHER = 0,
@@ -217,7 +191,7 @@ const getDocumentWidth = (doc: Document) => (doc.querySelector("html")?.clientWi
  */
 const calcSize = (element: HtmlElement | undefined, size: string, property: SizeProperties = SizeProperties.OTHER,
                   fontSizeRemDefaultAccessor = getDefaultFontSizeREM,
-                  documentWidthAccessor = getDocumentWidth.bind(null, element?.ownerDocument!!)): number => {
+                  documentWidthAccessor = getDocumentWidth.bind(null, element?.ownerDocument || document)): number => {
     if (!element) return 0;
     // perpendicular css transforms can cause css animation to go vertical
     // to accomidate we need a similar recursive search up the animation css transforms
@@ -276,7 +250,7 @@ const calcRotation = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFon
         rotationNumber = Number.parseFloat(rotation.split('rad')[0].trim()) * (180 / Math.PI) // or * 57.2958 ?
     }
 
-    return rotationNumber + (_parent(n) ? calcRotation(_parent(n)!!, fontSizeRemDefaultAccessor) : 0);
+    return rotationNumber + (_parent(n) ? calcRotation(_parent(n) || n, fontSizeRemDefaultAccessor) : 0);
 }
 
 const calcLeft = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSizeREM): number => {
@@ -288,7 +262,7 @@ const calcLeft = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSiz
     return cs(n.style?.left) +
         cs(n.style?.marginLeft) +
         calcSize(_parent(n), _parent(n)?.style?.paddingLeft || "0", SizeProperties.OTHER, fontSizeRemDefaultAccessor) +
-        (_parent(n) ? calcLeft(_parent(n)!!, fontSizeRemDefaultAccessor) : 0);
+        (_parent(n) ? calcLeft(_parent(n) || n, fontSizeRemDefaultAccessor) : 0);
 }
 const calcRight = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSizeREM()): number => {
     const boundingRect = n.getBoundingClientRect()
@@ -299,7 +273,7 @@ const calcRight = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSi
     return cs(n.style?.left) +
         cs(n.style?.marginLeft) +
         calcSize(_parent(n), _parent(n)?.style?.paddingLeft || "0", SizeProperties.OTHER, fontSizeRemDefaultAccessor) +
-        (_parent(n) ? calcLeft(_parent(n)!!, fontSizeRemDefaultAccessor) : 0) + cs(n.style?.width) +
+        (_parent(n) ? calcLeft(_parent(n) || n, fontSizeRemDefaultAccessor) : 0) + cs(n.style?.width) +
         cs(n.style?.marginRight);
 }
 const calcTop = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSizeREM()): number => {
@@ -311,7 +285,7 @@ const calcTop = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSize
     return cs(n.style?.top) +
         cs(n.style?.marginTop) +
         calcSize(_parent(n),_parent(n)?.style?.paddingTop || "0", SizeProperties.OTHER, fontSizeRemDefaultAccessor) +
-        (_parent(n) ? calcTop(_parent(n)!!, fontSizeRemDefaultAccessor) : 0);
+        (_parent(n) ? calcTop(_parent(n) || n, fontSizeRemDefaultAccessor) : 0);
 }
 const calcBottom = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontSizeREM()): number => {
     const boundingRect = n.getBoundingClientRect()
@@ -321,7 +295,7 @@ const calcBottom = (n: HtmlElement, fontSizeRemDefaultAccessor = getDefaultFontS
     const cs = (property: string) => calcSize(n, property, SizeProperties.OTHER, fontSizeRemDefaultAccessor)
     return cs(n.style?.top) + cs(n.style?.marginTop) +
         calcSize(_parent(n), _parent(n)?.style?.paddingTop || "0", SizeProperties.OTHER, fontSizeRemDefaultAccessor) +
-        (_parent(n) ? calcTop(_parent(n)!!, fontSizeRemDefaultAccessor) : 0) +
+        (_parent(n) ? calcTop(_parent(n) || n, fontSizeRemDefaultAccessor) : 0) +
         cs(n.style?.height);
 }
 
@@ -334,18 +308,19 @@ export const SizeFunctions = {
     calcRotation
 }
 
-const getPathSelector = (el: HtmlElement | undefined): string => {
-    if (!el) return ""
-    const parentNode: HtmlElement | undefined = el.parentNode as HtmlElement
-    return (parentNode ? getPathSelector(parentNode) + " > " : "") + Array.prototype.join.call(el?.classList || [], ",") // ternary for tail recursion
-}
+// Removed unused getPathSelector function
+
+// Helper function to check if we're in development mode
+const isDevelopmentMode = () => {
+    return typeof window !== 'undefined' && window.location && 
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+};
 
 export const ForThoustPanel = (
     document: Document,
     selector: string,
     selectorHierarchyService: SelectorHierarchyServiceInterface,
-    existingSelection?: HtmlSelection,
-    fontSizeRemDefaultAccessor = getDefaultFontSizeREM
+    existingSelection?: HtmlSelection
 ): HtmlSelection => {
 
     // figure out change of basis for screen pixels if necessary etc
@@ -375,7 +350,9 @@ export const ForThoustPanel = (
             const filteredElements = elements
                 .filter(el => (initialSelector.includes(el.nodeName.toLowerCase()) || [...el.classList].some(c => initialSelector.includes(c.toLowerCase()))) && el.textContent && el.textContent.trim().length > 0);
             
-            console.log(`🌊 Test mode: Found ${filteredElements.length} elements matching selector`);
+            if (isDevelopmentMode()) {
+                console.log(`🌊 Test mode: Found ${filteredElements.length} elements matching selector`);
+            }
             
             filteredElements.forEach(el => {
                 // Create a key based on tag name and full class list
@@ -383,20 +360,21 @@ export const ForThoustPanel = (
                 const fullClassList = [...el.classList].sort().join('-');
                 const key = `${tagName}-${fullClassList}`;
                 
-                console.log(`🌊 Test mode: Element ${el.tagName} with classes [${[...el.classList]}], key: ${key}`);
+                if (isDevelopmentMode()) {
+                    console.log(`🌊 Test mode: Element ${el.tagName} with classes [${[...el.classList]}], key: ${key}`);
+                }
                 
                 const group = elementGroups.get(key) || [];
                 group.push(el);
                 elementGroups.set(key, group);
             });
             
-            console.log(`🌊 Test mode: Created ${elementGroups.size} groups`);
-            elementGroups.forEach((groupElements, key) => {
-                console.log(`🌊 Test mode: Group ${key} has ${groupElements.length} elements`);
-            });
+            if (isDevelopmentMode()) {
+                console.log(`🌊 Test mode: Created ${elementGroups.size} groups`);
+            }
             
             // Convert groups to selectors
-            return Array.from(elementGroups.entries()).map(([key, groupElements]) => {
+            return Array.from(elementGroups.entries()).map(([, groupElements]) => {
                 const firstElement = groupElements[0];
                 return { 
                     elem: groupElements, 
@@ -426,7 +404,9 @@ export const ForThoustPanel = (
                 const fullClassList = [...el.classList].sort().join('-');
                 const key = `${tagName}-${fullClassList}`;
                 
-                console.log(`🌊 Debug: Element ${el.tagName} with classes [${[...el.classList]}], key: ${key}`);
+                if (isDevelopmentMode()) {
+                    console.log(`🌊 Debug: Element ${el.tagName} with classes [${[...el.classList]}], key: ${key}`);
+                }
                 
                 const existing = map.get(key) || [];
                 existing.push(el);
@@ -436,10 +416,9 @@ export const ForThoustPanel = (
             return map;
         }, new Map<string, HtmlElement[]>())
         
-        console.log(`🌊 Debug: Created ${classMap.size} class groups`);
-        classMap.forEach((elements, key) => {
-            console.log(`🌊 Debug: Group ${key} has ${elements.length} elements`);
-        });
+        if (isDevelopmentMode()) {
+            console.log(`🌊 Debug: Created ${classMap.size} class groups`);
+        }
 
         // Enhanced neighbor detection for headers and menus
         const isEnhancedNeighbor = (el: HtmlElement, possibleNeighbor: HtmlElement) => {
@@ -505,7 +484,7 @@ export const ForThoustPanel = (
         }
 
         // Create enhanced islands with better grouping
-        const createEnhancedIslands = (elements: HtmlElement[], className: string): HtmlElement[][] => {
+        const createEnhancedIslands = (elements: HtmlElement[]): HtmlElement[][] => {
             const islands: HtmlElement[][] = [];
             const processed = new Set<HtmlElement>();
 
@@ -523,7 +502,6 @@ export const ForThoustPanel = (
                             const totalWidth = island.reduce((sum, el) => sum + el.offsetWidth, 0);
                             const totalHeight = Math.max(...island.map(el => el.offsetTop + el.offsetHeight)) - 
                                               Math.min(...island.map(el => el.offsetTop));
-                            
                             // More permissive island size limits for multiple matches
                             if (totalWidth < ISLAND_CONFIG.MAX_ISLAND_WIDTH && 
                                 totalHeight < ISLAND_CONFIG.MAX_ISLAND_HEIGHT && 
@@ -537,7 +515,6 @@ export const ForThoustPanel = (
                 };
 
                 findEnhancedNeighbors(element);
-                
                 // More permissive minimum requirements for multiple matches
                 if (island.length >= ISLAND_CONFIG.MIN_ELEMENTS_PER_ISLAND) {
                     const area = island.reduce((sum, el) => sum + (el.offsetWidth * el.offsetHeight), 0);
@@ -553,17 +530,17 @@ export const ForThoustPanel = (
         // Process each class to create enhanced islands
         const enhancedIslands = new Map<string, HtmlElement[][]>();
         
-        classMap.forEach((elements, className) => {
-            const islands = createEnhancedIslands(elements, className);
+        classMap.forEach((elements) => {
+            const islands = createEnhancedIslands(elements);
             if (islands.length > 0) {
-                enhancedIslands.set(className, islands);
+                enhancedIslands.set("", islands);
             }
         });
 
         // Convert islands to selectors with enhanced filtering
         const selectors: Selector[] = [];
         
-        enhancedIslands.forEach((islands, className) => {
+        enhancedIslands.forEach((islands) => {
             islands.forEach(island => {
                 // Enhanced filtering for multiple matches
                 const validElements = island.filter((element: HtmlElement) => {
@@ -596,7 +573,20 @@ export const ForThoustPanel = (
             });
         });
 
-        return selectors;
+        // Apply the island limit
+        const limitedSelectors = selectors.slice(0, ISLAND_CONFIG.MAX_ISLANDS);
+        
+        if (selectors.length > ISLAND_CONFIG.MAX_ISLANDS) {
+            if (isDevelopmentMode()) {
+                console.log(`🌊 Island limit reached: ${selectors.length} islands found, limiting to ${ISLAND_CONFIG.MAX_ISLANDS}`);
+            }
+        } else {
+            if (isDevelopmentMode()) {
+                console.log(`🌊 Created ${selectors.length} islands (within limit of ${ISLAND_CONFIG.MAX_ISLANDS})`);
+            }
+        }
+        
+        return limitedSelectors;
     }
 
     const neighborIslands = getNeighborIslands([...nonSelectedHtmlElements, ...selectedHtmlElements] as HtmlElement[]);
@@ -704,6 +694,10 @@ export class SelectorHierarchy implements SelectorHierarchyServiceInterface {
 
     constructor(colorService: ColorGeneratorServiceInterface) {
         this.colorService = colorService;
+        if (isDevelopmentMode()) {
+            console.log("🌊 SelectorHierarchy constructor called with colorService:", colorService);
+            console.log("🌊 SelectorHierarchy colorService set to:", this.colorService);
+        }
     }
 
     getDimmedPanelSelectors(document: Document, selectedElements: HtmlElement[]): HtmlSelection {
@@ -718,18 +712,36 @@ export class SelectorHierarchy implements SelectorHierarchyServiceInterface {
 
     assignColorSelectionsForSelector(
         selector: Selector[],
-        selectorsGenerator: { (selector: Selector, i: number): ColorSelection } = this.defaultSelectorGenerator
+        selectorsGenerator?: { (selector: Selector, i: number): ColorSelection }
     ): HtmlSelection {
         const selectorsMap = new Map<Selector, ColorSelection>();
+        
+        // Use the provided generator or default to this.defaultSelectorGenerator with proper binding
+        const generator = selectorsGenerator || this.defaultSelectorGenerator.bind(this);
 
         selector.forEach((selector, i) => {
-            return selectorsMap.set(selector, selectorsGenerator(selector, i))
+            return selectorsMap.set(selector, generator(selector, i))
         })
 
         return new HtmlSelection(selectorsMap)
     }
 
     defaultSelectorGenerator(selector: Selector, i: number):  ColorSelection {
+        if (isDevelopmentMode()) {
+            console.log("🌊 defaultSelectorGenerator called with selector:", selector, "index:", i);
+            console.log("🌊 this.colorService:", this.colorService);
+        }
+        
+        // Check if colorService is available
+        if (!this.colorService) {
+            console.error("🌊 ERROR: colorService is null/undefined in defaultSelectorGenerator");
+            // Fallback to a default color
+            return {
+                selector,
+                color: tinycolor("#FF0000") // Red fallback
+            };
+        }
+        
         // Enhanced color generation for multiple matches with intelligent palette selection
         const isHeaderElement = (elem: HtmlElement) => {
             const tagName = elem.tagName.toLowerCase();
@@ -774,21 +786,32 @@ export class SelectorHierarchy implements SelectorHierarchyServiceInterface {
             baseColor = NavigationTriad[i % 3];
         }
         
-        // Generate a triad for this specific island with enhanced rotation
-        const triad = this.colorService.getTriad(baseColor, i * ISLAND_CONFIG.COLOR_ROTATION_DEGREES);
-        
-        // Use different colors from the triad for variety
-        const colorIndex = Math.floor(i / AllColorPalettes.length) % 3;
-        const color = triad[colorIndex];
-        
-        // Log for debugging
-        const elementType = hasHeaderElements ? 'header' : hasMenuElements ? 'menu' : hasNavigationElements ? 'navigation' : 'general';
-        console.log(`🌊 Island ${i}: Type ${elementType}, palette ${paletteIndex}, color ${color.toHexString()} from base ${baseColor.toHexString()}, triad index ${colorIndex}`);
-        
-        return {
-            selector,
-            color: color
-        };
+        try {
+            // Generate a triad for this specific island with enhanced rotation
+            const triad = this.colorService.getTriad(baseColor, i * ISLAND_CONFIG.COLOR_ROTATION_DEGREES);
+            
+            // Use different colors from the triad for variety
+            const colorIndex = Math.floor(i / AllColorPalettes.length) % 3;
+            const color = triad[colorIndex];
+            
+            // Log for debugging only in development
+            if (isDevelopmentMode()) {
+                const elementType = hasHeaderElements ? 'header' : hasMenuElements ? 'menu' : hasNavigationElements ? 'navigation' : 'general';
+                console.log(`🌊 Island ${i}: Type ${elementType}, palette ${paletteIndex}, color ${color.toHexString()} from base ${baseColor.toHexString()}, triad index ${colorIndex}`);
+            }
+            
+            return {
+                selector,
+                color: color
+            };
+        } catch (error) {
+            console.error("🌊 Error in defaultSelectorGenerator:", error);
+            // Fallback to a default color
+            return {
+                selector,
+                color: tinycolor("#FF0000") // Red fallback
+            };
+        }
     }
 
 }

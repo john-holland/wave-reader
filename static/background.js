@@ -8,7 +8,8 @@ import "regenerator-runtime/runtime";
 
 import { guardLastError } from "../src/util/util";
 import StartMessage from "../src/models/messages/start";
-import UpdateGoingStateMessage from "../src/models/messages/update-going-state";
+// import UpdateGoingStateMessage from "../src/models/messages/update-going-state";
+import PingMessage from "../src/models/messages/ping";
 
 // Handle keyboard shortcuts
 chrome.commands.onCommand.addListener((command) => {
@@ -39,31 +40,24 @@ chrome.commands.onCommand.addListener((command) => {
             
             console.log(`🌊 Background sending toggle command to tab:`, tabs[0].url);
             
-            // First ping the content script to make sure it's ready
-            pingContentScript(tabs[0].id, 3000).then(() => {
-                console.log('🌊 Content script is ready, sending toggle command');
-                
-                // Send toggle message to content script via window.postMessage
-                chrome.scripting.executeScript({
-                    target: { tabId: tabs[0].id },
-                    func: (messageData) => {
-                        console.log("🌊 Background script injecting toggle command to content script:", messageData);
-                        window.postMessage({
-                            source: 'wave-reader-extension',
-                            message: messageData
-                        }, '*');
-                    },
-                    args: [{
-                        from: 'background-script',
-                        name: 'toggle-wave-reader'
-                    }]
-                }).then(() => {
-                    console.log('🌊 Background script toggle command injected successfully');
-                }).catch((error) => {
-                    console.log('🌊 Background script failed to inject toggle command:', error);
-                });
+            // Send toggle message to content script via window.postMessage
+            chrome.scripting.executeScript({
+                target: { tabId: tabs[0].id },
+                func: (messageData) => {
+                    console.log("🌊 Background script injecting toggle command to content script:", messageData);
+                    window.postMessage({
+                        source: 'wave-reader-extension',
+                        message: messageData
+                    }, '*');
+                },
+                args: [{
+                    from: 'background-script',
+                    name: 'toggle-wave-reader'
+                }]
+            }).then(() => {
+                console.log('🌊 Background script toggle command injected successfully');
             }).catch((error) => {
-                console.log('🌊 Content script not ready for toggle command:', error);
+                console.log('🌊 Background script failed to inject toggle command:', error);
             });
         }).catch((error) => {
             console.error('🌊 Error querying tabs for keyboard shortcut:', error);
@@ -78,12 +72,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log("🌊 Message from:", message.from);
     console.log("🌊 Message name:", message.name);
     
-    // Handle ping messages from popup
-    if (message.from === 'popup' && message.name === 'ping') {
-        console.log("🌊 Background: Responding to popup ping");
-        sendResponse({ success: true, message: 'Background script is ready' });
-        return true;
-    }
+
     
     // Handle selection-made messages from content script (via chrome.runtime.sendMessage)
     if (message.from === 'content-script' && message.name === 'selection-made') {
@@ -98,6 +87,77 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             console.log("🌊 Background: Message forwarded to popup successfully");
         }).catch(error => {
             console.log("🌊 Background: Popup not available, message not sent:", error);
+        });
+        
+        sendResponse({ success: true });
+        return true; // Keep message channel open
+    }
+    
+    // Handle ping messages from popup
+    if (message.from === 'popup' && message.name === 'ping') {
+        console.log("🌊 Background: Received ping from popup, forwarding to content script");
+        
+        // Get the active tab and send ping message to content script
+        chrome.tabs.query({active: true, currentWindow: true}).then((tabs) => {
+            if (!tabs || tabs.length === 0) {
+                console.error('🌊 No active tabs found for ping');
+                sendResponse({ success: false, error: 'No active tabs found' });
+                return;
+            }
+            
+            // Check if the tab URL is accessible
+            const tabUrl = tabs[0].url;
+            if (tabUrl && (tabUrl.startsWith('chrome://') || tabUrl.startsWith('chrome-extension://') || tabUrl.startsWith('moz-extension://'))) {
+                console.log('🌊 Skipping ping for restricted URL:', tabUrl);
+                sendResponse({ success: false, error: 'Restricted URL' });
+                return;
+            }
+            
+            console.log(`🌊 Background sending ping to tab:`, tabs[0].url);
+            
+            // Send ping message to content script via window.postMessage
+            chrome.scripting.executeScript({
+                target: { tabId: tabs[0].id },
+                func: (messageData) => {
+                    console.log("🌊 Background script injecting ping to content script:", messageData);
+                    window.postMessage({
+                        source: 'wave-reader-extension',
+                        message: messageData
+                    }, '*');
+                },
+                args: [new PingMessage({
+                    timestamp: Date.now(),
+                    source: 'background-script'
+                })]
+            }).then(() => {
+                console.log('🌊 Background script ping injected successfully');
+                sendResponse({ success: true });
+            }).catch((error) => {
+                console.log('🌊 Background script failed to inject ping:', error);
+                sendResponse({ success: false, error: error.message });
+            });
+        }).catch((error) => {
+            console.error('🌊 Error querying tabs for ping:', error);
+            sendResponse({ success: false, error: error.message });
+        });
+        
+        return true; // Keep message channel open
+    }
+    
+    // Handle pong responses from content script
+    if (message.from === 'shadow-content-script' && message.name === 'pong') {
+        console.log("🌊 Background: Received pong from shadow content script:", message.timestamp);
+        
+        // Forward pong to popup if needed
+        chrome.runtime.sendMessage({
+            from: 'background-script',
+            name: 'pong',
+            timestamp: message.timestamp,
+            source: 'shadow-content-script'
+        }).then(() => {
+            console.log("🌊 Background: Pong forwarded to popup successfully");
+        }).catch(error => {
+            console.log("🌊 Background: Popup not available for pong:", error);
         });
         
         sendResponse({ success: true });
@@ -162,61 +222,73 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 console.log('background script loaded...')
 
-// Function to ping content script with timeout
-const pingContentScript = (tabId, timeoutMs = 5000) => {
-    return new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-            reject(new Error('Content script ping timeout'));
-        }, timeoutMs);
 
+
+// Function to send update-going-state message
+// const sendUpdateGoingState = (tabId, going) => {
+//     chrome.scripting.executeScript({
+//         target: { tabId: tabId },
+//         func: (messageData) => {
+//             console.log("🌊 Background script injecting update-going-state to content script:", messageData);
+//             window.postMessage({
+//                 source: 'wave-reader-extension',
+//                 message: messageData
+//             }, '*');
+//         },
+//         args: [new UpdateGoingStateMessage({ going })]
+//     }).then(() => {
+//         console.log('🌊 Background script update-going-state injected successfully');
+//     }).catch((error) => {
+//         console.log('🌊 Background script failed to inject update-going-state:', error);
+//     });
+// };
+
+// Function to send ping to content scripts
+const sendPingToContentScripts = () => {
+    chrome.tabs.query({active: true, currentWindow: true}).then((tabs) => {
+        if (!tabs || tabs.length === 0) {
+            console.log('🌊 No active tabs found for ping test');
+            return;
+        }
+        
+        const tab = tabs[0];
+        const tabUrl = tab.url;
+        
+        // Check if the tab URL is accessible
+        if (tabUrl && (tabUrl.startsWith('chrome://') || tabUrl.startsWith('chrome-extension://') || tabUrl.startsWith('moz-extension://'))) {
+            console.log('🌊 Skipping ping test for restricted URL:', tabUrl);
+            return;
+        }
+        
+        console.log(`🌊 Background sending ping test to tab:`, tabUrl);
+        
         chrome.scripting.executeScript({
-            target: { tabId: tabId },
+            target: { tabId: tab.id },
             func: (messageData) => {
-                console.log("🌊 Background script injecting ping to content script:", messageData);
+                console.log("🌊 Background script injecting ping test to content script:", messageData);
                 window.postMessage({
                     source: 'wave-reader-extension',
                     message: messageData
                 }, '*');
             },
-            args: [{
-                from: 'background-script',
-                name: 'ping'
-            }]
+            args: [new PingMessage({
+                timestamp: Date.now(),
+                source: 'background-script'
+            })]
         }).then(() => {
-            console.log('🌊 Background script ping injected successfully');
-            // We'll resolve when we get a response via window.postMessage
-            // For now, just resolve after a short delay
-            setTimeout(() => {
-                clearTimeout(timeout);
-                resolve(true);
-            }, 100);
+            console.log('🌊 Background script ping test injected successfully');
         }).catch((error) => {
-            clearTimeout(timeout);
-            console.log('🌊 Background script failed to inject ping:', error);
-            reject(error);
+            console.log('🌊 Background script failed to inject ping test:', error);
         });
-    });
-};
-
-// Function to send update-going-state message
-const sendUpdateGoingState = (tabId, going) => {
-    chrome.scripting.executeScript({
-        target: { tabId: tabId },
-        func: (messageData) => {
-            console.log("🌊 Background script injecting update-going-state to content script:", messageData);
-            window.postMessage({
-                source: 'wave-reader-extension',
-                message: messageData
-            }, '*');
-        },
-        args: [new UpdateGoingStateMessage({ going })]
-    }).then(() => {
-        console.log('🌊 Background script update-going-state injected successfully');
     }).catch((error) => {
-        console.log('🌊 Background script failed to inject update-going-state:', error);
+        console.error('🌊 Error querying tabs for ping test:', error);
     });
 };
 
+// Set up periodic ping test (every 30 seconds)
+setInterval(() => {
+    sendPingToContentScripts();
+}, 30000);
 
 // TODO: try https://github.com/fregante/content-scripts-register-polyfill if simply not calling this doesn't work
 //       it may be that the duplicate rules are throwing errors because we register in the manifest and the background.js
@@ -383,40 +455,7 @@ setTimeout(() => {
     initializeContentInterchange();
 }, 1000);
 
-// Test content script connectivity with longer delay
-console.log("🌊 Background script testing content script connectivity...");
-setTimeout(() => {
-    chrome.tabs.query({active: true, currentWindow: true}).then((tabs) => {
-        if (tabs && tabs.length > 0) {
-            // Check if the tab URL is accessible
-            const tabUrl = tabs[0].url;
-            if (tabUrl && (tabUrl.startsWith('chrome://') || tabUrl.startsWith('chrome-extension://') || tabUrl.startsWith('moz-extension://'))) {
-                console.log('🌊 Skipping connectivity test for restricted URL:', tabUrl);
-                return;
-            }
-            
-            console.log("🌊 Background script sending ping to content script...");
-            chrome.scripting.executeScript({
-                target: { tabId: tabs[0].id },
-                func: (messageData) => {
-                    console.log("🌊 Background script injecting ping to content script:", messageData);
-                    window.postMessage({
-                        source: 'wave-reader-extension',
-                        message: messageData
-                    }, '*');
-                },
-                args: [{
-                    from: 'background-script',
-                    name: 'ping'
-                }]
-            }).then(() => {
-                console.log('🌊 Background script ping injected successfully');
-            }).catch((error) => {
-                console.log('🌊 Background script failed to inject ping:', error);
-            });
-        }
-    });
-}, 3000);
+
 
 // The content script is loaded automatically by the manifest
 // No need for manual injection

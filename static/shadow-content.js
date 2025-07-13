@@ -1,34 +1,37 @@
 import "regenerator-runtime/runtime";
-import { guardLastError } from "../src/util/util";
-import { mousePos } from "../src/util/mouse";
-import { replaceAnimationVariables } from "../src/models/wave";
-import { FollowKeyChordObserver, WindowKeyDownKey } from "../src/components/util/user-input";
-import StateMachine  from "../src/util/state-machine";
+// import { FollowKeyChordObserver, WindowKeyDownKey } from "../src/components/util/user-input";
+import StateMachine from "../src/util/state-machine";
 import { CState } from "../src/util/state";
-import debounce from "../src/util/debounce";
-import {
-    BaseVentures,
-    StartVentures,
-    StopVentures,
-    WavingVentures,
-    AllVentures,
-    Base
-} from "../src/util/venture-states";
+// import debounce from "../src/util/debounce";
+// import {
+//     BaseVentures,
+//     StartVentures,
+//     StopVentures,
+//     WavingVentures,
+//     AllVentures,
+//     Base
+// } from "../src/util/venture-states";
 
-import SettingsService from "../src/services/settings"
-import UpdateWaveMessage from "../src/models/messages/update-wave";
-import SelectionModeMessage from "../src/models/messages/selection-mode";
-import UpdateGoingStateMessage from "../src/models/messages/update-going-state";
-import {MountOrFindSelectorHierarchyComponent} from "../src/components/selector-hierarchy";
-import {ColorGeneratorService, SelectorHierarchy} from "../src/services/selector-hierarchy";
+// import UpdateGoingStateMessage from "../src/models/messages/update-going-state";
+import { MountOrFindSelectorHierarchyComponent } from "../src/components/selector-hierarchy";
+// import { ErrorBoundary } from "../src/components/error-boundary";
+import { SimpleColorServiceAdapter } from "../src/services/simple-color-service";
+import { SelectorHierarchy } from "../src/services/selector-hierarchy";
 import SelectionMadeMessage from "../src/models/messages/selection-made";
-import { clientForLocation } from "../src/config/robotcopy";
-import { ClientLocation } from "../src/util/state-machine";
-import {ReactMachine} from "../src/util/react-machine";
+import PongMessage from "../src/models/messages/pong";
+// import React from "react";
+// import ReactDOM from "react-dom";
 
-console.log("🌊 Wave Reader Shadow DOM content script is loading on:", window.location.href);
+// Reduced logging - only log important events
+const log = (message) => {
+    const isDevelopment = typeof window !== 'undefined' && window.location && 
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    if (isDevelopment) {
+        console.log(`🌊 ${message}`);
+    }
+};
 
-const ContentClient = clientForLocation(ClientLocation.CONTENT)
+log("Wave Reader Shadow DOM content script is loading on: " + window.location.href);
 
 // Create Shadow DOM container
 class WaveReaderShadowDOM {
@@ -41,7 +44,7 @@ class WaveReaderShadowDOM {
         this.keychordObserver = undefined;
         this.eventListener = undefined;
         this.hierarchySelectorMount = undefined;
-        this.hierarchySelectorService = new SelectorHierarchy(new ColorGeneratorService());
+        this.hierarchySelectorService = new SelectorHierarchy(new SimpleColorServiceAdapter());
         this.setHierarchySelector = undefined;
         
         this.init();
@@ -50,7 +53,6 @@ class WaveReaderShadowDOM {
     init() {
         // Wait for document.body to be available
         if (!document.body) {
-            console.log("🌊 Shadow DOM: Document body not ready, waiting...");
             setTimeout(() => this.init(), 100);
             return;
         }
@@ -70,6 +72,23 @@ class WaveReaderShadowDOM {
         
         document.body.appendChild(container);
         this.shadowRoot = container.attachShadow({ mode: 'open' });
+        
+        // Create a proper document-like structure for styled-components
+        this.createStyledComponentsEnvironment();
+        
+        // Initialize state machine
+        this.initializeStateMachine();
+        
+        // Set up message listeners
+        this.setupMessageListeners();
+        
+        log("Shadow DOM initialized successfully");
+    }
+
+    createStyledComponentsEnvironment() {
+        // Create head element for styled-components
+        const head = document.createElement('head');
+        this.shadowRoot.appendChild(head);
         
         // Create style element for CSS injection
         this.styleElement = document.createElement('style');
@@ -99,164 +118,146 @@ class WaveReaderShadowDOM {
         
         this.shadowRoot.appendChild(this.styleElement);
         
-        // Initialize state machine
-        this.initializeStateMachine();
-        
-        // Set up message listeners
-        this.setupMessageListeners();
-        
-        console.log("🌊 Shadow DOM initialized successfully");
+        // Create a document facade that properly handles styled-components
     }
 
     initializeStateMachine() {
         const stateMachineMap = new Map();
-        stateMachineMap.set("base", Base);
-
-        this.stateMachine = new StateMachine();
         
         const states = {
-            "waving": CState("waving", WavingVentures, false, (async (message, state, previousState) => {
-                return stateMachineMap.get("waving")
-            }).bind(this)),
-            "error": CState("error", AllVentures, true, (async (message, state, previousState) => {
-                console.log("transitioning from error to base state from " + previousState.name)
-                return stateMachineMap.get('base')
-            }).bind(this), true),
-            "start": CState("start", StartVentures, false, (async (message, state, previousState) => {
-                this.latestOptions = message.options;
-                this.loadCSSTemplate(this.latestOptions.wave.cssTemplate);
-                this.going = true;
-                this.initializeOrUpdateToggleObserver(message);
-                return stateMachineMap.get('waving')
-            }).bind(this), false),
-            "stop": CState("stop", StopVentures, true, (async (message, state, previousState) => {
-                this.unloadCSS();
-                this.going = false;
-                return previousState.name === "waving" ? stateMachineMap.get("base") : previousState;
-            }).bind(this), false),
-            "update": CState("update", BaseVentures, false, (async (message, state, previousState) => {
-                this.unloadCSS();
-
-                if (!message?.options) {
-                    console.log("warning: update called with no options" + JSON.stringify(message));
-                    return previousState;
-                }
-
-                this.latestOptions = message.options;
-
-                console.log("Update called with previous state: " + previousState.name);
-                if (previousState.name === "waving") {
-                    this.loadCSSTemplate(this.latestOptions.wave.cssTemplate);
-                }
-
-                if (this.setHierarchySelector) {
-                    this.setHierarchySelector(this.latestOptions.wave.selector);
-                }
-
-                this.initializeOrUpdateToggleObserver(message);
-                return previousState
-            }).bind(this), true),
-            "toggle start": CState("toggle start", StartVentures, false, (async (message, state, previousState) => {
-                this.loadCSSTemplate(this.latestOptions.wave.cssTemplate);
-                this.going = true;
-                this.sendMessageToBackground(new UpdateGoingStateMessage({
-                    going: true
-                }));
-                return stateMachineMap.get('waving')
-            }).bind(this), false),
-            "toggle stop": CState("toggle stop", StopVentures, false, (async (message, state, previousState) => {
-                this.unloadCSS();
-                this.going = false;
-                this.sendMessageToBackground(new UpdateGoingStateMessage({
-                    going: false
-                }));
+            "base": CState("base", ["start", "stop"], true, (async () => {
                 return stateMachineMap.get('base')
             }).bind(this), false),
-            "start-selection-choose": CState("start-selection-choose", ["selection mode activate"], true, (async (message, state, previousState) => {
+            
+            "start": CState("start", ["start", "stop", "waving"], true, (async (message) => {
+                log("Start state activated");
+                this.loadCSS((message).options.wave.cssTemplate)
+                this.going = true;
+                return stateMachineMap.get('waving')
+            }).bind(this), false),
+            
+            "stop": CState("stop", ["start", "stop", "base"], true, (async () => {
+                log("Stop state activated");
+                this.unloadCSS()
+                this.going = false;
+                return stateMachineMap.get('base')
+            }).bind(this), false),
+            
+            "waving": CState("waving", ["start", "stop", "waving", "start-selection-choose"], true, (async (message) => {
+                if (message?.name === "update-going-state") {
+                    this.going = message.going;
+                    this.latestOptions = message.options;
+                }
+                return stateMachineMap.get('waving')
+            }).bind(this), false),
+            
+            "start-selection-choose": CState("start-selection-choose", ["selection mode activate"], true, (async (message) => {
                 const selector = message?.selector;
 
                 if (!(selector || "").trim()) {
-                    console.log("start selection choose activated without selector!")
+                    log("start selection choose activated without selector!");
                 }
 
-                console.log("🌊 Shadow DOM: Starting selector mode activation");
-                console.log("🌊 Shadow DOM: Selector:", selector);
+                log("Starting selector mode activation");
+                log("Selector: " + selector);
 
                 try {
-                    console.log("🌊 Shadow DOM: Mounting selector hierarchy component...");
+                    log("Mounting selector hierarchy component...");
+                    
+                    // Create a mount element within the Shadow DOM
+                    let mount = this.shadowRoot.querySelector("#wave-reader-component-mount");
+                    
+                    if (mount) {
+                        mount.remove();
+                    }
+                    
+                    mount = document.createElement("div");
+                    mount.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        z-index: 10000;
+                        pointer-events: auto;
+                        background: rgba(0, 0, 0, 0.1);
+                    `;
+                    mount.setAttribute("id", "wave-reader-component-mount");
+                    this.shadowRoot.appendChild(mount);
+                    
+                    log("Mount element created and appended: " + mount);
+                    
+                    // Create a custom document context for React components
+                    const customDocument = this.createCustomDocumentContext();
+                    
                     this.hierarchySelectorMount = MountOrFindSelectorHierarchyComponent({
                         service: this.hierarchySelectorService,
                         selector,
                         passSetSelector: (modifier) => { 
-                            console.log("🌊 Shadow DOM: Setting hierarchy selector modifier");
+                            log("Setting hierarchy selector modifier");
                             this.setHierarchySelector = modifier; 
                         },
                         onConfirmSelector: (selector) => {
-                            console.log("🌊 onConfirmSelector called with selector:", selector);
+                            log("onConfirmSelector called with selector: " + selector);
                             this.stateMachine.handleState(new SelectionMadeMessage({
                                 selector
                             }));
                         },
-                        doc: document
+                        doc: customDocument, // Use our custom document context
+                        uiRoot: this.shadowRoot
                     });
-                    console.log("🌊 Shadow DOM: Selector hierarchy component mounted successfully");
+                    log("Selector hierarchy component mounted successfully, mount: " + this.hierarchySelectorMount);
                 } catch (error) {
-                    console.error("🌊 Shadow DOM: Failed to mount selector hierarchy component:", error);
+                    console.error("Failed to mount selector hierarchy component:", error);
                 }
 
                 return stateMachineMap.get('selection mode')
             }).bind(this), false),
-            "selection mode": CState("selection mode", ["selection mode activate", "selection mode", "selection made", "end-selection-choose"], true, (async (message, state, previousState) => {
+            
+            "selection mode": CState("selection mode", ["selection mode activate", "selection mode", "selection made", "end-selection-choose"], true, (async () => {
                 return stateMachineMap.get('selection mode')
             }).bind(this), false),
-            "selection made": CState("selection made", ["end-selection-choose"], true, (async (message, state, previousState) => {
-                console.log("🌊 Selection made state triggered with selector:", message?.selector);
-                
-                this.sendMessageToBackground({
-                    name: 'selection-made',
-                    selector: message?.selector
-                });
-                
-                return stateMachineMap.get('end-selection-choose');
+            
+            "selection mode activate": CState("selection mode activate", ["selection mode", "selection made", "end-selection-choose"], true, (async () => {
+                return stateMachineMap.get('selection mode')
             }).bind(this), false),
-            "end-selection-choose": CState("end-selection-choose", BaseVentures, true, (async (message, state, previousState) => {
-                console.log("🌊 Shadow DOM: Ending selector mode");
-                
-                try {
-                    if (this.hierarchySelectorMount && this.hierarchySelectorMount.remove) {
-                        console.log("🌊 Shadow DOM: Removing hierarchy selector mount");
-                        this.hierarchySelectorMount.remove();
-                    }
-                    this.setHierarchySelector = undefined;
-                    console.log("🌊 Shadow DOM: Selector mode ended successfully");
-                } catch (error) {
-                    console.error("🌊 Shadow DOM: Failed to end selector mode:", error);
+            
+            "selection made": CState("selection made", ["end-selection-choose"], true, (async (message) => {
+                log("Selection made: " + message.selector);
+                return stateMachineMap.get('end-selection-choose')
+            }).bind(this), false),
+            
+            "end-selection-choose": CState("end-selection-choose", ["waving"], true, (async () => {
+                log("End selection choose activated");
+                if (this.hierarchySelectorMount) {
+                    this.hierarchySelectorMount.remove();
+                    this.hierarchySelectorMount = undefined;
                 }
-
-                return stateMachineMap.get('base')
+                return stateMachineMap.get('waving')
             }).bind(this), false)
         };
 
-        Object.keys(states).forEach(key => stateMachineMap.set(key, states[key]));
+        // Create state machine map
+        Object.keys(states).forEach(key => {
+            stateMachineMap.set(key, states[key]);
+        });
 
-        if (!stateMachineMap.has("base")) {
-            stateMachineMap.set("base", Base);
-        }
-
-        const stateNameMap = {
-            map: stateMachineMap,
+        // Create a NameAccessMapInterface implementation
+        const nameAccessMap = {
             getState: (name) => stateMachineMap.get(name)
         };
 
-        this.stateMachine.initialize(stateNameMap, Base);
-        console.log("🌊 Shadow DOM state machine initialized");
+        // Initialize the state machine with the map and initial state
+        this.stateMachine = new StateMachine();
+        this.stateMachine.initialize(nameAccessMap, states["base"]);
+        log("Shadow DOM state machine initialized");
     }
 
     setupMessageListeners() {
-        console.log("🌊 Shadow DOM: Setting up message listeners...");
+        log("Setting up message listeners...");
         
         // Listen for window.postMessage since we're in ISOLATED world
-        console.log("🌊 Shadow DOM: Adding window.postMessage listener");
+        log("Adding window.postMessage listener");
         window.addEventListener('message', (event) => {
             // Only handle messages from our extension
             if (event.source !== window || !event.data || event.data.source !== 'wave-reader-extension') {
@@ -264,65 +265,27 @@ class WaveReaderShadowDOM {
             }
             
             const message = event.data.message;
-            console.log(`🌊 Shadow DOM received window.postMessage: ${JSON.stringify(message)}`);
+            log("Shadow DOM received window.postMessage: " + JSON.stringify(message));
 
             if (message.from !== "popup" && message.from !== "background-script") {
-                console.log(`🌊 Message not from popup or background-script, ignoring. From: ${message.from}`);
+                log("Message not from popup or background-script, ignoring. From: " + message.from);
                 return;
             }
 
-            // Handle ping messages to test connectivity
+            // Handle ping message
             if (message.name === 'ping') {
-                console.log("🌊 Shadow DOM: Received ping message");
-                                    // Send response via window.postMessage back to background
-                    window.postMessage({
-                        source: 'wave-reader-extension',
-                        message: { success: true, message: 'Shadow DOM content script is ready' }
-                    }, '*');
-                return;
-            }
-
-                        // Handle keyboard shortcut toggle command
-            if (message.name === 'toggle-wave-reader') {
-                console.log("🌊 Shadow DOM: Received toggle-wave-reader command from keyboard shortcut");
+                log("Shadow DOM: Received ping, sending pong");
                 try {
-                    this.toggleWave();
-                    
-                    // Send update-going-state to background to sync the UI
-                    this.sendMessageToBackground(new UpdateGoingStateMessage({
-                        going: this.going
-                    }));
-                    
-                    // Send response via window.postMessage back to background
+                    // Send pong response via window.postMessage back to background
                     window.postMessage({
                         source: 'wave-reader-extension',
-                        message: { success: true }
+                        message: new PongMessage({
+                            timestamp: Date.now(),
+                            source: 'shadow-content-script'
+                        })
                     }, '*');
                 } catch (e) {
-                    console.error(`🌊 Failed to process toggle command: ${e.message}`);
-                    // Send error response via window.postMessage back to background
-                    window.postMessage({
-                        source: 'wave-reader-extension',
-                        message: { success: false, error: e.message }
-                    }, '*');
-                }
-                return;
-            }
-
-            // Handle update-going-state message
-            if (message.name === 'update-going-state') {
-                console.log("🌊 Shadow DOM: Received update-going-state command:", message.going);
-                try {
-                    this.going = message.going;
-                    console.log("🌊 Shadow DOM: Updated going state to:", this.going);
-                    
-                    // Send response via window.postMessage back to background
-                    window.postMessage({
-                        source: 'wave-reader-extension',
-                        message: { success: true, going: this.going }
-                    }, '*');
-                } catch (e) {
-                    console.error(`🌊 Failed to process update-going-state command: ${e.message}`);
+                    console.error("Failed to process ping command: " + e.message);
                     // Send error response via window.postMessage back to background
                     window.postMessage({
                         source: 'wave-reader-extension',
@@ -333,9 +296,9 @@ class WaveReaderShadowDOM {
             }
 
             try {
-                console.log(`🌊 Processing message: ${message.name}`);
+                log("Processing message: " + message.name);
                 this.stateMachine.handleState(message);
-                console.log(`🌊 Message processed successfully`);
+                log("Message processed successfully");
                 
                 // Send response via window.postMessage back to background
                 window.postMessage({
@@ -343,7 +306,7 @@ class WaveReaderShadowDOM {
                     message: { success: true }
                 }, '*');
             } catch (e) {
-                console.error(`🌊 Failed to process message: ${JSON.stringify(message)}, error: ${e.message}`);
+                console.error("Failed to process message: " + JSON.stringify(message) + ", error: " + e.message);
                 // Send error response via window.postMessage back to background
                 window.postMessage({
                     source: 'wave-reader-extension',
@@ -353,6 +316,16 @@ class WaveReaderShadowDOM {
         });
     }
 
+    unloadCSS() {
+        if (this.styleElement) {
+            this.styleElement.textContent = '';
+        }
+        if (this.mainDocumentStyle) {
+            this.mainDocumentStyle.textContent = '';
+        }
+        console.log("🌊 CSS unloaded from both Shadow DOM and main document");
+    }
+    
     loadCSS(css) {
         // Apply CSS to the main document, not just the Shadow DOM
         if (this.styleElement) {
@@ -367,74 +340,92 @@ class WaveReaderShadowDOM {
         }
         this.mainDocumentStyle.textContent = css;
         
-        console.log("🌊 Shadow DOM: CSS loaded into main document");
+        log("🌊 Shadow DOM: CSS loaded into main document");
     }
 
-    unloadCSS() {
-        if (this.styleElement) {
-            this.styleElement.textContent = '';
-        }
-        
-        // Remove CSS from main document
-        if (this.mainDocumentStyle) {
-            this.mainDocumentStyle.remove();
-            this.mainDocumentStyle = null;
-        }
-        
-        console.log("🌊 Shadow DOM: CSS unloaded from main document");
-    }
-
-    loadCSSTemplate(css) {
-        this.unloadCSS();
-        setTimeout(() => this.loadCSS(css));
-    }
-
-    sendMessageToBackground(message) {
-        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-            chrome.runtime.sendMessage({
-                from: 'content-script',
-                ...message
-            }).catch(error => {
-                console.error("🌊 Shadow DOM: Failed to send message to background:", error);
-            });
-        }
-    }
-
-    initializeOrUpdateToggleObserver(message) {
-        if (this.keychordObserver !== undefined) {
-            this.stopKeyChordEventListenerPredicate();
-        }
-
-        this.keychordObserver = FollowKeyChordObserver(
-            message.options.toggleKeys.keyChord,
-            WindowKeyDownKey((e) => {
-                this.eventListener = e;
-            }, false),
-            this.stopKeyChordEventListenerPredicate
-        ).subscribe((matched) => {
-            if (!matched) {
-                return;
-            } else {
-                console.log("matched: " + matched);
+    createCustomDocumentContext() {
+        // This function creates a custom document context that React components can use
+        // to render styled-components. It intercepts the styled-components style injection
+        // and ensures it goes to the Shadow DOM's head.
+        const customDocument = {
+            ...document, // Start with the main document's properties
+            head: this.shadowRoot.querySelector('head'), // Override head to point to Shadow DOM head
+            body: this.shadowRoot, // Override body to point to Shadow DOM
+            documentElement: {
+                ...document.documentElement,
+                scrollHeight: document.documentElement?.scrollHeight || window.innerHeight,
+                clientWidth: document.documentElement?.clientWidth || window.innerWidth,
+                clientHeight: document.documentElement?.clientHeight || window.innerHeight,
+                scrollWidth: document.documentElement?.scrollWidth || window.innerWidth,
+                scrollTop: document.documentElement?.scrollTop || 0,
+                scrollLeft: document.documentElement?.scrollLeft || 0,
+                style: document.documentElement?.style || {},
+                appendChild: (child) => {
+                    // Redirect style elements to Shadow DOM head
+                    if (child.tagName === 'STYLE') {
+                        const head = this.shadowRoot.querySelector('head');
+                        return head ? head.appendChild(child) : this.shadowRoot.appendChild(child);
+                    }
+                    return this.shadowRoot.appendChild(child);
+                },
+                insertBefore: (newNode, referenceNode) => {
+                    // Redirect style elements to Shadow DOM head
+                    if (newNode.tagName === 'STYLE') {
+                        const head = this.shadowRoot.querySelector('head');
+                        return head ? head.insertBefore(newNode, referenceNode) : this.shadowRoot.insertBefore(newNode, referenceNode);
+                    }
+                    return this.shadowRoot.insertBefore(newNode, referenceNode);
+                }
+            },
+            createElement: (tagName) => {
+                const element = document.createElement(tagName);
+                // Mark style elements for Shadow DOM
+                if (tagName.toLowerCase() === 'style') {
+                    log("Creating style element for Shadow DOM");
+                    element.setAttribute('data-shadow-dom', 'true');
+                }
+                return element;
+            },
+            createTextNode: (text) => document.createTextNode(text),
+            appendChild: (child) => {
+                if (child.tagName === 'STYLE') {
+                    const head = this.shadowRoot.querySelector('head');
+                    return head ? head.appendChild(child) : this.shadowRoot.appendChild(child);
+                }
+                return this.shadowRoot.appendChild(child);
+            },
+            insertBefore: (newNode, referenceNode) => {
+                if (newNode.tagName === 'STYLE') {
+                    const head = this.shadowRoot.querySelector('head');
+                    return head ? head.insertBefore(newNode, referenceNode) : this.shadowRoot.insertBefore(newNode, referenceNode);
+                }
+                return this.shadowRoot.insertBefore(newNode, referenceNode);
+            },
+            querySelector: (selector) => {
+                // Try Shadow DOM first, then main document
+                const shadowResult = this.shadowRoot.querySelector(selector);
+                return shadowResult || document.querySelector(selector);
+            },
+            querySelectorAll: (selector) => {
+                // Try Shadow DOM first, then main document
+                const shadowResult = this.shadowRoot.querySelectorAll(selector);
+                return shadowResult.length > 0 ? shadowResult : document.querySelectorAll(selector);
+            },
+            getElementById: (id) => {
+                const shadowResult = this.shadowRoot.getElementById(id);
+                return shadowResult || document.getElementById(id);
+            },
+            getElementsByTagName: (tagName) => {
+                const shadowResult = this.shadowRoot.getElementsByTagName(tagName);
+                return shadowResult.length > 0 ? shadowResult : document.getElementsByTagName(tagName);
+            },
+            getElementsByClassName: (className) => {
+                const shadowResult = this.shadowRoot.getElementsByClassName(className);
+                return shadowResult.length > 0 ? shadowResult : document.getElementsByClassName(className);
             }
-
-            this.toggleWave();
-        });
+        };
+        return customDocument;
     }
-
-    stopKeyChordEventListenerPredicate = () => {
-        if (this.eventListener !== undefined) {
-            window.removeEventListener("keydown", this.eventListener);
-        }
-    }
-
-    toggleWave = debounce((() => {
-        if (this.stateMachine.getCurrentState().name === "waving") {
-            this.stateMachine.handleState(this.stateMachine.getState("toggle stop"));
-        } else {
-            this.stateMachine.handleState(this.stateMachine.getState("toggle start"));
-        }
-    }).bind(this), 500, false);
 }
 
 // Initialize the Shadow DOM when the script loads
@@ -443,4 +434,4 @@ const waveReaderShadow = new WaveReaderShadowDOM();
 // Expose to window object for debugging
 window.waveReaderShadow = waveReaderShadow;
 
-console.log("🌊 Wave Reader Shadow DOM content script loaded successfully"); 
+log("Wave Reader Shadow DOM content script loaded successfully"); 

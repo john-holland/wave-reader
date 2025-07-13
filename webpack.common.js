@@ -12,7 +12,7 @@ const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 //config: path.join(__dirname, "./src/config/config.common.js")
 const config = {
     mode: "development",
-    devtool: "cheap-module-source-map",
+    devtool: "source-map",
     entry: {
         app: path.join(__dirname, "./static/index.js"),
         background: path.join(__dirname, "./static/background.js"),

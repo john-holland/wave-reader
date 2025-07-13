@@ -42,23 +42,82 @@ const stateMachine = new StateMachine()
 let latestOptions = undefined;
 
 function loadCSS(css) {
-    const head = document.head || document.getElementsByTagName("head")[0];
-    const style = document.createElement("style");
-    style.id = "extension";
-    style.textContent = css;
-    head.appendChild(style);
-
-    // todo: apply rotated animation with SizeFunctions.calcRotation
+    try {
+        // Check if we're in a Shadow DOM context
+        const isShadowDOM = document.head === null || document.head === undefined;
+        
+        if (isShadowDOM) {
+            // In Shadow DOM, we need to find the shadow root and create a style element there
+            const shadowRoot = document.querySelector('*').shadowRoot;
+            if (shadowRoot) {
+                const style = document.createElement("style");
+                style.id = "extension";
+                style.textContent = css;
+                shadowRoot.appendChild(style);
+                console.log("🌊 CSS loaded in Shadow DOM");
+                return;
+            }
+        }
+        
+        // Fallback to regular DOM
+        const head = document.head || document.getElementsByTagName("head")[0];
+        if (!head) {
+            console.warn("🌊 No head element found, cannot load CSS");
+            return;
+        }
+        
+        const style = document.createElement("style");
+        style.id = "extension";
+        style.textContent = css;
+        head.appendChild(style);
+        console.log("🌊 CSS loaded in regular DOM");
+    } catch (error) {
+        console.error("🌊 Error loading CSS:", error);
+    }
 }
 
 function unloadCSS() {
-    const cssNode = document.getElementById("extension");
-    cssNode?.parentNode?.removeChild(cssNode);
+    try {
+        // Try to find the style element in regular DOM
+        const cssNode = document.getElementById("extension");
+        if (cssNode && cssNode.parentNode) {
+            cssNode.parentNode.removeChild(cssNode);
+            console.log("🌊 CSS unloaded from regular DOM");
+            return;
+        }
+        
+        // Try to find the style element in Shadow DOM
+        const shadowRoot = document.querySelector('*')?.shadowRoot;
+        if (shadowRoot) {
+            const shadowCssNode = shadowRoot.getElementById("extension");
+            if (shadowCssNode) {
+                shadowCssNode.remove();
+                console.log("🌊 CSS unloaded from Shadow DOM");
+                return;
+            }
+        }
+        
+        console.log("🌊 No CSS element found to unload");
+    } catch (error) {
+        console.error("🌊 Error unloading CSS:", error);
+    }
 }
 
 function loadCSSTemplate(css) {
-    unloadCSS();
-    setTimeout(() => loadCSS(css));
+    try {
+        console.log("🌊 Loading CSS template:", css.substring(0, 100) + "...");
+        unloadCSS();
+        setTimeout(() => {
+            try {
+                loadCSS(css);
+                console.log("🌊 CSS template loaded successfully");
+            } catch (error) {
+                console.error("🌊 Error loading CSS template:", error);
+            }
+        }, 10);
+    } catch (error) {
+        console.error("🌊 Error in loadCSSTemplate:", error);
+    }
 }
 console.log("content script loaded...")
 
@@ -66,13 +125,23 @@ console.log("content script loaded...")
 //     .replaceAll("wave-reader__text", "test"));
 
 const applyMouseMove = (event, selector, message, elements) => {
-    const { rotationAmountY, translationAmountX } = mousePos(message.wave.axisRotationAmountYMax, event, elements);
-    unloadCSS();
-    loadCSS(replaceAnimationVariables(wave, translationAmountX, rotationAmountY));
+    try {
+        const { rotationAmountY, translationAmountX } = mousePos(message.wave.axisRotationAmountYMax, event, elements);
+        unloadCSS();
+        const newCSS = replaceAnimationVariables(wave, translationAmountX, rotationAmountY);
+        loadCSS(newCSS);
+        console.log("🌊 Applied mouse move animation:", { translationAmountX, rotationAmountY });
+    } catch (error) {
+        console.error("🌊 Error applying mouse move:", error);
+    }
 }
 
 const mouseMoveListener = (e) => {
-    applyMouseMove(e, message.wave.selector, message, elements)
+    try {
+        applyMouseMove(e, message.wave.selector, message, elements);
+    } catch (error) {
+        console.error("🌊 Error in mouse move listener:", error);
+    }
 }
 
 let keychordObserver /*Observable<boolean> | undefined*/ = undefined;
@@ -143,6 +212,24 @@ function StateNameMap(map = new Map()) {
         }, true),
         "start": CState("start", StartVentures, false, async (message, state, previousState) => {
             latestOptions = message.options;
+            
+            // Validate selector and elements
+            if (latestOptions.wave.selector) {
+                try {
+                    const elements = document.querySelectorAll(latestOptions.wave.selector);
+                    console.log(`🌊 Found ${elements.length} elements for selector: ${latestOptions.wave.selector}`);
+                    
+                    if (elements.length === 0) {
+                        console.warn(`🌊 No elements found for selector: ${latestOptions.wave.selector}`);
+                        // Try with a fallback selector
+                        const fallbackElements = document.querySelectorAll('p, div, span, h1, h2, h3, h4, h5, h6');
+                        console.log(`🌊 Using fallback selector, found ${fallbackElements.length} elements`);
+                    }
+                } catch (error) {
+                    console.error(`🌊 Invalid selector: ${latestOptions.wave.selector}`, error);
+                }
+            }
+            
             loadCSSTemplate(latestOptions.wave.cssTemplate)
             // TODO: see if the state machine will let us remove this
             going = true;
@@ -260,7 +347,8 @@ function StateNameMap(map = new Map()) {
                             selector
                         }))
                     },
-                    doc: document
+                    doc: document,
+                    uiRoot: (typeof shadowRoot !== 'undefined' && shadowRoot) ? shadowRoot : document
                 })
                 console.log("🌊 Content script: Selector hierarchy component mounted successfully");
             } catch (error) {
@@ -453,6 +541,13 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
         // Accept messages from both popup and background-script
         if (message.from !== "popup" && message.from !== "background-script") {
             console.log(`🌊 Message not from popup or background-script, ignoring. From: ${message.from}`);
+            return false;
+        }
+
+        // Check if we're in a valid DOM context before processing
+        if (!document || !document.head) {
+            console.warn("🌊 Content script: Not in valid DOM context, skipping message processing");
+            sendResponse({ success: false, error: "Invalid DOM context" });
             return false;
         }
 

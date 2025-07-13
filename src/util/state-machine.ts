@@ -2,8 +2,8 @@ import {State, NameAccessMapInterface, Named} from "./state"
 import {Observable, Subscriber} from "rxjs";
 import Message, {MessageInterface} from "../models/message";
 import MessageSender = chrome.runtime.MessageSender;
-import InstalledDetails = chrome.runtime.InstalledDetails;
-import {guardLastError} from "./util";
+// import InstalledDetails = chrome.runtime.InstalledDetails;
+// import {guardLastError} from "./util";
 import {fromMessage} from "./messages";
 import BootstrapMessage from "../models/messages/bootstrap";
 import BootstrapResultMessage from "../models/messages/bootstrap-result";
@@ -81,7 +81,7 @@ export abstract class APIMessage<T> extends Message<T> implements MessageInterfa
  * todo: implement
  * todo: implement polling
  */
-export class APIClientMessengerService<T extends Message<any>, Discovery extends ClientDiscovery> implements IClientMessengerService<T> {
+export class APIClientMessengerService<T extends Message<any>> implements IClientMessengerService<T> {
     cleanUp(): Promise<void> {
         return Promise.resolve(undefined);
     }
@@ -97,7 +97,7 @@ export class APIClientMessengerService<T extends Message<any>, Discovery extends
         throw new NotImplementedError("todo: implement api client message service")
     }
 
-    sendMessage(path: string, clientId: ClientID, message: T): Promise<Success> {
+    sendMessage(): Promise<Success> {
         throw new NotImplementedError("todo: implement api client message service")
     }
     initialize(): Promise<ClientID> {
@@ -241,14 +241,13 @@ export class GoogleClientMessengerService<T extends Message<any>, Discovery exte
     }
 
     onReceiveMessage(): Promise<Observable<ClientMessage<T>>> {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
         // todo: do we want a retry or timeout?
             let clientReceived = false;
             const backlog: any[] = [];
             const observable = new Observable<ClientMessage<T>>((subscriber) => {
-                this.runtimeProxy.onMessage((message: any, sender: MessageSender, response: {(response?: any): void}) => {
+                this.runtimeProxy.onMessage((message: any) => {
 
-                    const { id, frameId } = sender;
                     const typedMessage = fromMessage(message);
 
                     // @ mr-sekiro salt and hash messages beyond bootstrap?
@@ -305,7 +304,7 @@ export class GoogleClientMessengerService<T extends Message<any>, Discovery exte
             return Promise.resolve();
         }
         // send up
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             // todo: using what info is available, extension id, etc, send info back to requested
             this.runtimeProxy.sendMessageToRuntime(new BootstrapMessage(), (response) => {
                 if (response as HeartbeatResultMessage) {
@@ -317,7 +316,7 @@ export class GoogleClientMessengerService<T extends Message<any>, Discovery exte
     }
 
     initialize(): Promise<ClientID> {
-        return new Promise((resolve, reject) => {
+        return new Promise(() => {
             this.bootstrapMessages().then(this.onReceiveMessage);
         })
     }
@@ -333,7 +332,7 @@ export class FirefoxSyncClientMessengerService<T extends Message<any>> implement
         return Promise.resolve(undefined);
     }
 
-    sendMessage(clientId: ClientID, message: any): Promise<boolean> {
+    sendMessage(): Promise<boolean> {
         throw new Error("TODO: implement firefox!.");
     }
 
@@ -374,41 +373,41 @@ export interface IClient<T extends Message<any>> {
     getStateMachines(): Map<string, StateMachine>
 }
 
-const ContentToPopupDiscovery = {
-    from: ClientLocation.CONTENT,
-    to: ClientLocation.POPUP
-} as ClientDiscovery;
+// const ContentToPopupDiscovery = {
+//     from: ClientLocation.CONTENT,
+//     to: ClientLocation.POPUP
+// } as ClientDiscovery;
 
 const PopupToContentDiscovery = {
     from: ClientLocation.POPUP,
     to: ClientLocation.CONTENT
 } as ClientDiscovery;
 
-const PopupToBackgroundDiscovery = {
-    from: ClientLocation.POPUP,
-    to: ClientLocation.BACKGROUND
-} as ClientDiscovery;
+// const PopupToBackgroundDiscovery = {
+//     from: ClientLocation.POPUP,
+//     to: ClientLocation.BACKGROUND
+// } as ClientDiscovery;
 
-const BackgroundToPopupDiscovery = {
-    from: ClientLocation.BACKGROUND,
-    to: ClientLocation.POPUP
-} as ClientDiscovery;
+// const BackgroundToPopupDiscovery = {
+//     from: ClientLocation.BACKGROUND,
+//     to: ClientLocation.POPUP
+// } as ClientDiscovery;
 
-const PopupToAPIDiscovery = {
-    from: ClientLocation.POPUP,
-    to: ClientLocation.API
-} as ClientDiscovery;
+// const PopupToAPIDiscovery = {
+//     from: ClientLocation.POPUP,
+//     to: ClientLocation.API
+// } as ClientDiscovery;
 
-const ContentToAPIDiscovery = {
-    from: ClientLocation.CONTENT,
-    to: ClientLocation.API
-} as ClientDiscovery;
+// const ContentToAPIDiscovery = {
+//     from: ClientLocation.CONTENT,
+//     to: ClientLocation.API
+// } as ClientDiscovery;
 
-// for the time being we'd like the api access to primarily live on the background.js thread
-const BackgroundToAPIDiscovery = {
-    from: ClientLocation.BACKGROUND,
-    to: ClientLocation.API
-} as ClientDiscovery;
+// // for the time being we'd like the api access to primarily live on the background.js thread
+// const BackgroundToAPIDiscovery = {
+//     from: ClientLocation.BACKGROUND,
+//     to: ClientLocation.API
+// } as ClientDiscovery;
 
 export class Client<T extends Message<any>> implements IClient<T> {
     messengerClient: IClientMessengerService<T>
@@ -441,12 +440,12 @@ export class Client<T extends Message<any>> implements IClient<T> {
     }
 
     initialize(): Promise<Success> {
-        return new Promise(async (resolve, reject) => {
+        return new Promise(async (resolve) => {
              this.messengerClient.initialize().then(async (id) => {
                  this.clientId = id;
-                 this.observer = await this.onReceiveMessage(this.clientId)
+                 this.observer = await this.onReceiveMessage()
                  this.observer.subscribe((message) => {
-                     this.sendMessage(message).catch(e => {
+                     this.sendMessage(message).catch(() => {
                         console.log("failed to process state or message: " + JSON.stringify(message));
                      });
                  })
@@ -501,41 +500,31 @@ export class Client<T extends Message<any>> implements IClient<T> {
         });
     }
 
-    private onReceiveMessage(clientId: string): Promise<Observable<ClientMessage<T>>> {
-        if (this.clientId === clientId) {
-            return this.messengerClient.onReceiveMessage()
-        }
-        if (this.messengerClient.getClientMap().has(clientId)) {
-            if (!this.messengerClient.getApiMap().has(this.messengerClient.getClientMap().get(clientId)!)) {
-                throw new Error(`clientId: ${clientId} has no corresponding API mappings on this host ${this.clientId}`)
-            }
-            return this.messengerClient.getApiMap().get(this.messengerClient.getClientMap().get(clientId)!)!.onReceiveMessage()
-        } else {
-            throw new Error(`clientId: ${clientId} not found`)
-        }
+    private onReceiveMessage(): Promise<Observable<ClientMessage<T>>> {
+        return this.messengerClient.onReceiveMessage()
     }
 }
 
 
-const createBackgroundToPopupClientMessengerService = <T extends Message<T>>() => new GoogleClientMessengerService<T, ClientDiscovery>(
-    BackgroundToPopupDiscovery,
-    new Map<ClientID, IClientMessengerService<T>>()
-);
+// const createBackgroundToPopupClientMessengerService = <T extends Message<T>>() => new GoogleClientMessengerService<T, ClientDiscovery>(
+//     BackgroundToPopupDiscovery,
+//     new Map<ClientID, IClientMessengerService<T>>()
+// );
 
-const createPopupToBackgroundClientMessengerService = <T extends Message<T>>() => new GoogleClientMessengerService<T, ClientDiscovery>(
-    PopupToContentDiscovery,
-    new Map<ClientID, IClientMessengerService<T>>()
-);
+// const createPopupToBackgroundClientMessengerService = <T extends Message<T>>() => new GoogleClientMessengerService<T, ClientDiscovery>(
+//     PopupToContentDiscovery,
+//     new Map<ClientID, IClientMessengerService<T>>()
+// );
 
-const createContentToPopupClientMessengerService = <T extends Message<T>>() => new GoogleClientMessengerService<T, ClientDiscovery>(
-    ContentToPopupDiscovery,
-    new Map<ClientID, IClientMessengerService<T>>()
-);
+// const createContentToPopupClientMessengerService = <T extends Message<T>>() => new GoogleClientMessengerService<T, ClientDiscovery>(
+//     ContentToPopupDiscovery,
+//     new Map<ClientID, IClientMessengerService<T>>()
+// );
 
-const createPopupToContentClientMessengerService = <T extends Message<T>>() => new GoogleClientMessengerService<T, ClientDiscovery>(
-    PopupToContentDiscovery,
-    new Map<ClientID, IClientMessengerService<T>>()
-);
+// const createPopupToContentClientMessengerService = <T extends Message<T>>() => new GoogleClientMessengerService<T, ClientDiscovery>(
+//     PopupToContentDiscovery,
+//     new Map<ClientID, IClientMessengerService<T>>()
+// );
 
 class StateMachine {
     initialized: boolean = false;

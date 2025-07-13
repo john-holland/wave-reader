@@ -282,6 +282,9 @@ describe("selector quad service", () => {
                 const service = new SelectorHierarchy(new ColorGeneratorService());
 
                 withDocument((doc, window, dom) => {
+                    const host = doc.createElement("div");
+                    const shadowRoot = host.attachShadow({ mode: "open" });
+                    doc.body.appendChild(host);
                     let setSelector = (selector: string): void => {
                         throw new Error("didn't initialize modifier")
                     }
@@ -295,7 +298,9 @@ describe("selector quad service", () => {
                         onConfirmSelector: (selector) => {
                             confirmedSelector = selector
                         },
-                        doc, renderFunction: (mount, component) => {
+                        doc,
+                        uiRoot: shadowRoot,
+                        renderFunction: (mount, component) => {
                             expect(mount).toBeDefined();
                             render(component as ReactElement, { container: doc.documentElement, baseElement: mount });
                         }
@@ -321,6 +326,9 @@ describe("selector quad service", () => {
                 const service = new SelectorHierarchy(new ColorGeneratorService());
 
                 withDocument((doc, window, dom) => {
+                    const host = doc.createElement("div");
+                    const shadowRoot = host.attachShadow({ mode: "open" });
+                    doc.body.appendChild(host);
                     let setSelector = (selector: string): void => {
                         throw new Error("didn't initialize modifier")
                     }
@@ -333,7 +341,9 @@ describe("selector quad service", () => {
                         onConfirmSelector: (selector) => {
                             confirmedSelector = selector
                         },
-                        doc, renderFunction: (mount, component) => {
+                        doc,
+                        uiRoot: shadowRoot,
+                        renderFunction: (mount, component) => {
                             expect(mount).toBeDefined();
                             render(component as ReactElement, { container: doc.documentElement, baseElement: mount });
                         }
@@ -354,7 +364,9 @@ describe("selector quad service", () => {
                         onConfirmSelector: (selector) => {
                             confirmedSelector = selector
                         },
-                        doc, renderFunction: (mount, component) => {
+                        doc,
+                        uiRoot: shadowRoot,
+                        renderFunction: (mount, component) => {
                             expect(mount).toBeDefined();
                             render(component as ReactElement, { container: doc.documentElement, baseElement: mount });
                         }

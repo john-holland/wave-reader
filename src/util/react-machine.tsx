@@ -8,25 +8,24 @@ export type MachineComponentProps = {
     machine: StateMachine
     previousState: string
 }
-export type MachineComponent = ReactElement<any, any> | null & {
-}
+export type MachineComponent = ReactElement<any, any> | null;
 
 /**
  * Return to assert the current [MachineComponent]'s as the current view without affecting the view
  */
-export type View = {}
+export type View = Record<string, never>
 export const _View_ = {} as unknown as View;
 
 /**
  * Return to empty the current [views.views], maintaining the previous states (tm)
  */
-export type ClearViews = {}
+export type ClearViews = Record<string, never>
 export const _ClearViews_ = {} as unknown as ClearViews;
 
 /**
  * Return to empty [view.states] & [view.views]
  */
-export type Clean = {}
+export type Clean = Record<string, never>
 export const _Clean_ = {} as unknown as Clean;
 
 export type ComponentLog = {
@@ -39,11 +38,8 @@ export type ComponentLog = {
 
 export type ComponentLogView = {
     states: string[]
-
-
     state: string
-
-    views: MachineComponent[]
+    views: ReactElement<any, any>[]
 }
 
 export const log = (state: string, view?: MachineComponent | View | ClearViews | Clean) => {
@@ -52,7 +48,7 @@ export const log = (state: string, view?: MachineComponent | View | ClearViews |
         view
     } as unknown as ComponentLog
 }
-export const view = (state: string, states: string[], ...views: MachineComponent[]) => {
+export const view = (state: string, states: string[], ...views: ReactElement<any, any>[]) => {
     return {
         state,
         states,
@@ -110,7 +106,7 @@ export type ReactStateMachineComponentProps = {
 
 export class ReactStateMachine<TProps> {
     private states: { [key: string]: StateComponentFunction };
-    private renderTarget?: React.ReactElement<any, any> | null;
+    private renderTarget?: ReactElement<any, any> | null;
     private stateMachine: StateMachine = new StateMachine()
     private logView: ComponentLogView = {
         state: "base",
@@ -120,12 +116,12 @@ export class ReactStateMachine<TProps> {
     private state: UseStateProxy<TProps>;
     private errorView: string[] = [];
     private ErrorStateFunction = (): ComponentLog => {
-        return log("base", <ul>{this.errorView.map(e => <li>{e}</li>)}</ul>);
+        return log("base", <ul>{this.errorView.map(e => <li key={e}>{e}</li>)}</ul>);
     }
 
     private ErrorState = new State("error", ["error", "base"], true, (async (message, state, previousState): Promise<State> => {
         const log = this.ErrorStateFunction()
-        if (log.view) this.logView.views.push(log.view as MachineComponent)
+        if (log.view && React.isValidElement(log.view)) this.logView.views.push(log.view)
         this.logView.states.push(log.state)
         return this.stateMachine.getState((await log).state) || this.ErrorState
     }))
@@ -138,7 +134,7 @@ export class ReactStateMachine<TProps> {
             const log: ComponentLog = await componentFunction({
 
             } as Partial<MachineComponentProps>)
-            if (log.view) this.logView.views.push(log.view as MachineComponent)
+            if (log.view && React.isValidElement(log.view)) this.logView.views.push(log.view)
             this.logView.states.push(log.state)
             return this.stateMachine.getState((await log).state) || this.ErrorState
         }))
@@ -182,7 +178,7 @@ export class ReactStateMachine<TProps> {
 
                 // on the upside, optional types & type unions give us a neat little pattern matching pattern!
                 const matchComponent = (view?: MachineComponent): Promise<State> | State | undefined => {
-                    if (view) this.logView.views.push(view);
+                    if (view && React.isValidElement(view)) this.logView.views.push(view);
                     else return undefined;
 
                     return Promise.resolve(map.get(result.state)!)
@@ -229,7 +225,7 @@ export class ReactStateMachine<TProps> {
             useStateProxy: this.state,
             logView: this.logView,
             stateMachine: this.stateMachine
-        })
+        }) as ReactElement<any, any> | null
     }
 
     handleMessage(message: Named) {
@@ -282,9 +278,16 @@ export const ReactStateMachineRenderTarget: FunctionComponent<ReactStateMachineR
         }
     }, [rerender])
 
-    return (<context.Provider value={stateMachine}>
-        {logView.views.map((view, i) => <view key={i} />)}
-    </context.Provider>);
+    const validViews = logView.views.filter(React.isValidElement);
+    if (validViews.length === 0) return null;
+    
+    return (
+        <context.Provider value={stateMachine}>
+            <div>
+                {validViews.map((view, i) => React.cloneElement(view, { key: i }))}
+            </div>
+        </context.Provider>
+    );
 }
 
 export type ReactMachineFunction<TProps = any> = { (props: TProps): ReactStateMachine<TProps> };

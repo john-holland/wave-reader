@@ -1,4 +1,4 @@
-import React, {FunctionComponent, useEffect, useRef, useState} from 'react'; // we need this to make JSX compile
+import React, {FunctionComponent, useEffect, useRef, useState, useCallback} from 'react'; // we need this to make JSX compile
 import styled from 'styled-components';
 import {Autocomplete, Button, TextField} from "@mui/material";
 
@@ -47,69 +47,103 @@ const SelectorInput: FunctionComponent<SelectorProps> = ({
     selector,
     selectors,
     saved,
-    selectorClicked,
     onSave,
     selectorModeClicked,
     selectorModeOn = false
 }: SelectorProps) => {
     const [ selectorText, setSelectorText ] = useState(selector);
     const [ displaySelectors, setDisplaySelectors ] = useState([... new Set(selectors)])
+    const [ isEditing, setIsEditing ] = useState(!saved);
 
     const selectorRef = useRef<HTMLInputElement>(null);
 
+    // Sync with parent selector prop
     useEffect(() => {
-        //if (selectorRef.current?.value) {
-            setSelectorText(selector);
-        //}
-    }, [selector, selectorRef]);
+        setSelectorText(selector);
+        setIsEditing(!saved);
+    }, [selector, saved]);
 
-    const _selectorClicked = () => {
-        if (selectorClicked) {
-          selectorClicked();
-        }
-    };
+    // Update display selectors when selectors prop changes
+    useEffect(() => {
+        setDisplaySelectors([... new Set(selectors)]);
+    }, [selectors]);
 
-    const saveClicked = () => {
+    const saveClicked = useCallback(() => {
         if (onSave) {
-            const newSelector = selectorRef.current?.value || selector
+            const newSelector = selectorRef.current?.value || selectorText;
             console.log("🌊 SelectorInput: saveClicked called with selector:", newSelector);
             onSave(newSelector);
-            setDisplaySelectors([... new Set(selectors.concat([newSelector]))])
+            setSelectorText(newSelector);
+            setIsEditing(false);
+            // Update display selectors with the new selector
+            setDisplaySelectors(prev => [... new Set([...prev, newSelector])]);
         }
-    };
+    }, [onSave, selectorText]);
 
-    const onPathChange = (event: any, newValue: string | null) => {
+    const onPathChange = useCallback((event: any, newValue: string | null) => {
         if (newValue) {
             console.log("🌊 SelectorInput: onPathChange called with selector:", newValue);
             setSelectorText(newValue);
             onSave(newValue);
+            setIsEditing(false);
         }
-    }
+    }, [onSave]);
 
-    const onSelectorModeClicked = () => {
-        selectorModeClicked(!selectorModeOn)
-    }
+    const onSelectorModeClicked = useCallback(() => {
+        selectorModeClicked(!selectorModeOn);
+    }, [selectorModeClicked, selectorModeOn]);
+
+    const startEditing = useCallback(() => {
+        setIsEditing(true);
+        // Focus the input after a brief delay to ensure it's rendered
+        setTimeout(() => {
+            selectorRef.current?.focus();
+        }, 10);
+    }, []);
+
+    const cancelEditing = useCallback(() => {
+        setIsEditing(false);
+        setSelectorText(selector); // Reset to original value
+    }, [selector]);
 
     return (
         <div>
             <SelectorTitle>Text Selector </SelectorTitle>
-            <ClickableSelectorTextContainer data-testid={"clickable-selector-label"} onClick={_selectorClicked}>
-                <SelectorTextDisplay visible={saved}>{ selectorText }</SelectorTextDisplay>
-                <SelectorNote visible={saved}>&nbsp;(click to set selector)</SelectorNote>
+            <ClickableSelectorTextContainer data-testid={"clickable-selector-label"} onClick={startEditing}>
+                <SelectorTextDisplay visible={!isEditing}>{ selectorText }</SelectorTextDisplay>
+                <SelectorNote visible={!isEditing}>&nbsp;(click to edit selector)</SelectorNote>
             </ClickableSelectorTextContainer>
-            <SelectorTextInput visible={!saved} type="text" defaultValue={selectorText} ref={selectorRef} />
-            <SaveButton visible={!saved} type="button" value={"Save"} onClick={saveClicked} />
-            <Button onClick={onSelectorModeClicked}>{!selectorModeOn ? "Activate Selector Mode! 🌙" : "Deactivate Selector Mode 🌚"}</Button>
-            <Autocomplete id="selector-dropdown"
-                          className={"item"}
-                          disablePortal
-                          value={selector}
-                          onChange={onPathChange}
-                          options={displaySelectors || []}
-                          sx={{ width: "50%" }}
-                          renderInput={(params) => <TextField {...params} label={selector} />} />
+            <SelectorTextInput 
+                visible={isEditing} 
+                type="text" 
+                value={selectorText}
+                onChange={(e) => setSelectorText(e.target.value)}
+                ref={selectorRef} 
+            />
+            <SaveButton visible={isEditing} type="button" value={"Save"} onClick={saveClicked} />
+            <input 
+                type="button" 
+                value={"Cancel"} 
+                onClick={cancelEditing}
+                style={{ display: isEditing ? 'inline' : 'none', marginLeft: '8px' }}
+            />
+            <Button onClick={onSelectorModeClicked} style={{ marginTop: '8px' }}>
+                {!selectorModeOn ? "Activate Selector Mode! 🌙" : "Deactivate Selector Mode 🌚"}
+            </Button>
+            {/* Only show autocomplete when not editing */}
+            {!isEditing && (
+                <Autocomplete 
+                    id="selector-dropdown"
+                    className={"item"}
+                    disablePortal
+                    value={selectorText}
+                    onChange={onPathChange}
+                    options={displaySelectors || []}
+                    sx={{ width: "50%", marginTop: '8px' }}
+                    renderInput={(params) => <TextField {...params} label="Select from saved selectors" />} 
+                />
+            )}
             {/* todo: a remove button for selectors in this control might be cool */}
-
         </div>
     );
 }

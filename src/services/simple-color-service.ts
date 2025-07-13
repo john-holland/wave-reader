@@ -36,7 +36,8 @@ const rgbToHsl = (r: number, g: number, b: number): { h: number; s: number; l: n
     
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
-    let h = 0, s = 0, l = (max + min) / 2;
+    let h = 0, s = 0;
+    const l = (max + min) / 2;
 
     if (max !== min) {
         const d = max - min;
@@ -180,47 +181,47 @@ export class SimpleColorServiceAdapter {
         };
     }
 
-    getTriad(color: any, spin: number = 0): any[] {
+    getTriad(color: any, spin: any = 0): any[] {
         const simpleColor = this.tinyColorToSimpleColor(color);
         const triad = this.simpleService.getTriad(simpleColor, spin);
         return triad.map(c => this.createMockTinyColor(c));
     }
 
-    getSplitComponent(color: any, spin: number = 0): any[] {
+    getSplitComponent(color: any, spin: any = 0): any[] {
         const simpleColor = this.tinyColorToSimpleColor(color);
         const split = this.simpleService.getSplitComponent(simpleColor, spin);
         return split.map(c => this.createMockTinyColor(c));
     }
 
-    getTetrad(color: any, spin: number = 0): any[] {
+    getTetrad(color: any, spin: any = 0): any[] {
         const simpleColor = this.tinyColorToSimpleColor(color);
         const tetrad = this.simpleService.getTetrad(simpleColor, spin);
         return tetrad.map(c => this.createMockTinyColor(c));
     }
 
-    getDefaultTriad(startingIndex: number = Math.floor(Math.random() * DEFAULT_COLORS.length)): any[] {
+    getDefaultTriad(startingIndex: number): any[] {
         const triad = this.simpleService.getDefaultTriad(startingIndex);
         return triad.map(c => this.createMockTinyColor(c));
     }
 
-    getDefaultSplitComponent(startingIndex: number = Math.floor(Math.random() * DEFAULT_COLORS.length)): any[] {
+    getDefaultSplitComponent(startingIndex: number): any[] {
         const split = this.simpleService.getDefaultSplitComponent(startingIndex);
         return split.map(c => this.createMockTinyColor(c));
     }
 
-    getDefaultTetrad(startingIndex: number = Math.floor(Math.random() * DEFAULT_COLORS.length)): any[] {
+    getDefaultTetrad(startingIndex: number): any[] {
         const tetrad = this.simpleService.getDefaultTetrad(startingIndex);
         return tetrad.map(c => this.createMockTinyColor(c));
     }
 
     private tinyColorToSimpleColor(color: any): SimpleColor {
         // If it's already a SimpleColor, return it
-        if (color.hex && color.rgb && color.hsl) {
+        if (color && color.hex && color.rgb && color.hsl) {
             return color;
         }
         
         // If it's a tinycolor instance, extract the color
-        if (color.toHexString) {
+        if (color && color.toHexString) {
             const hex = color.toHexString();
             // Parse hex to RGB
             const r = parseInt(hex.slice(1, 3), 16);
@@ -230,7 +231,17 @@ export class SimpleColorServiceAdapter {
             return { hex, rgb: { r, g, b }, hsl };
         }
         
+        // If it's a string (hex color), parse it
+        if (typeof color === 'string' && color.startsWith('#')) {
+            const r = parseInt(color.slice(1, 3), 16);
+            const g = parseInt(color.slice(3, 5), 16);
+            const b = parseInt(color.slice(5, 7), 16);
+            const hsl = rgbToHsl(r, g, b);
+            return { hex: color, rgb: { r, g, b }, hsl };
+        }
+        
         // Default fallback
+        console.warn('🌊 Color conversion failed, using default color:', color);
         return DEFAULT_COLORS[0];
     }
 } 
