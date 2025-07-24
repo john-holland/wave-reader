@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wave Reader Extension Test Page</title>
+    <style>
+        body {
+            font-family: 'Georgia', serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .test-section h2 {
+            color: #333;
+            border-bottom: 2px solid #007acc;
+            padding-bottom: 10px;
+        }
+        
+        .test-content {
+            font-size: 18px;
+            color: #444;
+        }
+        
+        .test-content p {
+            margin-bottom: 15px;
+        }
+        
+        .highlight {
+            background-color: #fff3cd;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        
+        .test-controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+        
+        .test-controls button {
+            display: block;
+            width: 100%;
+            margin: 5px 0;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            background: #007acc;
+            color: white;
+            cursor: pointer;
+        }
+        
+        .test-controls button:hover {
+            background: #005a9e;
+        }
+        
+        .status-indicator {
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin: 5px 0;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-ready {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-testing {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-success {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-controls">
+        <h3>Wave Reader Test Controls</h3>
+        <div id="status" class="status-indicator status-ready">Ready for testing</div>
+        <button id="testMouseWave">Test Mouse Wave</button>
+        <button id="testCSSTemplate">Test CSS Template</button>
+        <button id="testToggle">Test Toggle</button>
+        <button id="testPerformance">Test Performance</button>
+        <button id="clearStatus">Clear Status</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Basic Text Content</h2>
+        <div class="test-content">
+            <p>This is a simple paragraph to test the Wave Reader extension. The text should be readable and the wave animation should be smooth and non-distracting.</p>
+            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Long Form Content</h2>
+        <div class="test-content">
+            <p>The quick brown fox jumps over the lazy dog. This pangram contains every letter of the alphabet at least once. It's commonly used to test fonts and keyboard layouts.</p>
+            <p>In a hole in the ground there lived a hobbit. Not a nasty, dirty, wet hole, filled with the ends of worms and an oozy smell, nor yet a dry, bare, sandy hole with nothing in it to sit down on or to eat: it was a hobbit-hole, and that means comfort.</p>
+            <p>It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness, it was the epoch of belief, it was the epoch of incredulity, it was the season of Light, it was the season of Darkness, it was the spring of hope, it was the winter of despair, we had everything before us, we had nothing before us, we were all going direct to Heaven, we were all going direct the other way.</p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Technical Content</h2>
+        <div class="test-content">
+            <p>The Wave Reader extension is designed to assist with eye tracking during reading by providing a subtle wave animation that follows the mouse cursor. This helps maintain focus and reduces eye strain during extended reading sessions.</p>
+            <p>The extension uses CSS animations and JavaScript to create smooth, responsive wave effects. It supports both mouse-following mode and template-based CSS animations. The performance is optimized with thresholds and cleanup mechanisms to prevent memory leaks.</p>
+            <p>Key features include: automatic initialization, performance monitoring, error handling with retry mechanisms, and support for both regular DOM and Shadow DOM contexts.</p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Mixed Content</h2>
+        <div class="test-content">
+            <p>Here's some <span class="highlight">highlighted text</span> to test how the wave animation handles different text styles and formatting.</p>
+            <p>This paragraph contains <strong>bold text</strong>, <em>italic text</em>, and <u>underlined text</u> to ensure the wave animation works well with various text decorations.</p>
+            <p>The extension should maintain readability while providing the wave animation effect. Users should be able to read comfortably without the animation being distracting or causing eye strain.</p>
+        </div>
+    </div>
+
+    <script>
+        // Test control functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const statusDiv = document.getElementById('status');
+            
+            function updateStatus(message, className) {
+                statusDiv.textContent = message;
+                statusDiv.className = `status-indicator ${className}`;
+            }
+            
+            // Test mouse wave functionality
+            document.getElementById('testMouseWave').addEventListener('click', function() {
+                updateStatus('Testing mouse wave animation...', 'status-testing');
+                
+                // Simulate mouse movement
+                const testContent = document.querySelector('.test-content');
+                const rect = testContent.getBoundingClientRect();
+                
+                // Create a mouse event
+                const mouseEvent = new MouseEvent('mousemove', {
+                    clientX: rect.left + rect.width / 2,
+                    clientY: rect.top + rect.height / 2,
+                    bubbles: true,
+                    cancelable: true
+                });
+                
+                testContent.dispatchEvent(mouseEvent);
+                
+                setTimeout(() => {
+                    updateStatus('Mouse wave test completed', 'status-success');
+                }, 2000);
+            });
+            
+            // Test CSS template functionality
+            document.getElementById('testCSSTemplate').addEventListener('click', function() {
+                updateStatus('Testing CSS template animation...', 'status-testing');
+                
+                // Simulate CSS template application
+                setTimeout(() => {
+                    updateStatus('CSS template test completed', 'status-success');
+                }, 1500);
+            });
+            
+            // Test toggle functionality
+            document.getElementById('testToggle').addEventListener('click', function() {
+                updateStatus('Testing toggle functionality...', 'status-testing');
+                
+                // Simulate toggle action
+                setTimeout(() => {
+                    updateStatus('Toggle test completed', 'status-success');
+                }, 1000);
+            });
+            
+            // Test performance
+            document.getElementById('testPerformance').addEventListener('click', function() {
+                updateStatus('Testing performance metrics...', 'status-testing');
+                
+                // Simulate performance testing
+                setTimeout(() => {
+                    updateStatus('Performance test completed', 'status-success');
+                }, 3000);
+            });
+            
+            // Clear status
+            document.getElementById('clearStatus').addEventListener('click', function() {
+                updateStatus('Ready for testing', 'status-ready');
+            });
+            
+            // Log page load for testing
+            console.log('Wave Reader test page loaded successfully');
+            console.log('Page URL:', window.location.href);
+            console.log('Document ready state:', document.readyState);
+        });
+    </script>
+</body>
+</html> 

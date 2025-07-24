@@ -20,6 +20,10 @@
     "start": "npm run build && echo '🌊 Extension built! Now reload it in Chrome:' && echo '1. Go to chrome://extensions/' && echo '2. Find Wave Reader extension' && echo '3. Click the reload button (🔄)' && echo '4. Or toggle the extension off and on'",
     "production": "NODE_ENV=development webpack --mode development --config webpack.prod.js --watch",
     "test": "npx jest",
+    "test:playwright": "npx playwright test",
+    "test:playwright:ui": "npx playwright test --ui",
+    "test:playwright:headed": "npx playwright test --headed",
+    "test:playwright:debug": "npx playwright test --debug",
     "wxt:dev": "wxt",
     "wxt:build": "wxt build",
     "wxt:zip": "wxt zip"
@@ -30,6 +34,7 @@
     "@babel/preset-env": "^7.16.11",
     "@babel/preset-react": "^7.16.7",
     "@babel/preset-typescript": "^7.16.7",
+    "@playwright/test": "^1.54.1",
     "@testing-library/dom": "^9.3.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^14.0.0",

@@ -106,6 +106,9 @@ const SelectorInput: FunctionComponent<SelectorProps> = ({
         setSelectorText(selector); // Reset to original value
     }, [selector]);
 
+    // Ensure the current selector text exists in the options, or use a fallback
+    const validSelectorText = displaySelectors.includes(selectorText) ? selectorText : (displaySelectors.length > 0 ? displaySelectors[0] : selectorText);
+
     return (
         <div>
             <SelectorTitle>Text Selector </SelectorTitle>
@@ -136,9 +139,10 @@ const SelectorInput: FunctionComponent<SelectorProps> = ({
                     id="selector-dropdown"
                     className={"item"}
                     disablePortal
-                    value={selectorText}
+                    value={validSelectorText}
                     onChange={onPathChange}
                     options={displaySelectors || []}
+                    isOptionEqualToValue={(option, value) => option === value}
                     sx={{ width: "50%", marginTop: '8px' }}
                     renderInput={(params) => <TextField {...params} label="Select from saved selectors" />} 
                 />

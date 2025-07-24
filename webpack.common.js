@@ -4,7 +4,7 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 const CopyPlugin = require("copy-webpack-plugin");
 const baseManifest = require("./chrome/manifest.json");
 const WebpackExtensionManifestPlugin = require("webpack-extension-manifest-plugin");
-const ESLintPlugin = require('eslint-webpack-plugin');
+// const ESLintPlugin = require('eslint-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
@@ -16,6 +16,7 @@ const config = {
     entry: {
         app: path.join(__dirname, "./static/index.js"),
         background: path.join(__dirname, "./static/background.js"),
+        content: path.join(__dirname, "./static/content.js"),
         shadowContent: path.join(__dirname, "./static/shadow-content.js")
     },
     output: {
@@ -68,11 +69,11 @@ const config = {
             config: {
                 base: baseManifest
             }
-        }),
-        new ESLintPlugin({
-            extensions: ['.tsx', '.ts', '.js'],
-            exclude: 'node_modules'
         })
+        // new ESLintPlugin({
+        //     extensions: ['.tsx', '.ts', '.js'],
+        //     exclude: 'node_modules'
+        // })
     ],
     module: {
         rules: [

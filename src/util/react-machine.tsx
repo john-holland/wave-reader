@@ -57,7 +57,7 @@ export const view = (state: string, states: string[], ...views: ReactElement<any
 }
 
 export type StateComponentFunction = { ({state, machine}: Partial<MachineComponentProps>): Promise<ComponentLog> }
-export type ReactStateMachineProps<TProps> = {
+export type ReactStateMachineProps<TProps = any> = {
     initialState: string | Named,
     states: { [key: string]: StateComponentFunction },
     client: Client<Message<any>>,
@@ -119,7 +119,7 @@ export class ReactStateMachine<TProps> {
         return log("base", <ul>{this.errorView.map(e => <li key={e}>{e}</li>)}</ul>);
     }
 
-    private ErrorState = new State("error", ["error", "base"], true, (async (message, state, previousState): Promise<State> => {
+    private ErrorState = new State("error", ["error", "base"], true, (async (_message, _state, _previousState): Promise<State> => {
         const log = this.ErrorStateFunction()
         if (log.view && React.isValidElement(log.view)) this.logView.views.push(log.view)
         this.logView.states.push(log.state)
@@ -130,7 +130,7 @@ export class ReactStateMachine<TProps> {
     private initialState: string | Named;
 
     private toState(name: string, isBaseLevel: boolean, ventureStates: string[], componentFunction: StateComponentFunction) {
-        return new State(name, ventureStates, isBaseLevel, (async (message, state, previousState): Promise<State> => {
+        return new State(name, ventureStates, isBaseLevel, (async (_message, _state, _previousState): Promise<State> => {
             const log: ComponentLog = await componentFunction({
 
             } as Partial<MachineComponentProps>)
@@ -153,12 +153,11 @@ export class ReactStateMachine<TProps> {
     }
 
     initialize() {
-        const machine = this;
         const map = new Map<string, State>();
 
         this.logView.state = typeof this.initialState === "string" ? this.initialState : (this.initialState as Named)?.name || "base";
         if (!(this.logView.state in this.states)) {
-            machine.errorView.push("cannot find initialState " + machine.logView.state + " in states map!")
+            this.errorView.push("cannot find initialState " + this.logView.state + " in states map!")
         }
 
         Object.keys(this.states).forEach(key => {

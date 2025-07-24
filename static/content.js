@@ -1,7 +1,7 @@
 import "regenerator-runtime/runtime";
 import { guardLastError } from "../src/util/util";
 import { mousePos } from "../src/util/mouse";
-import { replaceAnimationVariables } from "../src/models/wave";
+import { replaceAnimationVariables, replaceAnimationVariablesWithDuration } from "../src/models/wave";
 import { FollowKeyChordObserver, WindowKeyDownKey } from "../src/components/util/user-input";
 import StateMachine  from "../src/util/state-machine";
 import { CState } from "../src/util/state";
@@ -23,14 +23,50 @@ import SelectionMadeMessage from "../src/models/messages/selection-made";
 
 import {ReactMachine} from "../src/util/react-machine";
 
+// Import shared wave animation module
+import {
+    enableMouseFollowingWave as sharedEnableMouseFollowingWave,
+    disableMouseFollowingWave as sharedDisableMouseFollowingWave,
+    getWavePerformanceMetrics as sharedGetWavePerformanceMetrics
+} from "../src/util/wave-animation";
+
+// --- Mouse-following wave logic using shared module ---
+
+// Start/stop mouse-following interval using shared module
+function enableMouseFollowingWave(options) {
+    // Store options globally for compatibility
+    window.currentWaveOptions = options;
+    window.currentAnimationDuration = options?.wave?.waveSpeed || 4;
+    
+    // Use shared module with content.js specific CSS functions
+    sharedEnableMouseFollowingWave(options, loadCSSTemplate, replaceAnimationVariablesWithDuration);
+}
+
+function disableMouseFollowingWave() {
+    // Clear global references
+    window.currentWaveOptions = null;
+    window.currentAnimationDuration = null;
+    
+    // Use shared module
+    sharedDisableMouseFollowingWave();
+}
+// --- End Mouse-following wave logic ---
+
+// Debug function to get current performance metrics
+function getWavePerformanceMetrics() {
+    return sharedGetWavePerformanceMetrics();
+}
+
+// Expose for debugging
+window.getWavePerformanceMetrics = getWavePerformanceMetrics;
+
 console.log("🌊 Wave Reader content script is loading on:", window.location.href);
-
-
 
 // Content script runs in ISOLATED world, so chrome APIs are available
 console.log("🌊 Content script running in ISOLATED world - chrome APIs available");
 
-
+const CSS_MODE__MOUSE = "1";
+const CSS_MODE__TEMPLATE = "0";
 
 const stateMachineMap = new Map();
 stateMachineMap.set("base", Base);
@@ -41,21 +77,80 @@ const stateMachine = new StateMachine()
 
 let latestOptions = undefined;
 
+/**
+ * Centralized method to update wave animation status
+ * Handles mode changes, CSS updates, and mouse-following wave
+ */
+function updateWavingStatus(currentOptions, previousOptions) {
+    if (!currentOptions) {
+        console.log('🌊 Content script: No options provided to updateWavingStatus');
+        return;
+    }
+
+    const modeChanged = previousOptions?.waveAnimationControl !== currentOptions.waveAnimationControl;
+    
+    if (modeChanged) {
+        console.log('🌊 Content script: Animation mode changed from', previousOptions?.waveAnimationControl, 'to', currentOptions.waveAnimationControl);
+        
+        // Handle mode changes
+        if (currentOptions.waveAnimationControl === CSS_MODE__MOUSE) {
+            console.log('🌊 Content script: Switching to Mouse mode - enabling mouse-following wave');
+            enableMouseFollowingWave(currentOptions);
+        } else if (currentOptions.waveAnimationControl === CSS_MODE__TEMPLATE) {
+            console.log('🌊 Content script: Switching to CSS mode - disabling mouse-following wave');
+            disableMouseFollowingWave();
+            loadCSSTemplate(currentOptions.wave.cssTemplate);
+        }
+    } else {
+        // Handle updates within the same mode
+        if (currentOptions.waveAnimationControl === CSS_MODE__MOUSE) {
+            // Check if mouse template changed or wave speed changed
+            const templateChanged = previousOptions?.wave?.cssMouseTemplate !== currentOptions.wave.cssMouseTemplate;
+            const speedChanged = previousOptions?.wave?.waveSpeed !== currentOptions.wave.waveSpeed;
+            
+            if (templateChanged || speedChanged) {
+                console.log('🌊 Content script: Mouse template or speed updated - restarting mouse-following wave');
+                disableMouseFollowingWave();
+                enableMouseFollowingWave(currentOptions);
+            }
+        } else if (currentOptions.waveAnimationControl === CSS_MODE__TEMPLATE) {
+            // Check if CSS template changed
+            if (previousOptions?.wave?.cssTemplate !== currentOptions.wave.cssTemplate) {
+                console.log('🌊 Content script: CSS template updated');
+                loadCSSTemplate(currentOptions.wave.cssTemplate);
+            }
+        }
+    }
+}
+
 function loadCSS(css) {
+    if (!css || typeof css !== 'string') {
+        console.warn("🌊 Invalid CSS provided:", css);
+        return false;
+    }
+    
     try {
         // Check if we're in a Shadow DOM context
         const isShadowDOM = document.head === null || document.head === undefined;
         
         if (isShadowDOM) {
             // In Shadow DOM, we need to find the shadow root and create a style element there
-            const shadowRoot = document.querySelector('*').shadowRoot;
+            const shadowRoot = document.querySelector('*')?.shadowRoot;
             if (shadowRoot) {
+                // Remove existing style element if it exists
+                const existingStyle = shadowRoot.getElementById("extension");
+                if (existingStyle) {
+                    existingStyle.remove();
+                }
+                
                 const style = document.createElement("style");
                 style.id = "extension";
                 style.textContent = css;
                 shadowRoot.appendChild(style);
                 console.log("🌊 CSS loaded in Shadow DOM");
-                return;
+                return true;
+            } else {
+                console.warn("🌊 Shadow DOM not found, falling back to regular DOM");
             }
         }
         
@@ -63,7 +158,13 @@ function loadCSS(css) {
         const head = document.head || document.getElementsByTagName("head")[0];
         if (!head) {
             console.warn("🌊 No head element found, cannot load CSS");
-            return;
+            return false;
+        }
+        
+        // Remove existing style element if it exists
+        const existingStyle = document.getElementById("extension");
+        if (existingStyle) {
+            existingStyle.remove();
         }
         
         const style = document.createElement("style");
@@ -71,8 +172,10 @@ function loadCSS(css) {
         style.textContent = css;
         head.appendChild(style);
         console.log("🌊 CSS loaded in regular DOM");
+        return true;
     } catch (error) {
         console.error("🌊 Error loading CSS:", error);
+        return false;
     }
 }
 
@@ -104,19 +207,31 @@ function unloadCSS() {
 }
 
 function loadCSSTemplate(css) {
+    if (!css || typeof css !== 'string') {
+        console.warn("🌊 Invalid CSS template provided:", css);
+        return false;
+    }
+    
     try {
         console.log("🌊 Loading CSS template:", css.substring(0, 100) + "...");
         unloadCSS();
-        setTimeout(() => {
-            try {
-                loadCSS(css);
+        
+        // Use a more reliable approach with retry mechanism
+        return retryOperation(() => {
+            const success = loadCSS(css);
+            if (success) {
                 console.log("🌊 CSS template loaded successfully");
-            } catch (error) {
-                console.error("🌊 Error loading CSS template:", error);
+                return true;
+            } else {
+                throw new Error("Failed to load CSS");
             }
-        }, 10);
+        }, 2).then(() => true).catch(error => {
+            console.error("🌊 Failed to load CSS template after retries:", error);
+            return false;
+        });
     } catch (error) {
         console.error("🌊 Error in loadCSSTemplate:", error);
+        return false;
     }
 }
 console.log("content script loaded...")
@@ -230,7 +345,9 @@ function StateNameMap(map = new Map()) {
                 }
             }
             
-            loadCSSTemplate(latestOptions.wave.cssTemplate)
+            // Initialize wave animation based on mode
+            updateWavingStatus(latestOptions, null);
+            
             // TODO: see if the state machine will let us remove this
             going = true;
             initializeOrUpdateToggleObserver(message);
@@ -238,6 +355,10 @@ function StateNameMap(map = new Map()) {
         }, false),
         "stop": CState("stop", StopVentures, true, async (message, state, previousState) => {
             unloadCSS()
+            
+            // Disable mouse-following wave
+            disableMouseFollowingWave();
+            
             going = false;
             return previousState.name === "waving" ? map.get("base") : previousState;
         }, false),
@@ -249,12 +370,13 @@ function StateNameMap(map = new Map()) {
                 return previousState;
             }
 
+            const previousOptions = latestOptions;
             latestOptions = message.options;
 
             console.log("Update called with previous state: " + previousState.name);
-            if (previousState.name === "waving") {
-                loadCSSTemplate(latestOptions.wave.cssTemplate)
-            }
+            
+            // Handle mode changes while waving
+            updateWavingStatus(latestOptions, previousOptions);
 
             if (setHierarchySelector) {
                 setHierarchySelector(latestOptions.wave.selector);
@@ -265,7 +387,9 @@ function StateNameMap(map = new Map()) {
             return previousState
         }, true),
         "toggle start": CState("toggle start", StartVentures, false, async (message, state, previousState) => {
-            loadCSSTemplate(latestOptions.wave.cssTemplate)
+            // Initialize wave animation based on mode
+            updateWavingStatus(latestOptions, null);
+            
             going = !going;
             // Send message to background script to update sync storage
             window.postMessage({
@@ -279,6 +403,10 @@ function StateNameMap(map = new Map()) {
         }, false),
         "toggle stop": CState("toggle stop", StopVentures, false, async (message, state, previousState) => {
             unloadCSS()
+            
+            // Disable mouse-following wave
+            disableMouseFollowingWave();
+            
             going = false;
             // Send message to background script to update sync storage
             window.postMessage({
@@ -528,6 +656,28 @@ console.log("🌊 Content script window object:", typeof window);
 console.log("🌊 Content script document object:", typeof document);
 console.log("🌊 Content script chrome object:", typeof chrome);
 
+// Auto-initialize wave animation if we have saved options
+function autoInitializeWaveAnimation() {
+    try {
+        // Check if we have saved options in chrome.storage
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+            chrome.storage.sync.get(['options', 'going'], (result) => {
+                if (result.going && result.going.going && result.options) {
+                    console.log('🌊 Auto-initializing wave animation with saved options');
+                    latestOptions = result.options;
+                    updateWavingStatus(latestOptions, null);
+                    going = true;
+                }
+            });
+        }
+    } catch (error) {
+        console.warn('🌊 Auto-initialization failed:', error);
+    }
+}
+
+// Try to auto-initialize after a short delay to ensure DOM is ready
+setTimeout(autoInitializeWaveAnimation, 1000);
+
 // Check if chrome.runtime is available before setting up message listener
 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener( (message, sender, sendResponse) => {
@@ -553,7 +703,15 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
 
         try {
             console.log(`🌊 Processing message: ${message.name}`);
-            stateMachine.handleState(message);
+            
+            // Handle toggle-wave-reader command from background script
+            if (message.name === 'toggle-wave-reader') {
+                console.log('🌊 Content script: Handling toggle-wave-reader command');
+                toggleWave();
+            } else {
+                stateMachine.handleState(message);
+            }
+            
             console.log(`🌊 Message processed successfully`);
             
             // Send response with timeout
@@ -580,6 +738,44 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
 } else {
     console.warn("🌊 Chrome runtime not available in content script context");
 }
+
+// Also listen for window.postMessage events from background script
+window.addEventListener('message', (event) => {
+    // Only handle messages from our extension
+    if (event.source !== window || !event.data || event.data.source !== 'wave-reader-extension') {
+        return;
+    }
+    
+    const message = event.data.message;
+    console.log("🌊 Content script received window.postMessage:", message);
+
+    if (message.from !== "popup" && message.from !== "background-script") {
+        console.log("🌊 Message not from popup or background-script, ignoring. From: " + message.from);
+        return;
+    }
+
+    // Check if we're in a valid DOM context before processing
+    if (!document || !document.head) {
+        console.warn("🌊 Content script: Not in valid DOM context, skipping message processing");
+        return;
+    }
+
+    try {
+        console.log(`🌊 Processing window.postMessage: ${message.name}`);
+        
+        // Handle toggle-wave-reader command from background script
+        if (message.name === 'toggle-wave-reader') {
+            console.log('🌊 Content script: Handling toggle-wave-reader command');
+            toggleWave();
+        } else {
+            stateMachine.handleState(message);
+        }
+        
+        console.log(`🌊 Window.postMessage processed successfully`);
+    } catch (e) {
+        console.error(`🌊 Failed to process window.postMessage: ${JSON.stringify(message)}, error: ${e.message}`);
+    }
+});
 
 
 

@@ -114,19 +114,87 @@ export const Settings: FunctionComponent<SettingsProps> = ({
     const [textColor, setTextColor] = useState(initialSettings.wave.text.color);
     const [textSize, setTextSize] = useState(initialSettings.wave.text.size);
     const [selector, setSelector] = useState(initialSettings.wave.selector);
+    // CSS templates can be auto-generated from parameters or manually edited
     const [cssTemplate, setCssTemplate] = useState(initialSettings.wave.cssTemplate);
     const [cssMouseTemplate, setCssMouseTemplate] = useState(initialSettings.wave.cssMouseTemplate);
+    const [autoGenerateCss, setAutoGenerateCss] = useState(true); // Toggle for auto-generation
     const [waveSpeed, setWaveSpeed] = useState(initialSettings.wave.waveSpeed);
     const [axisTranslateAmountXMax, setAxisTranslateAmountXMax] = useState(initialSettings.wave.axisTranslateAmountXMax);
     const [axisTranslateAmountXMin, setAxisTranslateAmountXMin] = useState(initialSettings.wave.axisTranslateAmountXMin);
     const [axisRotationAmountYMax, setAxisRotationAmountYMax] = useState(initialSettings.wave.axisRotationAmountYMax);
     const [axisRotationAmountYMin, setAxisRotationAmountYMin] = useState(initialSettings.wave.axisRotationAmountYMin);
+    const [mouseFollowInterval, setMouseFollowInterval] = useState(initialSettings.wave.mouseFollowInterval);
     const [showNotifications, setShowNotifications] = useState(initialSettings.showNotifications);
     const [toggleKeys, setToggleKeys] = useState(initialSettings.toggleKeys)
 
     useEffect(() => {
         settingsService.getDomainsAndPaths().then(setDomainPaths)
     }, [])
+
+    // Auto-regenerate CSS templates when numeric parameters change (shader-like approach)
+    useEffect(() => {
+        if (autoGenerateCss) {
+            const wave = new Wave({
+                selector,
+                waveSpeed,
+                axisTranslateAmountXMax,
+                axisTranslateAmountXMin,
+                axisRotationAmountYMax,
+                axisRotationAmountYMin,
+                mouseFollowInterval,
+                text: new Text({
+                    color: textColor,
+                    size: textSize
+                })
+            });
+            console.log('🌊 Auto-generating CSS templates from parameters:', {
+                waveSpeed,
+                axisTranslateAmountXMax,
+                axisTranslateAmountXMin,
+                axisRotationAmountYMax,
+                axisRotationAmountYMin,
+                mouseFollowInterval
+            });
+            setCssTemplate(wave.cssTemplate);
+            setCssMouseTemplate(wave.cssMouseTemplate);
+        }
+    }, [
+        autoGenerateCss,
+        selector,
+        waveSpeed,
+        axisTranslateAmountXMax,
+        axisTranslateAmountXMin,
+        axisRotationAmountYMax,
+        axisRotationAmountYMin,
+        mouseFollowInterval,
+        textColor,
+        textSize
+    ]);
+
+    // Parse CSS template to extract numeric parameters (bidirectional sync)
+    const parseCssTemplate = (template: string) => {
+        if (!autoGenerateCss) {
+            // Extract numeric values from CSS template
+            const rotationMatch = template.match(/rotateY\(([^)]+)deg\)/);
+            const translateMatch = template.match(/translateX\(([^)]+)px\)/);
+            
+            if (rotationMatch) {
+                const rotationValue = parseFloat(rotationMatch[1]);
+                if (!isNaN(rotationValue)) {
+                    setAxisRotationAmountYMax(rotationValue);
+                    setAxisRotationAmountYMin(-rotationValue);
+                }
+            }
+            
+            if (translateMatch) {
+                const translateValue = parseFloat(translateMatch[1]);
+                if (!isNaN(translateValue)) {
+                    setAxisTranslateAmountXMax(translateValue);
+                    setAxisTranslateAmountXMin(-translateValue);
+                }
+            }
+        }
+    };
 
     useEffect(() => {
         if (domainPaths.length == 0) {
@@ -150,6 +218,7 @@ export const Settings: FunctionComponent<SettingsProps> = ({
                 axisTranslateAmountXMin,
                 axisRotationAmountYMax,
                 axisRotationAmountYMin,
+                mouseFollowInterval,
             })
         }
 
@@ -215,24 +284,6 @@ export const Settings: FunctionComponent<SettingsProps> = ({
 
         // Update local state with the new settings
         setSettings(settingsToSave);
-        
-        // Update all the individual state variables to match the new settings
-        if (deltaSettings) {
-            setShowNotifications(settingsToSave.showNotifications);
-            setWaveAnimationControl(settingsToSave.waveAnimationControl);
-            setToggleKeys(settingsToSave.toggleKeys);
-            setTextColor(settingsToSave.wave.text.color);
-            setTextSize(settingsToSave.wave.text.size);
-            setSelector(settingsToSave.wave.selector);
-            setCssTemplate(settingsToSave.wave.cssTemplate);
-            setCssMouseTemplate(settingsToSave.wave.cssMouseTemplate);
-            setWaveSpeed(settingsToSave.wave.waveSpeed);
-            setAxisTranslateAmountXMax(settingsToSave.wave.axisTranslateAmountXMax);
-            setAxisTranslateAmountXMin(settingsToSave.wave.axisTranslateAmountXMin);
-            setAxisRotationAmountYMax(settingsToSave.wave.axisRotationAmountYMax);
-            setAxisRotationAmountYMin(settingsToSave.wave.axisRotationAmountYMin);
-        }
-        
         onUpdateSettings(settingsToSave);
         setSaved(true);
     }
@@ -263,6 +314,14 @@ export const Settings: FunctionComponent<SettingsProps> = ({
             onDomainPathChange(currentDomain, newValue);
         }
     }
+
+    // Get available domains and paths for autocomplete
+    const availableDomains = domainPaths.map(dp => dp.domain) || [];
+    const currentDomainPaths = domainPaths.find((dp: DomainPaths) => dp.domain === currentDomain)?.paths || [];
+    
+    // Ensure current domain and path exist in options, or use fallbacks
+    const validCurrentDomain = availableDomains.includes(currentDomain) ? currentDomain : (availableDomains.length > 0 ? availableDomains[0] : currentDomain);
+    const validCurrentPath = currentDomainPaths.includes(currentPath) ? currentPath : (currentDomainPaths.length > 0 ? currentDomainPaths[0] : currentPath);
 
     // for the css template to work, we need to switch over to replacement templates instead of runtime.
     return (
@@ -317,33 +376,65 @@ export const Settings: FunctionComponent<SettingsProps> = ({
                            placeholder={"initial"}
                            label="Text CSS Selector"
                            variant="outlined"/>
+                <FormControlLabel
+                    control={
+                        <Checkbox 
+                            checked={autoGenerateCss}
+                            onChange={(e) => setAutoGenerateCss(e.target.checked)}
+                        />
+                    }
+                    label="Auto-generate CSS from parameters"
+                    className={"item"}
+                />
                 <TextField id="settings__css-template"
                     className={"item"}
                     value={cssTemplate}
-                    onChange={eventVal(setCssTemplate)}
+                    onChange={(e) => {
+                        setCssTemplate(e.target.value);
+                        if (!autoGenerateCss) {
+                            parseCssTemplate(e.target.value);
+                        }
+                    }}
                     multiline
                     rows={10}
-                    placeholder={"initial"}
-                    label="Text CSS Selector"
-                    variant="outlined" />
-                <TextField id="settings__css-template"
+                    label="CSS Template"
+                    variant="outlined"
+                    helperText={autoGenerateCss ? 
+                        "Auto-generated from parameters above" : 
+                        "Edit manually to update parameters below"
+                    } />
+                <TextField id="settings__css-mouse-template"
                     className={"item"}
                     value={cssMouseTemplate}
-                    onChange={eventVal(setCssMouseTemplate)}
+                    onChange={(e) => {
+                        setCssMouseTemplate(e.target.value);
+                        if (!autoGenerateCss) {
+                            parseCssTemplate(e.target.value);
+                        }
+                    }}
                     multiline
                     rows={10}
-                    placeholder={"initial"}
-                    label="Text CSS Selector"
-                    variant="outlined" />
+                    label="CSS Mouse Template"
+                    variant="outlined"
+                    helperText={autoGenerateCss ? 
+                        "Auto-generated from parameters above" : 
+                        "Edit manually to update parameters below"
+                    } />
                 <TextField id="settings__wave-speed"
                     className={"item"}
-                    label="Wave Speed"
+                    label="Animation Duration (seconds)"
                     type="number"
                     value={waveSpeed}
                     onChange={eventVal(setWaveSpeed)}
+                    inputProps={{
+                        min: 0.1,
+                        max: 20,
+                        step: 0.1
+                    }}
                     InputLabelProps={{
                         shrink: true,
-                    }} />
+                    }}
+                    helperText="Duration of the wave animation cycle (0.1 to 20 seconds)" />
                 <TextField id="settings__wave-translate-x-max"
                     className={"item"}
                     label="Axis Translation Amount X Max"
@@ -380,23 +471,36 @@ export const Settings: FunctionComponent<SettingsProps> = ({
                     InputLabelProps={{
                         shrink: true,
                     }} />
+                <TextField id="settings__mouse-follow-interval"
+                    className={"item"}
+                    label="Mouse Follow Interval (ms)"
+                    type="number"
+                    value={mouseFollowInterval}
+                    onChange={eventVal(setMouseFollowInterval)}
+                    disabled={waveAnimationControl === WaveAnimationControl.CSS}
+                    InputLabelProps={{
+                        shrink: true,
+                    }}
+                    helperText="Interval for updating wave animation to follow mouse position (only used with Mouse animation)" />
                 <Autocomplete id="domain-settings-dropdown"
                     className={"item"}
                     disablePortal
-                    value={currentDomain}
+                    value={validCurrentDomain}
                     onChange={onDomainChange}
-                    options={(domainPaths && domainPaths.map(dp => dp.domain)) || []}
+                    options={availableDomains}
+                    isOptionEqualToValue={(option, value) => option === value}
                     sx={{ width: "50%" }}
-                    renderInput={(params) => <TextField {...params} label={currentDomain} />} />
+                    renderInput={(params) => <TextField {...params} label="Domain" />} />
 
                 <Autocomplete id="path-settings-dropdown"
                     className={"item"}
                     disablePortal
-                    value={currentPath}
+                    value={validCurrentPath}
                     onChange={onPathChange}
-                    options={(domainPaths && domainPaths.find((dp: DomainPaths) => dp.domain === currentDomain)?.paths as string[]) || []}
+                    options={currentDomainPaths}
+                    isOptionEqualToValue={(option, value) => option === value}
                     sx={{ width: "50%" }}
-                    renderInput={(params) => <TextField {...params} label={currentPath} />} />
+                    renderInput={(params) => <TextField {...params} label="Path" />} />
 
             </FormControl>
             <ButtonGroup variant="text" aria-label="text button group">

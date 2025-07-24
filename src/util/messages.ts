@@ -17,6 +17,7 @@ import SelectorUpdatedMessage from "../models/messages/selector-updated";
 import StartAddSelectorMessage from "../models/messages/start-add-selector";
 import StartMouseMoveMessage from "../models/messages/start-mouse-move";
 import StopMouseMoveMessage from "../models/messages/stop-mouse-move";
+import ToggleWaveReaderMessage from "../models/messages/toggle-wave-reader";
 
 // todo: separate based on ClientLocation
 export const fromMessage = (message: Message<any>) => {
@@ -39,6 +40,7 @@ export const fromMessage = (message: Message<any>) => {
         case 'stop-mouse-move': return message as StopMouseMoveMessage;
         case 'update-selector': return message as UpdateSelectorMessage;
         case 'update-wave': return message as UpdateWaveMessage;
+        case 'toggle-wave-reader': return message as ToggleWaveReaderMessage;
 
         default: throw new Error(`unknown message type: ${message.name}`)
     }

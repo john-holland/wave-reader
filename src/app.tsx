@@ -6,7 +6,7 @@ import GoButton from "./components/go-button";
 import StartMessage from "./models/messages/start";
 import Wave from "./models/wave";
 import Options from "./models/options";
-import {getSyncObject, GetSyncObjectFunction, newSyncObject, setSyncObject} from './util/sync';
+import {getSyncObject, GetSyncObjectFunction, setSyncObject} from './util/sync';
 import StopMessage from "./models/messages/stop";
 import {fromMessage} from "./util/messages";
 import SelectorUpdated from "./models/messages/selector-updated";
@@ -45,7 +45,10 @@ const settingsService = new SettingsService();
 
 const startPageCss = (wave: Wave) => {
     try {
-        newSyncObject<Options>(Options,'options', Options.getDefaultOptions(), (options) => {
+        // Get current settings instead of using defaults
+        settingsService.getCurrentSettings().then((currentOptions) => {
+            const options = new Options(currentOptions);
+            
             if (options.showNotifications) {
                 try {
                     const notifOptions = {
@@ -71,7 +74,7 @@ const startPageCss = (wave: Wave) => {
             }
 
             setSyncObject("going", { going: true });
-        })
+        });
     } catch (error) {
         console.warn("Error in startPageCss:", error);
     }

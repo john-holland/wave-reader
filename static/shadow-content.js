@@ -19,8 +19,13 @@ import { SimpleColorServiceAdapter } from "../src/services/simple-color-service"
 import { SelectorHierarchy } from "../src/services/selector-hierarchy";
 import SelectionMadeMessage from "../src/models/messages/selection-made";
 import PongMessage from "../src/models/messages/pong";
+import StartMessage from "../src/models/messages/start";
+import StopMessage from "../src/models/messages/stop";
 // import React from "react";
 // import ReactDOM from "react-dom";
+
+const CSS_MODE__MOUSE = "1";
+const CSS_MODE__TEMPLATE = "0";
 
 // Reduced logging - only log important events
 const log = (message) => {
@@ -32,6 +37,17 @@ const log = (message) => {
 };
 
 log("Wave Reader Shadow DOM content script is loading on: " + window.location.href);
+
+// Mouse-following utility functions
+function cartesianToCylindrical(x, y, cx, cy) {
+    const dx = x - cx;
+    const dy = y - cy;
+    const r = Math.sqrt(dx * dx + dy * dy);
+    const theta = Math.atan2(dy, dx);
+    return { r, theta };
+}
+
+
 
 // Create Shadow DOM container
 class WaveReaderShadowDOM {
@@ -46,6 +62,16 @@ class WaveReaderShadowDOM {
         this.hierarchySelectorMount = undefined;
         this.hierarchySelectorService = new SelectorHierarchy(new SimpleColorServiceAdapter());
         this.setHierarchySelector = undefined;
+        
+        // Mouse-following wave variables
+        this.mouseX = 0;
+        this.mouseY = 0;
+        this.mouseFollowInterval = null;
+        this.lastCss = '';
+        this.lastMouseX = 0;
+        this.lastMouseY = 0;
+        this.lastMouseTime = Date.now();
+        this.currentAnimationDuration = null;
         
         this.init();
     }
@@ -81,6 +107,9 @@ class WaveReaderShadowDOM {
         
         // Set up message listeners
         this.setupMessageListeners();
+        
+        // Set up mouse tracking for mouse-following wave
+        this.setupMouseTracking();
         
         log("Shadow DOM initialized successfully");
     }
@@ -131,23 +160,35 @@ class WaveReaderShadowDOM {
             
             "start": CState("start", ["start", "stop", "waving"], true, (async (message) => {
                 log("Start state activated");
-                this.loadCSS((message).options.wave.cssTemplate)
+                this.latestOptions = message.options;
                 this.going = true;
+                log('🌊 Shadow DOM: Received waveAnimationControl:', this.latestOptions.waveAnimationControl);
+                log('🌊 Shadow DOM: Full options:', JSON.stringify(this.latestOptions));
+                
+                // Initialize wave animation based on mode
+                this.updateWavingStatus(this.latestOptions, null);
+                
                 return stateMachineMap.get('waving')
             }).bind(this), false),
             
             "stop": CState("stop", ["start", "stop", "base"], true, (async () => {
                 log("Stop state activated");
-                this.unloadCSS()
+                this.unloadCSS();
+                
+                // Disable mouse-following wave
+                this.disableMouseFollowingWave();
+                
                 this.going = false;
                 return stateMachineMap.get('base')
             }).bind(this), false),
             
             "waving": CState("waving", ["start", "stop", "waving", "start-selection-choose"], true, (async (message) => {
-                if (message?.name === "update-going-state") {
-                    this.going = message.going;
-                    this.latestOptions = message.options;
-                }
+                // Handle wave updates and mode changes
+                const previousOptions = this.latestOptions;
+                this.latestOptions = message.options;
+                
+                this.updateWavingStatus(this.latestOptions, previousOptions);
+
                 return stateMachineMap.get('waving')
             }).bind(this), false),
             
@@ -253,6 +294,52 @@ class WaveReaderShadowDOM {
         log("Shadow DOM state machine initialized");
     }
 
+    /**
+     * Centralized method to update wave animation status
+     * Handles mode changes, CSS updates, and mouse-following wave
+     */
+    updateWavingStatus(currentOptions, previousOptions) {
+        if (!currentOptions) {
+            log('🌊 Shadow DOM: No options provided to updateWavingStatus');
+            return;
+        }
+
+        const modeChanged = previousOptions?.waveAnimationControl !== currentOptions.waveAnimationControl;
+        
+        if (modeChanged) {
+            log('🌊 Shadow DOM: Animation mode changed from', previousOptions?.waveAnimationControl, 'to', currentOptions.waveAnimationControl);
+            
+            // Handle mode changes
+            if (currentOptions.waveAnimationControl === CSS_MODE__MOUSE) {
+                log('🌊 Shadow DOM: Switching to Mouse mode - enabling mouse-following wave');
+                this.enableMouseFollowingWave(currentOptions);
+            } else if (currentOptions.waveAnimationControl === CSS_MODE__TEMPLATE) {
+                log('🌊 Shadow DOM: Switching to CSS mode - disabling mouse-following wave');
+                this.disableMouseFollowingWave();
+                this.loadCSS(currentOptions.wave.cssTemplate);
+            }
+        } else {
+            // Handle updates within the same mode
+            if (currentOptions.waveAnimationControl === CSS_MODE__MOUSE) {
+                // Check if mouse template changed or wave speed changed
+                const templateChanged = previousOptions?.wave?.cssMouseTemplate !== currentOptions.wave.cssMouseTemplate;
+                const speedChanged = previousOptions?.wave?.waveSpeed !== currentOptions.wave.waveSpeed;
+                
+                if (templateChanged || speedChanged) {
+                    log('🌊 Shadow DOM: Mouse template or speed updated - restarting mouse-following wave');
+                    this.disableMouseFollowingWave();
+                    this.enableMouseFollowingWave(currentOptions);
+                }
+            } else if (currentOptions.waveAnimationControl === CSS_MODE__TEMPLATE) {
+                // Check if CSS template changed
+                if (previousOptions?.wave?.cssTemplate !== currentOptions.wave.cssTemplate) {
+                    log('🌊 Shadow DOM: CSS template updated');
+                    this.loadCSS(currentOptions.wave.cssTemplate);
+                }
+            }
+        }
+    }
+
     setupMessageListeners() {
         log("Setting up message listeners...");
         
@@ -297,7 +384,15 @@ class WaveReaderShadowDOM {
 
             try {
                 log("Processing message: " + message.name);
-                this.stateMachine.handleState(message);
+                
+                // Handle toggle-wave-reader command from background script
+                if (message.name === 'toggle-wave-reader') {
+                    log("Shadow DOM: Handling toggle-wave-reader command");
+                    this.toggleWaving();
+                } else {
+                    this.stateMachine.handleState(message);
+                }
+                
                 log("Message processed successfully");
                 
                 // Send response via window.postMessage back to background
@@ -323,6 +418,10 @@ class WaveReaderShadowDOM {
         if (this.mainDocumentStyle) {
             this.mainDocumentStyle.textContent = '';
         }
+        
+        // Clear mouse-following state
+        this.lastCss = '';
+        
         console.log("🌊 CSS unloaded from both Shadow DOM and main document");
     }
     
@@ -341,6 +440,114 @@ class WaveReaderShadowDOM {
         this.mainDocumentStyle.textContent = css;
         
         log("🌊 Shadow DOM: CSS loaded into main document");
+    }
+
+    toggleWaving() {
+        log("Shadow DOM: Toggle waving called");
+        if (this.going) {
+            log("Shadow DOM: Currently waving, stopping");
+            this.stateMachine.handleState(new StopMessage());
+        } else {
+            log("Shadow DOM: Currently stopped, starting");
+            if (this.latestOptions) {
+                this.stateMachine.handleState(new StartMessage({
+                    options: this.latestOptions
+                }));
+            } else {
+                log("Shadow DOM: No latest options available for toggle");
+            }
+        }
+    }
+
+    setupMouseTracking() {
+        // Listen for mouse movement globally
+        window.addEventListener('mousemove', (e) => {
+            this.mouseX = e.clientX;
+            this.mouseY = e.clientY;
+            this.lastMouseX = e.clientX;
+            this.lastMouseY = e.clientY;
+            this.lastMouseTime = Date.now();
+        });
+        log('🌊 Shadow DOM: Mouse tracking initialized');
+    }
+
+    // Mouse-following wave methods
+    updateWaveToMouse(options) {
+        this.updateWaveToMouseWithDuration(options, options?.wave?.waveSpeed || 4);
+    }
+
+    updateWaveToMouseWithDuration(options, duration) {
+        if (!options || !options.wave || !options.wave.selector) return;
+        const elements = document.querySelectorAll(options.wave.selector);
+        if (!elements.length) return;
+        
+        elements.forEach(el => {
+            const rect = el.getBoundingClientRect();
+            const cx = rect.left + rect.width/2;
+            const cy = rect.top + rect.height/2;
+            const { r, theta } = cartesianToCylindrical(this.mouseX, this.mouseY, cx, cy);
+            
+            // Map theta to a rotation (deg) and r to a translation (%)
+            // Adjust angle by adding π/2 (90 degrees) for more intuitive control
+            const adjustedTheta = theta + Math.PI / 2;
+            const rotationY = (adjustedTheta * 180 / Math.PI).toFixed(2); // degrees
+            // translation: scale r to a reasonable % (max 10% of width)
+            const maxR = Math.max(rect.width, rect.height) / 2;
+            const translationX = ((r / maxR) * 10 * Math.cos(adjustedTheta)).toFixed(2); // percent
+            
+            // Update the CSS with dynamic values and duration
+            const css = this.replaceAnimationVariablesWithDuration(options.wave, translationX, rotationY, duration);
+            if (css !== this.lastCss) {
+                this.loadCSS(css);
+                this.lastCss = css;
+            }
+        });
+    }
+
+    enableMouseFollowingWave(options) {
+        if (this.mouseFollowInterval) clearInterval(this.mouseFollowInterval);
+        
+        // Store options and base duration for dynamic updates
+        this.currentWaveOptions = options;
+        this.currentAnimationDuration = options?.wave?.waveSpeed || 4;
+        
+        // Use the current animation duration for the update interval (1:1 relationship)
+        const updateInterval = this.currentAnimationDuration * 1000; // Convert to milliseconds
+        this.mouseFollowInterval = setInterval(() => this.updateWaveToMouse(options), updateInterval);
+        log('🌊 Shadow DOM: Mouse-following wave enabled, duration:', this.currentAnimationDuration, 's, update interval:', updateInterval, 'ms (1:1 ratio)');
+    }
+
+    disableMouseFollowingWave() {
+        if (this.mouseFollowInterval) clearInterval(this.mouseFollowInterval);
+        this.mouseFollowInterval = null;
+        this.lastCss = '';
+        this.currentWaveOptions = null;
+        this.currentAnimationDuration = null;
+        log('🌊 Shadow DOM: Mouse-following wave disabled');
+    }
+
+    replaceAnimationVariables(wave, translationX, rotationY) {
+        // Use the same constants as the Wave model
+        const TRANSLATE_X = "TRANSLATE_X";
+        const ROTATE_Y = "ROTATE_Y";
+        
+        let css = wave.cssMouseTemplate || wave.cssTemplate || '';
+        css = css.replaceAll(TRANSLATE_X, translationX);
+        css = css.replaceAll(ROTATE_Y, rotationY);
+        return css;
+    }
+
+    replaceAnimationVariablesWithDuration(wave, translationX, rotationY, duration) {
+        // Use the same constants as the Wave model
+        const TRANSLATE_X = "TRANSLATE_X";
+        const ROTATE_Y = "ROTATE_Y";
+        const ANIMATION_DURATION = "ANIMATION_DURATION";
+        
+        let css = wave.cssMouseTemplate || wave.cssTemplate || '';
+        css = css.replaceAll(TRANSLATE_X, translationX);
+        css = css.replaceAll(ROTATE_Y, rotationY);
+        css = css.replaceAll(ANIMATION_DURATION, duration.toString());
+        return css;
     }
 
     createCustomDocumentContext() {
@@ -426,6 +633,8 @@ class WaveReaderShadowDOM {
         };
         return customDocument;
     }
+
+
 }
 
 // Initialize the Shadow DOM when the script loads

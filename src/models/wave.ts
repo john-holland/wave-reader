@@ -21,34 +21,31 @@ ${options.selector || '.wave-reader__text'} {
 }
 `;
 
-// maybe change initial 0% animation frame of wobble to 'initial' values
-//   and 15% to replacement values, such that the animation will pan to the new rotation
-//   NOTE: this may be the existing behavior.
+// Direct positioning template - no keyframes, just direct transforms
 export const defaultCssMouseTemplate = (options: Wave) => `
-@-webkit-keyframes wobble {
-  0% { transform: translateX(initial); rotateY(initial); }
-  15% { transform: translateX(TRANSLATE_X%); rotateY(ROTATE_Ydeg); }
-}
-
 ${options.selector || '.wave-reader__text'} {
   font-size: ${options.text?.size || 'inherit'};
-  -webkit-animation-name: wobble;
-  animation-name: wobble;
-  -webkit-animation-duration: ${options.waveSpeed}s;
-  animation-duration: ${options.waveSpeed}s;
-  -webkit-animation-fill-mode: both;
-  animation-fill-mode: both;
-  animation-iteration-count: infinite;
+  transform: translateX(TRANSLATE_X%) rotateY(ROTATE_Ydeg);
+  transition: transform ANIMATION_DURATIONs ease-out;
 }
 `;
 
 const TRANSLATE_X = "TRANSLATE_X";
 const ROTATE_Y = "ROTATE_Y";
+const ANIMATION_DURATION = "ANIMATION_DURATION";
 
 export const replaceAnimationVariables = (wave: Wave, translateX: string, rotateY: string): string => {
     return (wave.cssMouseTemplate || "")
         .replaceAll(TRANSLATE_X, translateX)
         .replaceAll(ROTATE_Y, rotateY);
+}
+
+export const replaceAnimationVariablesWithDuration = (wave: Wave, translateX: string, rotateY: string, duration: number): string => {
+    let css = wave.cssMouseTemplate || "";
+    css = css.replaceAll(TRANSLATE_X, translateX);
+    css = css.replaceAll(ROTATE_Y, rotateY);
+    css = css.replaceAll(ANIMATION_DURATION, duration.toString());
+    return css;
 }
 
 const enum WaveShape {
@@ -90,19 +87,21 @@ export default class Wave extends AttributeConstructor<Wave>{
     axisTranslateAmountXMin?: number;
     axisRotationAmountYMax?: number;
     axisRotationAmountYMin?: number;
+    mouseFollowInterval?: number;
 
     constructor(attributes: Partial<Wave> = Wave.getDefaultWave()) {
         super(attributes);
-        this.cssTemplate = attributes.cssTemplate || defaultCssTemplate(attributes as Wave);
-        this.cssMouseTemplate = attributes.cssMouseTemplate || defaultCssMouseTemplate(attributes as Wave)
+        // Always generate CSS templates from current parameters (shader-like approach)
+        // Use the attributes directly to ensure we have the correct values
+        const waveWithAttributes = { ...this, ...attributes };
+        this.cssTemplate = defaultCssTemplate(waveWithAttributes);
+        this.cssMouseTemplate = defaultCssMouseTemplate(waveWithAttributes);
     }
 
-    // mutates the wave if necessary to update the css
+    // Always regenerate CSS templates from current parameters
     public update(): Wave {
-        if (!this.cssTemplate) {
-            this.cssTemplate = defaultCssTemplate(this);
-            this.cssMouseTemplate = defaultCssMouseTemplate(this);
-        }
+        this.cssTemplate = defaultCssTemplate(this);
+        this.cssMouseTemplate = defaultCssMouseTemplate(this);
         return this
     }
 
@@ -115,6 +114,7 @@ export default class Wave extends AttributeConstructor<Wave>{
             axisTranslateAmountXMin: -1,
             axisRotationAmountYMin: -2,
             axisRotationAmountYMax: 2,
+            mouseFollowInterval: 100,
             text: new Text({
                 size: 'initial',
                 color: 'initial'
