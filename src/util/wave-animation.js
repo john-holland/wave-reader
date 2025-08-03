@@ -24,8 +24,17 @@ let isMouseTrackingActive = false;
 
 // Wave animation state
 let mouseFollowInterval = null;
+let animationFrameId = null;
 let lastCss = '';
 let currentAnimationDuration = null;
+let lastAnimationTime = 0;
+
+// Smooth animation state
+let currentRotationY = 0;
+let targetRotationY = 0;
+let currentTranslationX = 0;
+let targetTranslationX = 0;
+let isInitialized = false;
 
 // Performance monitoring function
 function updatePerformanceMetrics(updateTime, cssUpdated = false, error = false) {
@@ -57,14 +66,7 @@ function updatePerformanceMetrics(updateTime, cssUpdated = false, error = false)
     }
 }
 
-// Utility: Cartesian to cylindrical (relative to center)
-function cartesianToCylindrical(x, y, cx, cy) {
-    const dx = x - cx;
-    const dy = y - cy;
-    const r = Math.sqrt(dx*dx + dy*dy);
-    const theta = Math.atan2(dy, dx); // radians
-    return { r, theta };
-}
+
 
 // Check if mouse has moved significantly since last update
 function hasMouseMovedSignificantly() {
@@ -126,7 +128,6 @@ function setupMouseTracking() {
         mouseY = e.clientY;
         lastMouseX = e.clientX;
         lastMouseY = e.clientY;
-        lastMouseTime = Date.now();
     };
     
     window.addEventListener('mousemove', globalMouseMoveListener);
@@ -214,16 +215,56 @@ function updateWaveToMouseWithDuration(options, duration, loadCSSFunction, repla
                     return;
                 }
                 
-                const { r, theta } = cartesianToCylindrical(mouseX, mouseY, cx, cy);
+                // Calculate target values based on mouse position
+                const mouseXNormalized = Math.max(0, Math.min(1, mouseX / window.innerWidth)); // Clamp to 0-1
+                const mouseYNormalized = Math.max(0, Math.min(1, mouseY / window.innerHeight)); // Clamp to 0-1
                 
-                // Map theta to a rotation (deg) and r to a translation (%)
-                // Adjust angle by adding π/2 (90 degrees) for more intuitive control
-                const adjustedTheta = theta + Math.PI / 2;
-                const rotationY = (adjustedTheta * 180 / Math.PI).toFixed(2); // degrees
+                // Use default values if settings are missing
+                const minRotation = options.wave.axisRotationAmountYMin ?? -2;
+                const maxRotation = options.wave.axisRotationAmountYMax ?? 2;
+                const rotationRange = maxRotation - minRotation;
                 
-                // translation: scale r to a reasonable % (max 10% of width)
-                const maxR = Math.max(rect.width, rect.height) / 2;
-                const translationX = ((r / maxR) * 10 * Math.cos(adjustedTheta)).toFixed(2); // percent
+                // Calculate target rotation (center position)
+                const centerRotation = (minRotation + maxRotation) / 2;
+                const targetRotation = centerRotation + (mouseXNormalized - 0.5) * rotationRange;
+                targetRotationY = Math.max(minRotation, Math.min(maxRotation, targetRotation));
+                
+                // Calculate target translation (center position)
+                const translationRange = 1.0; // -0.5% to +0.5%
+                const targetTranslation = (mouseYNormalized - 0.5) * translationRange;
+                targetTranslationX = Math.max(-0.5, Math.min(0.5, targetTranslation));
+                
+                // Smooth interpolation (lerp) toward target values
+                const lerpFactor = 0.1; // Adjust for smoothness (0.1 = smooth, 0.5 = faster)
+                currentRotationY += (targetRotationY - currentRotationY) * lerpFactor;
+                currentTranslationX += (targetTranslationX - currentTranslationX) * lerpFactor;
+                
+                // Format for CSS
+                const rotationY = currentRotationY.toFixed(2);
+                const translationX = currentTranslationX.toFixed(2);
+                
+                // Debug logging to check values
+                console.log('🌊 Animation values:', {
+                    mouseX, mouseY,
+                    mouseXNormalized, mouseYNormalized,
+                    minRotation, maxRotation, rotationRange,
+                    centerRotation: (minRotation + maxRotation) / 2,
+                    targetRotationY, currentRotationY,
+                    targetTranslationX, currentTranslationX,
+                    rotationY, translationX,
+                    lerpFactor: 0.1,
+                    settings: {
+                        min: options.wave.axisRotationAmountYMin,
+                        max: options.wave.axisRotationAmountYMax
+                    },
+                    options: options.wave
+                });
+                
+                // Additional safety check - clamp rotation to reasonable values
+                const clampedRotationY = Math.max(-10, Math.min(10, parseFloat(rotationY))).toFixed(2);
+                if (Math.abs(parseFloat(rotationY)) > 10) {
+                    console.warn('🌊 Rotation value too large, clamping:', rotationY, '->', clampedRotationY);
+                }
                 
                 // Performance optimization: Only update CSS if values have changed significantly
                 if (hasCssChangedSignificantly(rotationY, translationX, lastRotationY, lastTranslationX)) {
@@ -258,7 +299,9 @@ function updateWaveToMouseWithDuration(options, duration, loadCSSFunction, repla
 
 // Enable mouse-following wave
 function enableMouseFollowingWave(options, loadCSSFunction, replaceAnimationVariablesFunction) {
+    // Clear any existing intervals or animation frames
     if (mouseFollowInterval) clearInterval(mouseFollowInterval);
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
     
     // Reset performance metrics
     performanceMetrics = {
@@ -269,11 +312,26 @@ function enableMouseFollowingWave(options, loadCSSFunction, replaceAnimationVari
         errorCount: 0
     };
     
+    // Initialize smooth animation state
+    const minRotation = options?.wave?.axisRotationAmountYMin ?? -2;
+    const maxRotation = options?.wave?.axisRotationAmountYMax ?? 2;
+    const centerRotation = (minRotation + maxRotation) / 2;
+    
+    // Start at center position
+    currentRotationY = centerRotation;
+    targetRotationY = centerRotation;
+    currentTranslationX = 0;
+    targetTranslationX = 0;
+    isInitialized = true;
+    
+    console.log('🌊 Smooth animation initialized at center:', {
+        centerRotation,
+        currentRotationY,
+        currentTranslationX
+    });
+    
     // Store options and base duration for dynamic updates
     currentAnimationDuration = options?.wave?.waveSpeed || 4;
-    
-    // Use the current animation duration for the update interval (1:1 relationship)
-    const updateInterval = currentAnimationDuration * 1000; // Convert to milliseconds
     
     // Set up mouse tracking first
     setupMouseTracking();
@@ -282,20 +340,35 @@ function enableMouseFollowingWave(options, loadCSSFunction, replaceAnimationVari
     console.log('🌊 Mouse-following wave enabled, performing immediate update...');
     updateWaveToMouse(options, loadCSSFunction, replaceAnimationVariablesFunction);
     
-    // Then start the interval for continuous updates
-    mouseFollowInterval = setInterval(() => 
-        updateWaveToMouse(options, loadCSSFunction, replaceAnimationVariablesFunction), 
-        updateInterval
-    );
-    console.log('🌊 Mouse-following wave enabled, duration:', currentAnimationDuration, 's, update interval:', updateInterval, 'ms (1:1 ratio)');
+    // Use requestAnimationFrame with proper timing control
+    const animate = (currentTime) => {
+        // Check if enough time has passed since last animation update
+        const timeSinceLastUpdate = currentTime - lastAnimationTime;
+        const updateInterval = currentAnimationDuration * 1000; // Convert to milliseconds
+        
+        if (timeSinceLastUpdate >= updateInterval) {
+            updateWaveToMouse(options, loadCSSFunction, replaceAnimationVariablesFunction);
+            lastAnimationTime = currentTime;
+        }
+        
+        animationFrameId = requestAnimationFrame(animate);
+    };
+    
+    // Start the animation loop immediately
+    lastAnimationTime = performance.now();
+    animationFrameId = requestAnimationFrame(animate);
+    console.log('🌊 Mouse-following wave enabled with timed requestAnimationFrame, duration:', currentAnimationDuration, 's');
 }
 
 // Disable mouse-following wave
 function disableMouseFollowingWave() {
     if (mouseFollowInterval) clearInterval(mouseFollowInterval);
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
     mouseFollowInterval = null;
+    animationFrameId = null;
     lastCss = '';
     currentAnimationDuration = null;
+    lastAnimationTime = 0;
     cleanupMouseTracking();
     console.log('🌊 Mouse-following wave disabled');
 }
@@ -327,8 +400,17 @@ function resetWaveAnimationState() {
     lastMouseTime = Date.now();
     isMouseTrackingActive = false;
     mouseFollowInterval = null;
+    animationFrameId = null;
     lastCss = '';
     currentAnimationDuration = null;
+    lastAnimationTime = 0;
+    
+    // Reset smooth animation state
+    currentRotationY = 0;
+    targetRotationY = 0;
+    currentTranslationX = 0;
+    targetTranslationX = 0;
+    isInitialized = false;
     
     cleanupMouseTracking();
 }
@@ -343,7 +425,6 @@ export {
     cleanupMouseTracking,
     getWavePerformanceMetrics,
     resetWaveAnimationState,
-    cartesianToCylindrical,
     hasMouseMovedSignificantly,
     hasCssChangedSignificantly,
     retryOperation,

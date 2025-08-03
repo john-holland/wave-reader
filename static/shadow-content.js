@@ -21,11 +21,30 @@ import SelectionMadeMessage from "../src/models/messages/selection-made";
 import PongMessage from "../src/models/messages/pong";
 import StartMessage from "../src/models/messages/start";
 import StopMessage from "../src/models/messages/stop";
+
+// Import shared wave animation module
+import {
+    enableMouseFollowingWave as sharedEnableMouseFollowingWave,
+    disableMouseFollowingWave as sharedDisableMouseFollowingWave,
+    getWavePerformanceMetrics as sharedGetWavePerformanceMetrics
+} from "../src/util/wave-animation";
+
+// Import centralized state name map factory
+import { createStateNameMap } from "../src/util/state-name-map-factory";
+
+// Import centralized animation business logic
+import {
+    updateWavingStatus as sharedUpdateWavingStatus,
+    loadCSS as sharedLoadCSS,
+    unloadCSS as sharedUnloadCSS,
+    loadCSSTemplate as sharedLoadCSSTemplate,
+    replaceAnimationVariables as sharedReplaceAnimationVariables,
+    replaceAnimationVariablesWithDuration as sharedReplaceAnimationVariablesWithDuration,
+    CSS_MODE__MOUSE,
+    CSS_MODE__TEMPLATE
+} from "../src/util/animation-business-logic";
 // import React from "react";
 // import ReactDOM from "react-dom";
-
-const CSS_MODE__MOUSE = "1";
-const CSS_MODE__TEMPLATE = "0";
 
 // Reduced logging - only log important events
 const log = (message) => {
@@ -38,14 +57,7 @@ const log = (message) => {
 
 log("Wave Reader Shadow DOM content script is loading on: " + window.location.href);
 
-// Mouse-following utility functions
-function cartesianToCylindrical(x, y, cx, cy) {
-    const dx = x - cx;
-    const dy = y - cy;
-    const r = Math.sqrt(dx * dx + dy * dy);
-    const theta = Math.atan2(dy, dx);
-    return { r, theta };
-}
+
 
 
 
@@ -108,8 +120,7 @@ class WaveReaderShadowDOM {
         // Set up message listeners
         this.setupMessageListeners();
         
-        // Set up mouse tracking for mouse-following wave
-        this.setupMouseTracking();
+        // Mouse tracking is now handled by the shared wave animation module
         
         log("Shadow DOM initialized successfully");
     }
@@ -151,147 +162,40 @@ class WaveReaderShadowDOM {
     }
 
     initializeStateMachine() {
-        const stateMachineMap = new Map();
-        
-        const states = {
-            "base": CState("base", ["start", "stop"], true, (async () => {
-                return stateMachineMap.get('base')
-            }).bind(this), false),
-            
-            "start": CState("start", ["start", "stop", "waving"], true, (async (message) => {
-                log("Start state activated");
-                this.latestOptions = message.options;
-                this.going = true;
-                log('🌊 Shadow DOM: Received waveAnimationControl:', this.latestOptions.waveAnimationControl);
-                log('🌊 Shadow DOM: Full options:', JSON.stringify(this.latestOptions));
-                
-                // Initialize wave animation based on mode
-                this.updateWavingStatus(this.latestOptions, null);
-                
-                return stateMachineMap.get('waving')
-            }).bind(this), false),
-            
-            "stop": CState("stop", ["start", "stop", "base"], true, (async () => {
-                log("Stop state activated");
-                this.unloadCSS();
-                
-                // Disable mouse-following wave
-                this.disableMouseFollowingWave();
-                
-                this.going = false;
-                return stateMachineMap.get('base')
-            }).bind(this), false),
-            
-            "waving": CState("waving", ["start", "stop", "waving", "start-selection-choose"], true, (async (message) => {
-                // Handle wave updates and mode changes
-                const previousOptions = this.latestOptions;
-                this.latestOptions = message.options;
-                
-                this.updateWavingStatus(this.latestOptions, previousOptions);
-
-                return stateMachineMap.get('waving')
-            }).bind(this), false),
-            
-            "start-selection-choose": CState("start-selection-choose", ["selection mode activate"], true, (async (message) => {
-                const selector = message?.selector;
-
-                if (!(selector || "").trim()) {
-                    log("start selection choose activated without selector!");
-                }
-
-                log("Starting selector mode activation");
-                log("Selector: " + selector);
-
-                try {
-                    log("Mounting selector hierarchy component...");
-                    
-                    // Create a mount element within the Shadow DOM
-                    let mount = this.shadowRoot.querySelector("#wave-reader-component-mount");
-                    
-                    if (mount) {
-                        mount.remove();
-                    }
-                    
-                    mount = document.createElement("div");
-                    mount.style.cssText = `
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        width: 100%;
-                        height: 100%;
-                        z-index: 10000;
-                        pointer-events: auto;
-                        background: rgba(0, 0, 0, 0.1);
-                    `;
-                    mount.setAttribute("id", "wave-reader-component-mount");
-                    this.shadowRoot.appendChild(mount);
-                    
-                    log("Mount element created and appended: " + mount);
-                    
-                    // Create a custom document context for React components
-                    const customDocument = this.createCustomDocumentContext();
-                    
-                    this.hierarchySelectorMount = MountOrFindSelectorHierarchyComponent({
-                        service: this.hierarchySelectorService,
-                        selector,
-                        passSetSelector: (modifier) => { 
-                            log("Setting hierarchy selector modifier");
-                            this.setHierarchySelector = modifier; 
-                        },
-                        onConfirmSelector: (selector) => {
-                            log("onConfirmSelector called with selector: " + selector);
-                            this.stateMachine.handleState(new SelectionMadeMessage({
-                                selector
-                            }));
-                        },
-                        doc: customDocument, // Use our custom document context
-                        uiRoot: this.shadowRoot
-                    });
-                    log("Selector hierarchy component mounted successfully, mount: " + this.hierarchySelectorMount);
-                } catch (error) {
-                    console.error("Failed to mount selector hierarchy component:", error);
-                }
-
-                return stateMachineMap.get('selection mode')
-            }).bind(this), false),
-            
-            "selection mode": CState("selection mode", ["selection mode activate", "selection mode", "selection made", "end-selection-choose"], true, (async () => {
-                return stateMachineMap.get('selection mode')
-            }).bind(this), false),
-            
-            "selection mode activate": CState("selection mode activate", ["selection mode", "selection made", "end-selection-choose"], true, (async () => {
-                return stateMachineMap.get('selection mode')
-            }).bind(this), false),
-            
-            "selection made": CState("selection made", ["end-selection-choose"], true, (async (message) => {
-                log("Selection made: " + message.selector);
-                return stateMachineMap.get('end-selection-choose')
-            }).bind(this), false),
-            
-            "end-selection-choose": CState("end-selection-choose", ["waving"], true, (async () => {
-                log("End selection choose activated");
-                if (this.hierarchySelectorMount) {
-                    this.hierarchySelectorMount.remove();
-                    this.hierarchySelectorMount = undefined;
-                }
-                return stateMachineMap.get('waving')
-            }).bind(this), false)
-        };
-
-        // Create state machine map
-        Object.keys(states).forEach(key => {
-            stateMachineMap.set(key, states[key]);
+        // Create StateNameMap using the centralized factory
+        const StateNameMap = createStateNameMap({
+            isShadowDom: true,
+            context: {
+                latestOptions: this.latestOptions,
+                going: this.going,
+                setHierarchySelector: this.setHierarchySelector,
+                hierarchySelectorMount: this.hierarchySelectorMount,
+                hierarchySelectorService: this.hierarchySelectorService,
+                stateMachine: this.stateMachine,
+                shadowRoot: this.shadowRoot,
+                unloadCSS: this.unloadCSS.bind(this),
+                enableMouseFollowingWave: this.enableMouseFollowingWave.bind(this),
+                disableMouseFollowingWave: this.disableMouseFollowingWave.bind(this),
+                updateWavingStatus: this.updateWavingStatus.bind(this),
+                initializeOrUpdateToggleObserver: this.initializeOrUpdateToggleObserver?.bind(this)
+            },
+            updateWavingStatus: this.updateWavingStatus.bind(this),
+            enableMouseFollowingWave: this.enableMouseFollowingWave.bind(this),
+            disableMouseFollowingWave: this.disableMouseFollowingWave.bind(this),
+            unloadCSS: this.unloadCSS.bind(this),
+            loadCSSTemplate: this.loadCSSTemplate.bind(this),
+            createCustomDocumentContext: this.createCustomDocumentContext.bind(this),
+            MountOrFindSelectorHierarchyComponent,
+            SelectionMadeMessage,
+            log
         });
-
-        // Create a NameAccessMapInterface implementation
-        const nameAccessMap = {
-            getState: (name) => stateMachineMap.get(name)
-        };
 
         // Initialize the state machine with the map and initial state
         this.stateMachine = new StateMachine();
-        this.stateMachine.initialize(nameAccessMap, states["base"]);
-        log("Shadow DOM state machine initialized");
+        const stateMachineMap = new Map();
+        const nameAccessMap = StateNameMap(stateMachineMap);
+        this.stateMachine.initialize(nameAccessMap, nameAccessMap.getState("base"));
+        log("🌊 Shadow DOM: State machine initialized using centralized factory");
     }
 
     /**
@@ -299,45 +203,13 @@ class WaveReaderShadowDOM {
      * Handles mode changes, CSS updates, and mouse-following wave
      */
     updateWavingStatus(currentOptions, previousOptions) {
-        if (!currentOptions) {
-            log('🌊 Shadow DOM: No options provided to updateWavingStatus');
-            return;
-        }
-
-        const modeChanged = previousOptions?.waveAnimationControl !== currentOptions.waveAnimationControl;
-        
-        if (modeChanged) {
-            log('🌊 Shadow DOM: Animation mode changed from', previousOptions?.waveAnimationControl, 'to', currentOptions.waveAnimationControl);
-            
-            // Handle mode changes
-            if (currentOptions.waveAnimationControl === CSS_MODE__MOUSE) {
-                log('🌊 Shadow DOM: Switching to Mouse mode - enabling mouse-following wave');
-                this.enableMouseFollowingWave(currentOptions);
-            } else if (currentOptions.waveAnimationControl === CSS_MODE__TEMPLATE) {
-                log('🌊 Shadow DOM: Switching to CSS mode - disabling mouse-following wave');
-                this.disableMouseFollowingWave();
-                this.loadCSS(currentOptions.wave.cssTemplate);
-            }
-        } else {
-            // Handle updates within the same mode
-            if (currentOptions.waveAnimationControl === CSS_MODE__MOUSE) {
-                // Check if mouse template changed or wave speed changed
-                const templateChanged = previousOptions?.wave?.cssMouseTemplate !== currentOptions.wave.cssMouseTemplate;
-                const speedChanged = previousOptions?.wave?.waveSpeed !== currentOptions.wave.waveSpeed;
-                
-                if (templateChanged || speedChanged) {
-                    log('🌊 Shadow DOM: Mouse template or speed updated - restarting mouse-following wave');
-                    this.disableMouseFollowingWave();
-                    this.enableMouseFollowingWave(currentOptions);
-                }
-            } else if (currentOptions.waveAnimationControl === CSS_MODE__TEMPLATE) {
-                // Check if CSS template changed
-                if (previousOptions?.wave?.cssTemplate !== currentOptions.wave.cssTemplate) {
-                    log('🌊 Shadow DOM: CSS template updated');
-                    this.loadCSS(currentOptions.wave.cssTemplate);
-                }
-            }
-        }
+        const context = {
+            enableMouseFollowingWave: this.enableMouseFollowingWave.bind(this),
+            disableMouseFollowingWave: this.disableMouseFollowingWave.bind(this),
+            loadCSSTemplate: this.loadCSSTemplate.bind(this),
+            log
+        };
+        sharedUpdateWavingStatus(currentOptions, previousOptions, context, '🌊 Shadow DOM');
     }
 
     setupMessageListeners() {
@@ -412,34 +284,31 @@ class WaveReaderShadowDOM {
     }
 
     unloadCSS() {
-        if (this.styleElement) {
-            this.styleElement.textContent = '';
-        }
-        if (this.mainDocumentStyle) {
-            this.mainDocumentStyle.textContent = '';
-        }
-        
-        // Clear mouse-following state
+        const context = {
+            styleElement: this.styleElement,
+            mainDocumentStyle: this.mainDocumentStyle,
+            log
+        };
+        sharedUnloadCSS(context, true); // true = Shadow DOM
         this.lastCss = '';
-        
-        console.log("🌊 CSS unloaded from both Shadow DOM and main document");
     }
     
     loadCSS(css) {
-        // Apply CSS to the main document, not just the Shadow DOM
-        if (this.styleElement) {
-            this.styleElement.textContent = css;
-        }
-        
-        // Also inject CSS into the main document for text elements
-        if (!this.mainDocumentStyle) {
-            this.mainDocumentStyle = document.createElement('style');
-            this.mainDocumentStyle.id = 'wave-reader-main-css';
-            document.head.appendChild(this.mainDocumentStyle);
-        }
-        this.mainDocumentStyle.textContent = css;
-        
-        log("🌊 Shadow DOM: CSS loaded into main document");
+        const context = {
+            styleElement: this.styleElement,
+            mainDocumentStyle: this.mainDocumentStyle,
+            log
+        };
+        return sharedLoadCSS(css, context, true); // true = Shadow DOM
+    }
+
+    loadCSSTemplate(css) {
+        const context = {
+            loadCSS: this.loadCSS.bind(this),
+            unloadCSS: this.unloadCSS.bind(this),
+            log
+        };
+        return sharedLoadCSSTemplate(css, context, true); // true = Shadow DOM
     }
 
     toggleWaving() {
@@ -459,96 +328,35 @@ class WaveReaderShadowDOM {
         }
     }
 
-    setupMouseTracking() {
-        // Listen for mouse movement globally
-        window.addEventListener('mousemove', (e) => {
-            this.mouseX = e.clientX;
-            this.mouseY = e.clientY;
-            this.lastMouseX = e.clientX;
-            this.lastMouseY = e.clientY;
-            this.lastMouseTime = Date.now();
-        });
-        log('🌊 Shadow DOM: Mouse tracking initialized');
-    }
+    // Mouse tracking is now handled by the shared wave animation module
 
-    // Mouse-following wave methods
+    // Wrapper functions that use the shared wave animation module
     updateWaveToMouse(options) {
-        this.updateWaveToMouseWithDuration(options, options?.wave?.waveSpeed || 4);
+        // This function is handled by the shared module
+        // The shared module will call our loadCSS and replaceAnimationVariablesWithDuration functions
     }
 
     updateWaveToMouseWithDuration(options, duration) {
-        if (!options || !options.wave || !options.wave.selector) return;
-        const elements = document.querySelectorAll(options.wave.selector);
-        if (!elements.length) return;
-        
-        elements.forEach(el => {
-            const rect = el.getBoundingClientRect();
-            const cx = rect.left + rect.width/2;
-            const cy = rect.top + rect.height/2;
-            const { r, theta } = cartesianToCylindrical(this.mouseX, this.mouseY, cx, cy);
-            
-            // Map theta to a rotation (deg) and r to a translation (%)
-            // Adjust angle by adding π/2 (90 degrees) for more intuitive control
-            const adjustedTheta = theta + Math.PI / 2;
-            const rotationY = (adjustedTheta * 180 / Math.PI).toFixed(2); // degrees
-            // translation: scale r to a reasonable % (max 10% of width)
-            const maxR = Math.max(rect.width, rect.height) / 2;
-            const translationX = ((r / maxR) * 10 * Math.cos(adjustedTheta)).toFixed(2); // percent
-            
-            // Update the CSS with dynamic values and duration
-            const css = this.replaceAnimationVariablesWithDuration(options.wave, translationX, rotationY, duration);
-            if (css !== this.lastCss) {
-                this.loadCSS(css);
-                this.lastCss = css;
-            }
-        });
+        // This function is handled by the shared module
+        // The shared module will call our loadCSS and replaceAnimationVariablesWithDuration functions
     }
 
     enableMouseFollowingWave(options) {
-        if (this.mouseFollowInterval) clearInterval(this.mouseFollowInterval);
-        
-        // Store options and base duration for dynamic updates
-        this.currentWaveOptions = options;
-        this.currentAnimationDuration = options?.wave?.waveSpeed || 4;
-        
-        // Use the current animation duration for the update interval (1:1 relationship)
-        const updateInterval = this.currentAnimationDuration * 1000; // Convert to milliseconds
-        this.mouseFollowInterval = setInterval(() => this.updateWaveToMouse(options), updateInterval);
-        log('🌊 Shadow DOM: Mouse-following wave enabled, duration:', this.currentAnimationDuration, 's, update interval:', updateInterval, 'ms (1:1 ratio)');
+        // Use shared module with shadow-content specific CSS functions
+        sharedEnableMouseFollowingWave(options, this.loadCSS.bind(this), sharedReplaceAnimationVariablesWithDuration);
+        log('🌊 Shadow DOM: Mouse-following wave enabled using shared module');
     }
 
     disableMouseFollowingWave() {
-        if (this.mouseFollowInterval) clearInterval(this.mouseFollowInterval);
-        this.mouseFollowInterval = null;
+        // Use shared module
+        sharedDisableMouseFollowingWave();
         this.lastCss = '';
         this.currentWaveOptions = null;
         this.currentAnimationDuration = null;
-        log('🌊 Shadow DOM: Mouse-following wave disabled');
+        log('🌊 Shadow DOM: Mouse-following wave disabled using shared module');
     }
 
-    replaceAnimationVariables(wave, translationX, rotationY) {
-        // Use the same constants as the Wave model
-        const TRANSLATE_X = "TRANSLATE_X";
-        const ROTATE_Y = "ROTATE_Y";
-        
-        let css = wave.cssMouseTemplate || wave.cssTemplate || '';
-        css = css.replaceAll(TRANSLATE_X, translationX);
-        css = css.replaceAll(ROTATE_Y, rotationY);
-        return css;
-    }
-
-    replaceAnimationVariablesWithDuration(wave, translationX, rotationY, duration) {
-        // Use the same constants as the Wave model
-        const TRANSLATE_X = "TRANSLATE_X";
-        const ROTATE_Y = "ROTATE_Y";
-        const ANIMATION_DURATION = "ANIMATION_DURATION";
-        
-        let css = wave.cssMouseTemplate || wave.cssTemplate || '';
-        css = css.replaceAll(TRANSLATE_X, translationX);
-        css = css.replaceAll(ROTATE_Y, rotationY);
-        css = css.replaceAll(ANIMATION_DURATION, duration.toString());
-        return css;
-    }
+    // Animation variable replacement is now handled by the shared module
 
     createCustomDocumentContext() {
         // This function creates a custom document context that React components can use

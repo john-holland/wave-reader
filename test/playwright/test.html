@@ -52,6 +52,7 @@
             border-radius: 8px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
             z-index: 1000;
+            max-width: 300px;
         }
         
         .test-controls button {
@@ -97,17 +98,35 @@
             background: #f8d7da;
             color: #721c24;
         }
+        
+        .debug-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
     <div class="test-controls">
         <h3>Wave Reader Test Controls</h3>
         <div id="status" class="status-indicator status-ready">Ready for testing</div>
+        <div id="debugInfo" class="debug-info">
+            <strong>Debug Info:</strong><br>
+            <span id="extensionStatus">Checking extension...</span><br>
+            <span id="chromeStatus">Checking Chrome APIs...</span><br>
+            <span id="contentScriptStatus">Checking content scripts...</span>
+        </div>
         <button id="testMouseWave">Test Mouse Wave</button>
         <button id="testCSSTemplate">Test CSS Template</button>
-        <button id="testToggle">Test Toggle</button>
+        <button id="testToggle">Test Toggle (Alt+W)</button>
+        <button id="testKeyboard">Test Keyboard Input</button>
         <button id="testPerformance">Test Performance</button>
         <button id="clearStatus">Clear Status</button>
+        <button id="refreshDebug">Refresh Debug Info</button>
     </div>
 
     <div class="test-section">
@@ -146,13 +165,37 @@
     </div>
 
     <script>
-        // Test control functionality
+        // Debugging and testing functionality
         document.addEventListener('DOMContentLoaded', function() {
             const statusDiv = document.getElementById('status');
+            const extensionStatus = document.getElementById('extensionStatus');
+            const chromeStatus = document.getElementById('chromeStatus');
+            const contentScriptStatus = document.getElementById('contentScriptStatus');
             
             function updateStatus(message, className) {
                 statusDiv.textContent = message;
                 statusDiv.className = `status-indicator ${className}`;
+            }
+            
+            function updateDebugInfo() {
+                // Check for Chrome extension APIs
+                const hasChrome = typeof chrome !== 'undefined';
+                const hasRuntime = hasChrome && typeof chrome.runtime !== 'undefined';
+                const hasStorage = hasChrome && typeof chrome.storage !== 'undefined';
+                const hasScripting = hasChrome && typeof chrome.scripting !== 'undefined';
+                
+                extensionStatus.textContent = `Extension: ${hasChrome ? '✅' : '❌'}`;
+                chromeStatus.textContent = `Chrome APIs: ${hasRuntime ? '✅' : '❌'}`;
+                contentScriptStatus.textContent = `Content Scripts: ${hasChrome ? '✅' : '❌'}`;
+                
+                console.log('🔍 Debug Info:', {
+                    hasChrome,
+                    hasRuntime,
+                    hasStorage,
+                    hasScripting,
+                    userAgent: navigator.userAgent,
+                    url: window.location.href
+                });
             }
             
             // Test mouse wave functionality
@@ -190,12 +233,49 @@
             
             // Test toggle functionality
             document.getElementById('testToggle').addEventListener('click', function() {
-                updateStatus('Testing toggle functionality...', 'status-testing');
+                updateStatus('Testing toggle functionality (Alt+W)...', 'status-testing');
                 
-                // Simulate toggle action
+                // Simulate Alt+W keypress
+                const keyEvent = new KeyboardEvent('keydown', {
+                    key: 'w',
+                    altKey: true,
+                    bubbles: true,
+                    cancelable: true
+                });
+                
+                document.dispatchEvent(keyEvent);
+                
                 setTimeout(() => {
                     updateStatus('Toggle test completed', 'status-success');
                 }, 1000);
+            });
+            
+            // Test keyboard input
+            document.getElementById('testKeyboard').addEventListener('click', function() {
+                updateStatus('Testing keyboard input...', 'status-testing');
+                
+                // Test various key combinations
+                const keys = ['a', 'b', 'c', 'w'];
+                let index = 0;
+                
+                const testKey = () => {
+                    if (index < keys.length) {
+                        const keyEvent = new KeyboardEvent('keydown', {
+                            key: keys[index],
+                            bubbles: true,
+                            cancelable: true
+                        });
+                        
+                        document.dispatchEvent(keyEvent);
+                        console.log(`🔍 Tested key: ${keys[index]}`);
+                        index++;
+                        setTimeout(testKey, 500);
+                    } else {
+                        updateStatus('Keyboard test completed', 'status-success');
+                    }
+                };
+                
+                testKey();
             });
             
             // Test performance
@@ -213,10 +293,38 @@
                 updateStatus('Ready for testing', 'status-ready');
             });
             
+            // Refresh debug info
+            document.getElementById('refreshDebug').addEventListener('click', function() {
+                updateDebugInfo();
+                updateStatus('Debug info refreshed', 'status-success');
+            });
+            
+            // Listen for keyboard events
+            document.addEventListener('keydown', function(event) {
+                console.log('🔍 Key pressed:', event.key, 'Alt:', event.altKey, 'Ctrl:', event.ctrlKey, 'Shift:', event.shiftKey);
+            });
+            
+            // Listen for extension messages
+            window.addEventListener('message', function(event) {
+                if (event.data && event.data.source === 'wave-reader-extension') {
+                    console.log('🔍 Extension message received:', event.data);
+                }
+            });
+            
+            // Initial debug info
+            updateDebugInfo();
+            
             // Log page load for testing
-            console.log('Wave Reader test page loaded successfully');
-            console.log('Page URL:', window.location.href);
-            console.log('Document ready state:', document.readyState);
+            console.log('🌊 Wave Reader test page loaded successfully');
+            console.log('🌊 Page URL:', window.location.href);
+            console.log('🌊 Document ready state:', document.readyState);
+            console.log('🌊 User Agent:', navigator.userAgent);
+            
+            // Check for extension after a delay
+            setTimeout(() => {
+                updateDebugInfo();
+                console.log('🌊 Extension check completed');
+            }, 2000);
         });
     </script>
 </body>
