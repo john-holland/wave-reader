@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Selector Input Component</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="selector-input-container" class="selector-input-component">
+        <!-- Content will be dynamically rendered by the state machine -->
+    </div>
+
+    <script>
+        // Global state for the component
+        let componentState = {
+            selector: 'p',
+            selectors: ['p', 'h1', 'h2', 'h3', '.content', '.article'],
+            saved: true,
+            isEditing: false,
+            selectorText: 'p',
+            displaySelectors: ['p', 'h1', 'h2', 'h3', '.content', '.article'],
+            validationError: null,
+            suggestions: []
+        };
+
+        // Event handlers for the component
+        function startEditing() {
+            console.log('🌊 SelectorInput: Starting edit mode');
+            componentState.isEditing = true;
+            componentState.selectorText = componentState.selector;
+            renderComponent();
+        }
+
+        function toggleSelectorMode() {
+            console.log('🌊 SelectorInput: Toggling selector mode');
+            // This would typically send a message to the background script
+            // to enable element selection mode
+            if (window.parent && window.parent.postMessage) {
+                window.parent.postMessage({
+                    type: 'TOGGLE_SELECTOR_MODE',
+                    source: 'selector-input'
+                }, '*');
+            }
+        }
+
+        function updateSelectorText(value) {
+            console.log('🌊 SelectorInput: Updating selector text:', value);
+            componentState.selectorText = value;
+            componentState.validationError = null;
+            
+            // Generate suggestions
+            componentState.suggestions = generateSuggestions(value, componentState.selectors);
+            renderComponent();
+        }
+
+        function selectSuggestion(suggestion) {
+            console.log('🌊 SelectorInput: Selecting suggestion:', suggestion);
+            componentState.selectorText = suggestion;
+            componentState.suggestions = [];
+            renderComponent();
+        }
+
+        function saveSelector() {
+            console.log('🌊 SelectorInput: Saving selector:', componentState.selectorText);
+            
+            if (!componentState.selectorText || componentState.selectorText.trim() === '') {
+                componentState.validationError = 'Selector cannot be empty';
+                renderComponent();
+                return;
+            }
+
+            // Validate selector
+            if (!isValidSelector(componentState.selectorText)) {
+                componentState.validationError = 'Invalid CSS selector';
+                renderComponent();
+                return;
+            }
+
+            // Save the selector
+            componentState.selector = componentState.selectorText;
+            componentState.saved = true;
+            componentState.isEditing = false;
+            componentState.validationError = null;
+
+            // Add to saved selectors if not already there
+            if (!componentState.selectors.includes(componentState.selector)) {
+                componentState.selectors.push(componentState.selector);
+                componentState.displaySelectors = [...new Set(componentState.selectors)];
+            }
+
+            // Save to storage
+            if (window.parent && window.parent.postMessage) {
+                window.parent.postMessage({
+                    type: 'SELECTOR_SAVED',
+                    selector: componentState.selector,
+                    source: 'selector-input'
+                }, '*');
+            }
+
+            renderComponent();
+        }
+
+        function cancelEditing() {
+            console.log('🌊 SelectorInput: Canceling editing');
+            componentState.isEditing = false;
+            componentState.selectorText = componentState.selector;
+            componentState.validationError = null;
+            componentState.suggestions = [];
+            renderComponent();
+        }
+
+        function confirmSelection() {
+            console.log('🌊 SelectorInput: Confirming selection');
+            // This would typically be called after an element is selected
+            // For now, we'll just go back to idle state
+            componentState.isEditing = false;
+            renderComponent();
+        }
+
+        function cancelSelection() {
+            console.log('🌊 SelectorInput: Canceling selection');
+            componentState.isEditing = false;
+            renderComponent();
+        }
+
+        function useSelector(selector) {
+            console.log('🌊 SelectorInput: Using selector:', selector);
+            componentState.selector = selector;
+            componentState.selectorText = selector;
+            componentState.saved = true;
+            renderComponent();
+        }
+
+        function removeSelector(selector) {
+            console.log('🌊 SelectorInput: Removing selector:', selector);
+            const index = componentState.selectors.indexOf(selector);
+            if (index > -1) {
+                componentState.selectors.splice(index, 1);
+                componentState.displaySelectors = [...new Set(componentState.selectors)];
+                
+                // If we removed the current selector, reset to default
+                if (componentState.selector === selector) {
+                    componentState.selector = 'p';
+                    componentState.selectorText = 'p';
+                }
+            }
+            renderComponent();
+        }
+
+        function retryValidation() {
+            console.log('🌊 SelectorInput: Retrying validation');
+            componentState.validationError = null;
+            renderComponent();
+        }
+
+        function goToIdle() {
+            console.log('🌊 SelectorInput: Going to idle state');
+            componentState.isEditing = false;
+            componentState.validationError = null;
+            componentState.suggestions = [];
+            renderComponent();
+        }
+
+        // Helper functions
+        function generateSuggestions(input, existingSelectors) {
+            if (!input || input.length < 2) return [];
+            
+            const suggestions = [];
+            
+            // Add existing selectors that match
+            existingSelectors.forEach(selector => {
+                if (selector.toLowerCase().includes(input.toLowerCase())) {
+                    suggestions.push(selector);
+                }
+            });
+            
+            // Add common CSS selectors
+            const commonSelectors = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span', 'a', 'img', '.content', '.article', '.text', '.title'];
+            commonSelectors.forEach(selector => {
+                if (selector.toLowerCase().includes(input.toLowerCase()) && !suggestions.includes(selector)) {
+                    suggestions.push(selector);
+                }
+            });
+            
+            return suggestions.slice(0, 5); // Limit to 5 suggestions
+        }
+
+        function isValidSelector(selector) {
+            try {
+                // Basic CSS selector validation
+                if (!selector || typeof selector !== 'string') return false;
+                
+                // Check for basic CSS selector patterns
+                const validPatterns = [
+                    /^[a-zA-Z][a-zA-Z0-9_-]*$/, // Element selectors
+                    /^\.[a-zA-Z][a-zA-Z0-9_-]*$/, // Class selectors
+                    /^#[a-zA-Z][a-zA-Z0-9_-]*$/, // ID selectors
+                    /^[a-zA-Z][a-zA-Z0-9_-]*\[[^\]]+\]$/, // Attribute selectors
+                    /^[a-zA-Z][a-zA-Z0-9_-]*:[a-zA-Z][a-zA-Z0-9_-]*$/, // Pseudo-class selectors
+                    /^[a-zA-Z][a-zA-Z0-9_-]*::[a-zA-Z][a-zA-Z0-9_-]*$/, // Pseudo-element selectors
+                    /^[a-zA-Z][a-zA-Z0-9_-]*\.[a-zA-Z][a-zA-Z0-9_-]*$/, // Element.class
+                    /^[a-zA-Z][a-zA-Z0-9_-]*#[a-zA-Z][a-zA-Z0-9_-]*$/, // Element#id
+                    /^[a-zA-Z][a-zA-Z0-9_-]*\s+[a-zA-Z][a-zA-Z0-9_-]*$/, // Descendant selectors
+                    /^[a-zA-Z][a-zA-Z0-9_-]*>[a-zA-Z][a-zA-Z0-9_-]*$/, // Child selectors
+                    /^[a-zA-Z][a-zA-Z0-9_-]*\+[a-zA-Z][a-zA-Z0-9_-]*$/, // Adjacent sibling selectors
+                    /^[a-zA-Z][a-zA-Z0-9_-]*~[a-zA-Z][a-zA-Z0-9_-]*$/ // General sibling selectors
+                ];
+                
+                return validPatterns.some(pattern => pattern.test(selector)) || 
+                       selector === '*' || // Universal selector
+                       selector === 'p' || // Common simple selectors
+                       selector === 'h1' ||
+                       selector === 'h2' ||
+                       selector === 'h3' ||
+                       selector === 'div' ||
+                       selector === 'span' ||
+                       selector === 'a' ||
+                       selector === 'img';
+            } catch (error) {
+                return false;
+            }
+        }
+
+        // Render functions for different states
+        function renderIdleState() {
+            return `
+                <div class="selector-input-idle">
+                    <div class="selector-display">
+                        <h3 class="selector-title">CSS Selector</h3>
+                        <div class="selector-text-display" onclick="startEditing()">
+                            <span class="selector-text">${componentState.selector}</span>
+                            <span class="edit-hint">(click to edit)</span>
+                        </div>
+                        <button class="btn btn-secondary" onclick="toggleSelectorMode()">
+                            🎯 Select Element
+                        </button>
+                    </div>
+                    
+                    <div class="saved-selectors">
+                        <h4>Saved Selectors:</h4>
+                        ${componentState.displaySelectors.length === 0 ? '<p>No selectors saved yet</p>' : 
+                          componentState.displaySelectors.map(selector => `
+                            <div class="selector-item">
+                                <span class="selector-text">${selector}</span>
+                                <div class="selector-actions">
+                                    <button class="btn btn-sm btn-secondary" onclick="useSelector('${selector}')">
+                                        Use
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="removeSelector('${selector}')">
+                                        Remove
+                                    </button>
+                                </div>
+                            </div>
+                          `).join('')
+                        }
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderEditingState() {
+            return `
+                <div class="selector-input-editing">
+                    <div class="selector-input-section">
+                        <h3 class="selector-title">CSS Selector</h3>
+                        <input type="text" 
+                               class="selector-text-input" 
+                               id="selectorInput" 
+                               value="${componentState.selectorText}"
+                               placeholder="Enter CSS selector (e.g., p, h1, .content)"
+                               onchange="updateSelectorText(this.value)">
+                        
+                        ${componentState.suggestions.length > 0 ? `
+                            <div class="suggestions" id="suggestions">
+                                ${componentState.suggestions.map(suggestion => `
+                                    <div class="suggestion-item" onclick="selectSuggestion('${suggestion}')">
+                                        ${suggestion}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                        
+                        ${componentState.validationError ? `
+                            <div class="validation-error" id="validationError">
+                                ${componentState.validationError}
+                            </div>
+                        ` : ''}
+                        
+                        <div class="control-buttons">
+                            <button class="btn btn-primary" onclick="saveSelector()">
+                                💾 Save
+                            </button>
+                            <button class="btn btn-secondary" onclick="cancelEditing()">
+                                ❌ Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSelectorModeState() {
+            return `
+                <div class="selector-input-selector-mode">
+                    <div class="selector-mode-header">
+                        <h3>🎯 Element Selection Mode</h3>
+                        <p>Click on any element on the page to select it</p>
+                    </div>
+                    
+                    <div class="selection-instructions">
+                        <div class="instruction-step">
+                            <span class="step-number">1</span>
+                            <span class="step-text">Click on any element on the page</span>
+                        </div>
+                        <div class="instruction-step">
+                            <span class="step-number">2</span>
+                            <span class="step-text">The element will be highlighted</span>
+                        </div>
+                        <div class="instruction-step">
+                            <span class="step-number">3</span>
+                            <span class="step-text">Confirm your selection</span>
+                        </div>
+                    </div>
+                    
+                    <div class="selection-controls">
+                        <button class="btn btn-primary" onclick="confirmSelection()">
+                            ✅ Confirm Selection
+                        </button>
+                        <button class="btn btn-secondary" onclick="cancelSelection()">
+                            ❌ Cancel Selection
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderValidatingState() {
+            return `
+                <div class="selector-input-validating">
+                    <div class="validation-header">
+                        <h3>🔍 Validating Selector</h3>
+                        <p>Checking if selector "${componentState.selectorText}" is valid...</p>
+                    </div>
+                    
+                    <div class="validation-progress">
+                        <div class="spinner"></div>
+                        <p>Validating CSS selector syntax and checking for elements...</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderErrorState() {
+            return `
+                <div class="selector-input-error">
+                    <div class="error-header">
+                        <h3>❌ Error</h3>
+                        <p>${componentState.validationError || 'An error occurred'}</p>
+                    </div>
+                    
+                    <div class="error-actions">
+                        <button class="btn btn-primary" onclick="retryValidation()">
+                            🔄 Retry
+                        </button>
+                        <button class="btn btn-secondary" onclick="goToIdle()">
+                            ← Back to Idle
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Main render function
+        function renderComponent() {
+            const container = document.getElementById('selector-input-container');
+            
+            if (componentState.validationError && !componentState.isEditing) {
+                container.innerHTML = renderErrorState();
+            } else if (componentState.isEditing) {
+                container.innerHTML = renderEditingState();
+            } else {
+                container.innerHTML = renderIdleState();
+            }
+        }
+
+        // Initialize the component
+        function initComponent() {
+            console.log('🌊 SelectorInput: Initializing component');
+            
+            // Load saved selectors from storage if available
+            if (window.parent && window.parent.postMessage) {
+                window.parent.postMessage({
+                    type: 'GET_SAVED_SELECTORS',
+                    source: 'selector-input'
+                }, '*');
+            }
+            
+            renderComponent();
+        }
+
+        // Listen for messages from parent
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.source === 'background') {
+                switch (event.data.type) {
+                    case 'SELECTORS_LOADED':
+                        if (event.data.selectors) {
+                            componentState.selectors = event.data.selectors;
+                            componentState.displaySelectors = [...new Set(event.data.selectors)];
+                        }
+                        break;
+                    case 'SELECTOR_VALIDATED':
+                        if (event.data.valid) {
+                            componentState.validationError = null;
+                            saveSelector();
+                        } else {
+                            componentState.validationError = event.data.error || 'Invalid selector';
+                            renderComponent();
+                        }
+                        break;
+                }
+            }
+        });
+
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initComponent);
+        } else {
+            initComponent();
+        }
+    </script>
+</body>
+</html>

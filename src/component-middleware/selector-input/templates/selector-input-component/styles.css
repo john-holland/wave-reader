@@ -1,0 +1,393 @@
+/* Selector Input Component Styles */
+
+.selector-input-component {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #333;
+  line-height: 1.5;
+}
+
+/* Common button styles */
+.btn {
+  display: inline-block;
+  padding: 8px 16px;
+  margin: 4px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  text-align: center;
+}
+
+.btn-primary {
+  background: #667eea;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #5a6fd8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #5a6268;
+  transform: translateY(-1px);
+}
+
+.btn-danger {
+  background: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #c82333;
+  transform: translateY(-1px);
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* Idle State */
+.selector-input-idle {
+  padding: 20px;
+}
+
+.selector-display {
+  margin-bottom: 24px;
+}
+
+.selector-title {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.selector-text-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.selector-text-display:hover {
+  background: #e9ecef;
+  border-color: #667eea;
+}
+
+.selector-text {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 16px;
+  color: #495057;
+  font-weight: 500;
+}
+
+.edit-hint {
+  font-size: 12px;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.saved-selectors {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.saved-selectors h4 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  color: #2c3e50;
+}
+
+.selector-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  margin-bottom: 8px;
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.selector-item:hover {
+  border-color: #667eea;
+  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.1);
+}
+
+.selector-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Editing State */
+.selector-input-editing {
+  padding: 20px;
+}
+
+.selector-input-section {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.selector-text-input {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e9ecef;
+  border-radius: 6px;
+  font-size: 16px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  margin-bottom: 16px;
+  transition: border-color 0.2s ease;
+}
+
+.selector-text-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.suggestions {
+  margin-bottom: 16px;
+}
+
+.suggestion-item {
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 14px;
+}
+
+.suggestion-item:hover {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.validation-error {
+  color: #dc3545;
+  font-size: 14px;
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+}
+
+.control-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+/* Selector Mode State */
+.selector-input-selector-mode {
+  padding: 20px;
+  text-align: center;
+}
+
+.selector-mode-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  color: #2c3e50;
+}
+
+.selector-mode-header p {
+  margin: 0 0 24px 0;
+  color: #6c757d;
+  font-size: 16px;
+}
+
+.selection-instructions {
+  margin-bottom: 32px;
+}
+
+.instruction-step {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.step-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #667eea;
+  color: white;
+  border-radius: 50%;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.step-text {
+  font-size: 16px;
+  color: #2c3e50;
+}
+
+.selection-controls {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+/* Validating State */
+.selector-input-validating {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.validation-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  color: #2c3e50;
+}
+
+.validation-header p {
+  margin: 0 0 32px 0;
+  color: #6c757d;
+  font-size: 16px;
+}
+
+.validation-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e9ecef;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.validation-progress p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 14px;
+}
+
+/* Error State */
+.selector-input-error {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.error-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  color: #dc3545;
+}
+
+.error-header p {
+  margin: 0 0 32px 0;
+  color: #6c757d;
+  font-size: 16px;
+}
+
+.error-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .selector-input-component {
+    padding: 16px;
+  }
+  
+  .control-buttons,
+  .selection-controls,
+  .error-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .selector-item {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+  
+  .selector-actions {
+    justify-content: center;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .selector-input-component {
+    color: #e9ecef;
+    background: #1a1a1a;
+  }
+  
+  .selector-text-display,
+  .saved-selectors,
+  .selector-input-section,
+  .instruction-step {
+    background: #2d2d2d;
+    border-color: #404040;
+  }
+  
+  .selector-item {
+    background: #2d2d2d;
+    border-color: #404040;
+  }
+  
+  .selector-text-input {
+    background: #2d2d2d;
+    border-color: #404040;
+    color: #e9ecef;
+  }
+  
+  .suggestion-item {
+    background: #2d2d2d;
+    border-color: #404040;
+    color: #e9ecef;
+  }
+  
+  .selector-title,
+  .step-text {
+    color: #e9ecef;
+  }
+}

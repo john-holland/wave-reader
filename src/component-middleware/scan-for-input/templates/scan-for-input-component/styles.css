@@ -1,0 +1,565 @@
+/* Scan For Input Component Styles */
+
+.scan-for-input-component {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #333;
+  line-height: 1.5;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Common button styles */
+.btn {
+  display: inline-block;
+  padding: 10px 20px;
+  margin: 8px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #5a6268;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(108, 117, 125, 0.4);
+}
+
+.btn-warning {
+  background: linear-gradient(135deg, #ff9a56, #ff6b6b);
+  color: white;
+}
+
+.btn-warning:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 154, 86, 0.4);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+  color: white;
+}
+
+.btn-danger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Idle State */
+.scan-for-input-idle {
+  padding: 24px;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.scan-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #2c3e50;
+  text-align: center;
+}
+
+.scan-header p {
+  margin: 0 0 24px 0;
+  color: #6c757d;
+  font-size: 16px;
+  text-align: center;
+}
+
+.shortcut-display {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+  border: 2px solid #e9ecef;
+  text-align: center;
+}
+
+.shortcut-display h4 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  color: #2c3e50;
+}
+
+.shortcut-text {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.no-shortcut {
+  color: #6c757d;
+  font-style: italic;
+  font-size: 16px;
+}
+
+.key {
+  display: inline-block;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border-radius: 6px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+  min-width: 32px;
+  text-align: center;
+}
+
+.scan-controls {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.shortcut-info {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e9ecef;
+}
+
+.shortcut-info p {
+  margin: 8px 0;
+  color: #495057;
+}
+
+.shortcut-info .hint {
+  color: #6c757d;
+  font-style: italic;
+  font-size: 14px;
+  margin-top: 16px;
+  text-align: center;
+}
+
+/* Scanning State */
+.scan-for-input-scanning {
+  padding: 24px;
+  background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(255, 193, 7, 0.2);
+}
+
+.scanning-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #856404;
+  text-align: center;
+}
+
+.scanning-header p {
+  margin: 0 0 24px 0;
+  color: #856404;
+  font-size: 16px;
+  text-align: center;
+}
+
+.scanning-progress {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+  border: 2px solid #ffc107;
+}
+
+.key-chord-display h4 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  color: #2c3e50;
+  text-align: center;
+}
+
+.key-chord {
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.waiting {
+  color: #6c757d;
+  font-style: italic;
+  font-size: 16px;
+}
+
+.key.pressed {
+  background: linear-gradient(135deg, #28a745, #20c997);
+  animation: keyPress 0.3s ease-in-out;
+  transform: scale(1.1);
+}
+
+@keyframes keyPress {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1.1); }
+}
+
+.scanning-status {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.status-indicator.scanning {
+  width: 20px;
+  height: 20px;
+  background: #ffc107;
+  border-radius: 50%;
+  margin: 0 auto 16px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.1); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.scanning-status p {
+  margin: 8px 0;
+  color: #495057;
+}
+
+.key-limit {
+  font-weight: 600;
+  color: #856404;
+  font-size: 18px;
+}
+
+.scanning-controls {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.scanning-instructions {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #ffc107;
+}
+
+.instruction {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 8px;
+  background: #fff8e1;
+  border-radius: 6px;
+}
+
+.instruction:last-child {
+  margin-bottom: 0;
+}
+
+.instruction-icon {
+  font-size: 20px;
+  width: 24px;
+  text-align: center;
+}
+
+/* Validating State */
+.scan-for-input-validating {
+  padding: 40px 24px;
+  text-align: center;
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(33, 150, 243, 0.2);
+}
+
+.validation-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #1565c0;
+}
+
+.validation-header p {
+  margin: 0 0 32px 0;
+  color: #1565c0;
+  font-size: 16px;
+}
+
+.validation-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e3f2fd;
+  border-top: 4px solid #2196f3;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.validation-progress p {
+  margin: 0;
+  color: #1565c0;
+  font-size: 16px;
+}
+
+/* Shortcut Conflict State */
+.scan-for-input-conflict {
+  padding: 24px;
+  background: linear-gradient(135deg, #ffebee, #ffcdd2);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(244, 67, 54, 0.2);
+}
+
+.conflict-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #c62828;
+  text-align: center;
+}
+
+.conflict-header p {
+  margin: 0 0 24px 0;
+  color: #c62828;
+  font-size: 16px;
+  text-align: center;
+}
+
+.conflict-details {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+  border: 2px solid #f44336;
+}
+
+.conflict-details h4 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  color: #2c3e50;
+}
+
+.conflict-list {
+  margin: 0;
+  padding-left: 20px;
+  color: #495057;
+}
+
+.conflict-list li {
+  margin-bottom: 8px;
+}
+
+.conflict-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+/* Shortcut Saved State */
+.scan-for-input-saved {
+  padding: 24px;
+  background: linear-gradient(135deg, #e8f5e8, #c8e6c9);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(76, 175, 80, 0.2);
+}
+
+.saved-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #2e7d32;
+  text-align: center;
+}
+
+.saved-header p {
+  margin: 0 0 24px 0;
+  color: #2e7d32;
+  font-size: 16px;
+  text-align: center;
+}
+
+.saved-shortcut {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+  border: 2px solid #4caf50;
+  text-align: center;
+}
+
+.saved-shortcut h4 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  color: #2c3e50;
+}
+
+.shortcut-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.saved-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+/* Error State */
+.scan-for-input-error {
+  padding: 40px 24px;
+  text-align: center;
+  background: linear-gradient(135deg, #ffebee, #ffcdd2);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(244, 67, 54, 0.2);
+}
+
+.error-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #c62828;
+}
+
+.error-header p {
+  margin: 0 0 32px 0;
+  color: #c62828;
+  font-size: 16px;
+}
+
+.error-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .scan-for-input-component {
+    padding: 16px;
+  }
+  
+  .scan-controls,
+  .scanning-controls,
+  .conflict-actions,
+  .saved-actions,
+  .error-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .btn {
+    width: 100%;
+    max-width: 300px;
+  }
+  
+  .key-chord {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .key {
+    min-width: 60px;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .scan-for-input-component {
+    color: #e9ecef;
+    background: #1a1a1a;
+  }
+  
+  .scan-for-input-idle {
+    background: linear-gradient(135deg, #2d2d2d, #404040);
+  }
+  
+  .shortcut-display,
+  .shortcut-info,
+  .scanning-progress,
+  .scanning-instructions,
+  .conflict-details,
+  .saved-shortcut {
+    background: #2d2d2d;
+    border-color: #404040;
+  }
+  
+  .scan-for-input-scanning {
+    background: linear-gradient(135deg, #3d2c02, #4d3c12);
+  }
+  
+  .scan-for-input-validating {
+    background: linear-gradient(135deg, #0d2b3d, #1b3c4d);
+  }
+  
+  .scan-for-input-conflict {
+    background: linear-gradient(135deg, #3d0a0a, #4d1a1a);
+  }
+  
+  .scan-for-input-saved {
+    background: linear-gradient(135deg, #0d2d0d, #1b3d1b);
+  }
+  
+  .scan-for-input-error {
+    background: linear-gradient(135deg, #3d0a0a, #4d1a1a);
+  }
+  
+  .scan-header h3,
+  .scanning-header h3,
+  .validation-header h3,
+  .conflict-header h3,
+  .saved-header h3,
+  .error-header h3 {
+    color: #e9ecef;
+  }
+  
+  .shortcut-info p,
+  .scanning-status p,
+  .validation-progress p {
+    color: #e9ecef;
+  }
+}

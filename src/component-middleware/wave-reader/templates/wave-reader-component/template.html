@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wave Reader - Motion Reader for Eye Tracking</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="wave-reader-container">
+        <div class="wave-reader-header">
+            <h1>🌊 Wave Reader</h1>
+            <p>Motion Reader for Eye Tracking</p>
+        </div>
+
+        <div class="wave-reader-content">
+            <!-- Main Interface -->
+            <div id="main-interface" class="wave-reader-idle">
+                <div class="idle-header">
+                    <h2>🌊 Wave Reader</h2>
+                    <p>Ready to start reading</p>
+                </div>
+                
+                <div class="selector-input-section">
+                    <h3>CSS Selector</h3>
+                    <input type="text" class="selector-input" id="selector" 
+                           placeholder="Enter CSS selector (e.g., p, h1, .content)" 
+                           value="p">
+                    
+                    <div class="control-buttons">
+                        <button class="btn btn-primary" onclick="startWaveReader()">
+                            🚀 Start Reading
+                        </button>
+                        <button class="btn btn-secondary" onclick="addSelector()">
+                            ➕ Add Selector
+                        </button>
+                        <button class="btn btn-secondary" onclick="showSettings()">
+                            ⚙️ Settings
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="selectors-list">
+                    <h4>Saved Selectors:</h4>
+                    <div id="selectors-container">
+                        <p>No selectors saved yet</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Interface (Hidden by default) -->
+            <div id="settings-interface" class="wave-reader-settings" style="display: none;">
+                <h2>⚙️ Settings</h2>
+                
+                <div class="settings-section">
+                    <h3>Wave Animation</h3>
+                    <div class="setting-group">
+                        <label for="wave-speed">Wave Speed (ms):</label>
+                        <input type="range" id="wave-speed" min="500" max="3000" step="100" 
+                               value="1000" onchange="updateWaveSpeed(this.value)">
+                        <span class="value-display">1000ms</span>
+                    </div>
+                    
+                    <div class="setting-group">
+                        <label for="wave-color">Wave Color:</label>
+                        <input type="color" id="wave-color" value="#667eea" 
+                               onchange="updateWaveColor(this.value)">
+                    </div>
+                    
+                    <div class="setting-group">
+                        <label for="wave-opacity">Wave Opacity:</label>
+                        <input type="range" id="wave-opacity" min="0.1" max="1.0" step="0.1" 
+                               value="0.8" onchange="updateWaveOpacity(this.value)">
+                        <span class="value-display">0.8</span>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>Notifications</h3>
+                    <div class="setting-group">
+                        <label>
+                            <input type="checkbox" id="show-notifications" checked 
+                                   onchange="updateShowNotifications(this.checked)">
+                            Show Notifications
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>Domain & Path</h3>
+                    <p><strong>Current Domain:</strong> <span id="current-domain">Not set</span></p>
+                    <p><strong>Current Path:</strong> <span id="current-path">Not set</span></p>
+                </div>
+                
+                <div class="settings-actions">
+                    <button class="btn btn-primary" onclick="saveSettings()">
+                        💾 Save Settings
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetToDefaults()">
+                        🔄 Reset to Defaults
+                    </button>
+                    <button class="btn btn-secondary" onclick="goBackToMain()">
+                        ← Back to Main
+                    </button>
+                </div>
+            </div>
+
+            <!-- Wave Animation Interface (Hidden by default) -->
+            <div id="wave-interface" class="wave-reader-waving" style="display: none;">
+                <div class="waving-header">
+                    <h2>🌊 Wave Reader Active</h2>
+                    <p>Currently reading: <span id="current-selector">p</span></p>
+                </div>
+                
+                <div class="wave-animation">
+                    <div class="wave-indicator">
+                        <div class="wave-dot active"></div>
+                        <div class="wave-dot"></div>
+                        <div class="wave-dot"></div>
+                        <div class="wave-dot"></div>
+                        <div class="wave-dot"></div>
+                    </div>
+                    <p class="wave-status">Reading in progress...</p>
+                </div>
+                
+                <div class="control-buttons">
+                    <button class="btn btn-success" onclick="stopWaveReader()">
+                        ⏹️ Stop Reading
+                    </button>
+                    <button class="btn btn-secondary" onclick="pauseWaveReader()">
+                        ⏸️ Pause
+                    </button>
+                </div>
+                
+                <div class="current-settings">
+                    <h4>Current Settings:</h4>
+                    <p><strong>Selector:</strong> <span id="active-selector">p</span></p>
+                    <p><strong>Speed:</strong> <span id="active-speed">1000ms</span></p>
+                    <p><strong>Color:</strong> <span class="color-preview" id="active-color-preview"></span> <span id="active-color">#667eea</span></p>
+                </div>
+            </div>
+
+            <!-- Selector Selection Interface (Hidden by default) -->
+            <div id="selection-interface" class="wave-reader-selector-selection" style="display: none;">
+                <div class="selection-header">
+                    <h2>🎯 Selector Selection Mode</h2>
+                    <p>Click on an element to select it</p>
+                </div>
+                
+                <div class="selection-instructions">
+                    <div class="instruction-step">
+                        <span class="step-number">1</span>
+                        <span class="step-text">Click on any element on the page</span>
+                    </div>
+                    <div class="instruction-step">
+                        <span class="step-number">2</span>
+                        <span class="step-text">The element will be highlighted</span>
+                    </div>
+                    <div class="instruction-step">
+                        <span class="step-number">3</span>
+                        <span class="step-text">Confirm your selection</span>
+                    </div>
+                </div>
+                
+                <div class="selection-controls">
+                    <button class="btn btn-primary" onclick="confirmSelection()">
+                        ✅ Confirm Selection
+                    </button>
+                    <button class="btn btn-secondary" onclick="cancelSelection()">
+                        ❌ Cancel Selection
+                    </button>
+                </div>
+                
+                <div class="current-selection">
+                    <h4>Current Selection:</h4>
+                    <p id="selected-element">No element selected yet</p>
+                    <p id="selected-selector">Selector: None</p>
+                </div>
+            </div>
+
+            <!-- Error Interface (Hidden by default) -->
+            <div id="error-interface" class="wave-reader-error" style="display: none;">
+                <div class="error-header">
+                    <h2>❌ Error Occurred</h2>
+                    <p>Something went wrong with the wave reader</p>
+                </div>
+                
+                <div class="error-details">
+                    <p><strong>Error Type:</strong> <span id="error-type">Unknown</span></p>
+                    <p><strong>Error Message:</strong> <span id="error-message">No error message available</span></p>
+                    <p><strong>Trace ID:</strong> <span id="error-trace-id">N/A</span></p>
+                </div>
+                
+                <div class="error-actions">
+                    <button class="btn btn-primary" onclick="retryOperation()">
+                        🔄 Retry
+                    </button>
+                    <button class="btn btn-secondary" onclick="goBackToMain()">
+                        ← Back to Main
+                    </button>
+                    <button class="btn btn-danger" onclick="reportError()">
+                        📧 Report Error
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Wave Reader Component JavaScript
+        
+        // State management
+        let currentState = 'idle';
+        let waveReaderActive = false;
+        let currentSelector = 'p';
+        let savedSelectors = ['p', 'h1', 'h2', 'h3', '.content', '.article'];
+        let settings = {
+            showNotifications: true,
+            waveSpeed: 1000,
+            waveColor: '#667eea',
+            waveOpacity: 0.8
+        };
+
+        // Initialize the component
+        function initializeComponent() {
+            updateSelectorsList();
+            updateActiveColorPreview();
+            loadSettings();
+        }
+
+        // Navigation functions
+        function showInterface(interfaceName) {
+            // Hide all interfaces
+            document.getElementById('main-interface').style.display = 'none';
+            document.getElementById('settings-interface').style.display = 'none';
+            document.getElementById('wave-interface').style.display = 'none';
+            document.getElementById('selection-interface').style.display = 'none';
+            document.getElementById('error-interface').style.display = 'none';
+            
+            // Show the requested interface
+            document.getElementById(interfaceName + '-interface').style.display = 'block';
+            
+            currentState = interfaceName;
+        }
+
+        function goBackToMain() {
+            showInterface('main');
+        }
+
+        function showSettings() {
+            showInterface('settings');
+        }
+
+        // Wave Reader functions
+        function startWaveReader() {
+            const selector = document.getElementById('selector').value;
+            if (!selector) {
+                alert('Please enter a CSS selector');
+                return;
+            }
+            
+            currentSelector = selector;
+            waveReaderActive = true;
+            
+            // Update the active selector display
+            document.getElementById('current-selector').textContent = selector;
+            document.getElementById('active-selector').textContent = selector;
+            document.getElementById('active-speed').textContent = settings.waveSpeed + 'ms';
+            document.getElementById('active-color').textContent = settings.waveColor;
+            
+            // Start wave animation
+            startWaveAnimation();
+            
+            // Show wave interface
+            showInterface('wave');
+            
+            // Send start message to API
+            fetch('/api/wave-reader/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    selector: selector,
+                    options: settings
+                })
+            }).then(response => response.json())
+              .then(data => {
+                  if (data.success) {
+                      console.log('Wave reader started:', data);
+                  }
+              })
+              .catch(error => {
+                  console.error('Failed to start wave reader:', error);
+                  showError('Start Error', 'Failed to start wave reader: ' + error.message);
+              });
+        }
+
+        function stopWaveReader() {
+            waveReaderActive = false;
+            stopWaveAnimation();
+            
+            // Send stop message to API
+            fetch('/api/wave-reader/stop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            }).then(response => response.json())
+              .then(data => {
+                  if (data.success) {
+                      console.log('Wave reader stopped:', data);
+                  }
+              })
+              .catch(error => {
+                  console.error('Failed to stop wave reader:', error);
+              });
+            
+            // Return to main interface
+            showInterface('main');
+        }
+
+        function pauseWaveReader() {
+            // Toggle pause state
+            if (waveReaderActive) {
+                waveReaderActive = false;
+                stopWaveAnimation();
+                document.querySelector('.wave-status').textContent = 'Paused';
+                document.querySelector('.btn-secondary').textContent = '▶️ Resume';
+            } else {
+                waveReaderActive = true;
+                startWaveAnimation();
+                document.querySelector('.wave-status').textContent = 'Reading in progress...';
+                document.querySelector('.btn-secondary').textContent = '⏸️ Pause';
+            }
+        }
+
+        // Wave animation functions
+        function startWaveAnimation() {
+            const dots = document.querySelectorAll('.wave-dot');
+            let currentDot = 0;
+            
+            const animation = setInterval(() => {
+                if (!waveReaderActive) {
+                    clearInterval(animation);
+                    return;
+                }
+                
+                // Remove active class from all dots
+                dots.forEach(dot => dot.classList.remove('active'));
+                
+                // Add active class to current dot
+                dots[currentDot].classList.add('active');
+                
+                // Move to next dot
+                currentDot = (currentDot + 1) % dots.length;
+            }, settings.waveSpeed / 5);
+        }
+
+        function stopWaveAnimation() {
+            const dots = document.querySelectorAll('.wave-dot');
+            dots.forEach(dot => dot.classList.remove('active'));
+        }
+
+        // Selector management functions
+        function addSelector() {
+            const selector = document.getElementById('selector').value;
+            if (!selector) {
+                alert('Please enter a CSS selector');
+                return;
+            }
+            
+            if (!savedSelectors.includes(selector)) {
+                savedSelectors.push(selector);
+                updateSelectorsList();
+                saveSelectorsToStorage();
+            } else {
+                alert('Selector already exists');
+            }
+        }
+
+        function removeSelector(selector) {
+            if (confirm('Remove selector: ' + selector + '?')) {
+                const index = savedSelectors.indexOf(selector);
+                if (index > -1) {
+                    savedSelectors.splice(index, 1);
+                    updateSelectorsList();
+                    saveSelectorsToStorage();
+                }
+            }
+        }
+
+        function useSelector(selector) {
+            document.getElementById('selector').value = selector;
+            currentSelector = selector;
+        }
+
+        function updateSelectorsList() {
+            const container = document.getElementById('selectors-container');
+            
+            if (savedSelectors.length === 0) {
+                container.innerHTML = '<p>No selectors saved yet</p>';
+                return;
+            }
+            
+            container.innerHTML = savedSelectors.map(selector => `
+                <div class="selector-item">
+                    <span class="selector-text">${selector}</span>
+                    <div class="selector-actions">
+                        <button class="btn btn-sm btn-secondary" onclick="useSelector('${selector}')">
+                            Use
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="removeSelector('${selector}')">
+                            Remove
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Settings functions
+        function updateWaveSpeed(value) {
+            settings.waveSpeed = parseInt(value);
+            document.querySelector('#wave-speed + .value-display').textContent = value + 'ms';
+        }
+
+        function updateWaveColor(value) {
+            settings.waveColor = value;
+            updateActiveColorPreview();
+        }
+
+        function updateWaveOpacity(value) {
+            settings.waveOpacity = parseFloat(value);
+            document.querySelector('#wave-opacity + .value-display').textContent = value;
+        }
+
+        function updateShowNotifications(checked) {
+            settings.showNotifications = checked;
+        }
+
+        function updateActiveColorPreview() {
+            const preview = document.getElementById('active-color-preview');
+            if (preview) {
+                preview.style.backgroundColor = settings.waveColor;
+            }
+        }
+
+        function saveSettings() {
+            // Save settings to localStorage
+            localStorage.setItem('waveReaderSettings', JSON.stringify(settings));
+            localStorage.setItem('waveReaderSelectors', JSON.stringify(savedSelectors));
+            
+            alert('Settings saved successfully!');
+        }
+
+        function loadSettings() {
+            // Load settings from localStorage
+            const savedSettings = localStorage.getItem('waveReaderSettings');
+            const savedSelectorsData = localStorage.getItem('waveReaderSelectors');
+            
+            if (savedSettings) {
+                settings = { ...settings, ...JSON.parse(savedSettings) };
+                
+                // Update UI elements
+                document.getElementById('wave-speed').value = settings.waveSpeed;
+                document.getElementById('wave-color').value = settings.waveColor;
+                document.getElementById('wave-opacity').value = settings.waveOpacity;
+                document.getElementById('show-notifications').checked = settings.showNotifications;
+                
+                // Update value displays
+                document.querySelector('#wave-speed + .value-display').textContent = settings.waveSpeed + 'ms';
+                document.querySelector('#wave-opacity + .value-display').textContent = settings.waveOpacity;
+            }
+            
+            if (savedSelectorsData) {
+                savedSelectors = JSON.parse(savedSelectorsData);
+                updateSelectorsList();
+            }
+        }
+
+        function resetToDefaults() {
+            if (confirm('Reset all settings to defaults?')) {
+                settings = {
+                    showNotifications: true,
+                    waveSpeed: 1000,
+                    waveColor: '#667eea',
+                    waveOpacity: 0.8
+                };
+                
+                savedSelectors = ['p', 'h1', 'h2', 'h3', '.content', '.article'];
+                
+                // Update UI
+                document.getElementById('wave-speed').value = settings.waveSpeed;
+                document.getElementById('wave-color').value = settings.waveColor;
+                document.getElementById('wave-opacity').value = settings.waveOpacity;
+                document.getElementById('show-notifications').checked = settings.showNotifications;
+                
+                document.querySelector('#wave-speed + .value-display').textContent = settings.waveSpeed + 'ms';
+                document.querySelector('#wave-opacity + .value-display').textContent = settings.waveOpacity;
+                
+                updateSelectorsList();
+                updateActiveColorPreview();
+                
+                alert('Settings reset to defaults');
+            }
+        }
+
+        function saveSelectorsToStorage() {
+            localStorage.setItem('waveReaderSelectors', JSON.stringify(savedSelectors));
+        }
+
+        // Error handling functions
+        function showError(errorType, errorMessage) {
+            document.getElementById('error-type').textContent = errorType;
+            document.getElementById('error-message').textContent = errorMessage;
+            document.getElementById('error-trace-id').textContent = Date.now().toString();
+            
+            showInterface('error');
+        }
+
+        function retryOperation() {
+            // Retry the last operation based on current state
+            if (currentState === 'error') {
+                goBackToMain();
+            }
+        }
+
+        function reportError() {
+            const errorType = document.getElementById('error-type').textContent;
+            const errorMessage = document.getElementById('error-message').textContent;
+            const traceId = document.getElementById('error-trace-id').textContent;
+            
+            // In a real application, this would send the error to a logging service
+            console.log('Error Report:', { errorType, errorMessage, traceId, timestamp: new Date().toISOString() });
+            
+            alert('Error reported. Thank you for your feedback.');
+        }
+
+        // Selector selection functions
+        function enterSelectorSelectionMode() {
+            showInterface('selection');
+            // In a real extension, this would activate the content script selector mode
+        }
+
+        function confirmSelection() {
+            // In a real extension, this would confirm the selected element
+            alert('Selection confirmed!');
+            goBackToMain();
+        }
+
+        function cancelSelection() {
+            goBackToMain();
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', initializeComponent);
+    </script>
+</body>
+</html>

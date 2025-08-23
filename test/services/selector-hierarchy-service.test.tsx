@@ -302,7 +302,7 @@ describe("selector quad service", () => {
                         uiRoot: shadowRoot,
                         renderFunction: (mount, component) => {
                             expect(mount).toBeDefined();
-                            render(component as ReactElement, { container: doc.documentElement, baseElement: mount });
+                            render(component as ReactElement, { container: mount, baseElement: mount });
                         }
                     })
 
@@ -315,7 +315,7 @@ describe("selector quad service", () => {
                         // todo: screen doesn't seem to register the provided jsdom,
                         //       so for any text verification, we'll just have to search the innerHTML etc
                         //       or use selector queries
-                        expect(doc.documentElement.innerHTML).toContain("test selector")
+                        expect(mount.innerHTML).toContain("test selector")
                     }, {timeout: 200, interval: 300}).then(resolve)
                 });
             })
@@ -345,7 +345,7 @@ describe("selector quad service", () => {
                         uiRoot: shadowRoot,
                         renderFunction: (mount, component) => {
                             expect(mount).toBeDefined();
-                            render(component as ReactElement, { container: doc.documentElement, baseElement: mount });
+                            render(component as ReactElement, { container: mount, baseElement: mount });
                         }
                     })
 
@@ -368,7 +368,7 @@ describe("selector quad service", () => {
                         uiRoot: shadowRoot,
                         renderFunction: (mount, component) => {
                             expect(mount).toBeDefined();
-                            render(component as ReactElement, { container: doc.documentElement, baseElement: mount });
+                            render(component as ReactElement, { container: mount, baseElement: mount });
                         }
                     })
 
@@ -380,7 +380,7 @@ describe("selector quad service", () => {
                     })
 
                     waitFor(async () => {
-                        expect(doc.documentElement.innerHTML).toContain("test selector")
+                        expect(mount.innerHTML).toContain("test selector")
                     }, {timeout: 200, interval: 300}).then(resolve)
                 });
             });
@@ -410,7 +410,7 @@ describe("selector quad service", () => {
         //                         }}
         //                         selectorModeOn={false} />,
         //                  {
-        //                             container: doc.documentElement,
+        //                             container: mount,
         //                             baseElement: mount
         //                         }
         //                 );
