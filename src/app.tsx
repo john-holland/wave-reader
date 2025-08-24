@@ -1,8 +1,8 @@
 import React, { FunctionComponent, useEffect, useState } from 'react'
 import styled from "styled-components";
 import './styles.scss';
-import SelectorInput from "./components/selector-input-new";
-import GoButton from "./components/go-button-new";
+import SelectorInput from "./components/selector-input";
+import GoButton from "./components/go-button";
 import StartMessage from "./models/messages/start";
 import Wave from "./models/wave";
 import Options from "./models/options";
@@ -16,9 +16,9 @@ import configured from './config/config';
 const isDevelopment = configured.mode !== 'production'; //process.env.NODE_ENV !== 'production';
 import { guardLastError } from "./util/util";
 import UpdateWaveMessage from "./models/messages/update-wave";
-import { Settings } from "./components/settings-new";
+import { Settings } from "./components/settings";
 
-import WaveTabs from './components/wave-tabs-new';
+import WaveTabs from './components/wave-tabs';
 import About from './components/about';
 import ErrorTestComponent from './components/ErrorTestComponent';
 import ErrorDemoComponent from './components/ErrorDemoComponent';

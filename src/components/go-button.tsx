@@ -1,6 +1,7 @@
-import React, {FunctionComponent, ReactNode, useEffect, useRef, useState} from "react";
+import React, { FunctionComponent, useEffect, useRef, useState, ReactNode } from "react";
 import styled from "styled-components";
-import {Button} from "@mui/material";
+import { Button } from "@mui/material";
+import { GoButtonTomes } from "../component-middleware/go-button/GoButtonTomes";
 
 type SelectorProps = {
     going: boolean,
@@ -13,8 +14,8 @@ export const Go = styled(Button)`
     width: 8rem;
     font-family: "Roboto","Helvetica","Arial",sans-serif;
     text-transform: uppercase;
-  
 `;
+
 const WaveTypography = styled.h2`
   display: inline;
   font-size: 5rem!important;
@@ -47,13 +48,11 @@ type WaveProps = {
     children?: ReactNode | any
 }
 
-/* eslint-disable  @typescript-eslint/no-unused-vars */
 const WaveSymbol = ({
  children
 }: WaveProps) => {
     return <WaveTypography>{children}</WaveTypography>;
 }
-
 
 const GoButton: FunctionComponent<SelectorProps> = ({ going, onGo, onStop }: SelectorProps) => {
     const [goDisplayText, setGoDisplayText] = useState('go!');
