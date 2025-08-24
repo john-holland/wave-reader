@@ -1,8 +1,8 @@
 import React, { FunctionComponent, useEffect, useState } from 'react'
 import styled from "styled-components";
 import './styles.scss';
-import SelectorInput from "./components/selector-input";
-import GoButton from "./components/go-button";
+import SelectorInput from "./components/selector-input-new";
+import GoButton from "./components/go-button-new";
 import StartMessage from "./models/messages/start";
 import Wave from "./models/wave";
 import Options from "./models/options";
@@ -16,9 +16,9 @@ import configured from './config/config';
 const isDevelopment = configured.mode !== 'production'; //process.env.NODE_ENV !== 'production';
 import { guardLastError } from "./util/util";
 import UpdateWaveMessage from "./models/messages/update-wave";
-import { Settings } from "./components/settings";
+import { Settings } from "./components/settings-new";
 
-import WaveTabs from './components/wave-tabs';
+import WaveTabs from './components/wave-tabs-new';
 import About from './components/about';
 import ErrorTestComponent from './components/ErrorTestComponent';
 import ErrorDemoComponent from './components/ErrorDemoComponent';
@@ -613,7 +613,7 @@ const App: FunctionComponent = () => {
                     selectors={selectors}
                     saved={saved}
                     selectorClicked={selectorClicked}
-                    onSave={async (selector) => selectorUpdated(new SelectorUpdated({ selector }))}
+                    onSave={async (selector: string) => selectorUpdated(new SelectorUpdated({ selector }))}
                     selectorModeClicked={selectorModeClicked}
                     selectorModeOn={selectorModeOn}
                 />
