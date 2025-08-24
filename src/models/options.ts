@@ -72,6 +72,16 @@ export const DeepEquals = (a: unknown, b: unknown): boolean => {
     return true;
 }
 
+// Domain/path-specific settings interface
+export interface DomainPathSettings {
+    domain: string;
+    path: string;
+    settings: Partial<Options>;
+    lastUpdated: number;
+    usageCount: number;
+    userRating: number;
+}
+
 export default class Options extends AttributeConstructor<Options> {
     defaultSettings: boolean = false;
     state: State | undefined = undefined;
@@ -81,6 +91,7 @@ export default class Options extends AttributeConstructor<Options> {
     wave: Wave = WaveDefaultFactory();
     toggleKeys: WaveToggleConfig = WaveToggleConfig.getDefaultConfig();
     selectors: string[] = SelectorsDefaultFactory();
+    domainPathSettings: Map<string, DomainPathSettings> = new Map();
 
     constructor(props: Partial<Options> = {}) {
         super(undefined);
@@ -96,5 +107,83 @@ export default class Options extends AttributeConstructor<Options> {
 
     public static OptionsEqual(a: Options, b: Options) {
         return DeepEquals(a, b);
+    }
+
+    /**
+     * Get or create domain/path-specific settings
+     */
+    public getDomainPathSettings(domain: string, path: string): Partial<Options> {
+        const key = this.generateDomainPathKey(domain, path);
+        const existing = this.domainPathSettings.get(key);
+        
+        if (existing) {
+            // Increment usage count
+            existing.usageCount++;
+            existing.lastUpdated = Date.now();
+            return existing.settings;
+        }
+        
+        // Return default settings if none exist
+        return {};
+    }
+
+    /**
+     * Set domain/path-specific settings
+     */
+    public setDomainPathSettings(domain: string, path: string, settings: Partial<Options>): void {
+        const key = this.generateDomainPathKey(domain, path);
+        const existing = this.domainPathSettings.get(key);
+        
+        if (existing) {
+            // Update existing settings
+            existing.settings = { ...existing.settings, ...settings };
+            existing.lastUpdated = Date.now();
+            existing.usageCount++;
+        } else {
+            // Create new domain/path settings
+            this.domainPathSettings.set(key, {
+                domain,
+                path,
+                settings: { ...settings },
+                lastUpdated: Date.now(),
+                usageCount: 1,
+                userRating: 5 // Default high rating for new settings
+            });
+        }
+    }
+
+    /**
+     * Generate a unique key for domain/path combination
+     */
+    private generateDomainPathKey(domain: string, path: string): string {
+        return `${domain}${path}`;
+    }
+
+    /**
+     * Get all domain/path settings
+     */
+    public getAllDomainPathSettings(): DomainPathSettings[] {
+        return Array.from(this.domainPathSettings.values());
+    }
+
+    /**
+     * Remove domain/path settings
+     */
+    public removeDomainPathSettings(domain: string, path: string): boolean {
+        const key = this.generateDomainPathKey(domain, path);
+        return this.domainPathSettings.delete(key);
+    }
+
+    /**
+     * Update user rating for domain/path settings
+     */
+    public updateDomainPathRating(domain: string, path: string, rating: number): void {
+        const key = this.generateDomainPathKey(domain, path);
+        const existing = this.domainPathSettings.get(key);
+        
+        if (existing) {
+            existing.userRating = Math.max(1, Math.min(5, rating)); // Clamp between 1-5
+            existing.lastUpdated = Date.now();
+        }
     }
 }

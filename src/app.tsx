@@ -561,6 +561,9 @@ const App: FunctionComponent = () => {
                 duration: 0,
                 userRating: 5 // High rating for user-initiated changes
             });
+            
+            // Save domain/path-specific settings for future use
+            await mlSettingsService.saveDomainPathSettings(domain, path, settings);
         } catch (error) {
             console.warn('Failed to record settings change for ML:', error);
         }
@@ -647,6 +650,15 @@ const App: FunctionComponent = () => {
                 previousPath,
                 options
             );
+            
+            // Check if we have domain/path-specific settings to load
+            const domainPathSettings = await mlSettingsService.getDomainPathSettings(domain, path, options);
+            if (domainPathSettings) {
+                // Apply domain/path-specific settings
+                const mergedSettings = new Options({ ...options, ...domainPathSettings });
+                setOptions(mergedSettings);
+                console.log(`🌊 Applied domain/path-specific settings for ${domain}${path}`);
+            }
         } catch (error) {
             console.warn('Failed to record domain path change for ML:', error);
         }

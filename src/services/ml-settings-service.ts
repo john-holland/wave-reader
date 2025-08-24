@@ -321,6 +321,22 @@ export class MLSettingsService {
             // Clean path to remove potential PII
             const cleanPath = this.cleanPath(path);
             
+            // Check for domain/path-specific settings first
+            if (existingSettings && !forceReset) {
+                const domainPathSettings = existingSettings.getDomainPathSettings?.(domain, cleanPath);
+                if (domainPathSettings && Object.keys(domainPathSettings).length > 0) {
+                    // Return domain/path-specific settings as high-confidence recommendation
+                    return [{
+                        confidence: 0.95,
+                        settings: domainPathSettings,
+                        reasoning: [`Using saved settings for ${domain}${cleanPath}`],
+                        similarPatterns: 1,
+                        isDefault: false,
+                        respectsUserSettings: true
+                    }];
+                }
+            }
+            
             // Record this behavior pattern
             const newPattern: UserBehaviorPattern = {
                 timestamp: Date.now(),
@@ -850,7 +866,53 @@ export class MLSettingsService {
         // Recalculate statistical bounds with new data
         this.calculateStatisticalBounds();
         
-        console.log(`🌊 ML: Recorded domain path change: ${previousDomain || 'unknown'}${previousPath || ''} → ${domain}${path}`);
+        console.log(`🌊 ML: Recorded domain path change: ${previousDomain || 'unknown'}${previousPath || ''} → ${domain}${cleanPath}`);
+    }
+
+    /**
+     * Save domain/path-specific settings for future use
+     */
+    async saveDomainPathSettings(
+        domain: string,
+        path: string,
+        settings: Partial<Options>,
+        userRating: number = 5
+    ): Promise<void> {
+        try {
+            const cleanPath = this.cleanPath(path);
+            
+            if (settings && typeof settings.setDomainPathSettings === 'function') {
+                settings.setDomainPathSettings(domain, cleanPath, settings);
+                console.log(`🌊 ML: Saved domain/path settings for ${domain}${cleanPath}`);
+            }
+        } catch (error) {
+            console.warn('Failed to save domain/path settings:', error);
+        }
+    }
+
+    /**
+     * Get domain/path-specific settings
+     */
+    async getDomainPathSettings(
+        domain: string,
+        path: string,
+        settings: Partial<Options>
+    ): Promise<Partial<Options> | null> {
+        try {
+            const cleanPath = this.cleanPath(path);
+            
+            if (settings && typeof settings.getDomainPathSettings === 'function') {
+                const domainPathSettings = settings.getDomainPathSettings(domain, cleanPath);
+                if (domainPathSettings && Object.keys(domainPathSettings).length > 0) {
+                    console.log(`🌊 ML: Retrieved domain/path settings for ${domain}${cleanPath}`);
+                    return domainPathSettings;
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to get domain/path settings:', error);
+        }
+        
+        return null;
     }
 }
 
