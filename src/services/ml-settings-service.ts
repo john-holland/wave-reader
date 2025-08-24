@@ -43,6 +43,80 @@ export class MLSettingsService {
         this.calculateStatisticalBounds();
     }
 
+    /**
+     * Scrub query parameters to remove potential PII
+     * @param url The URL to scrub
+     * @returns Cleaned URL without sensitive query parameters
+     */
+    private scrubQueryParameters(url: string): string {
+        try {
+            const urlObj = new URL(url);
+            const searchParams = urlObj.searchParams;
+            
+            // List of potentially sensitive query parameter names
+            const sensitiveParams = [
+                'token', 'auth', 'key', 'secret', 'password', 'passwd', 'pwd',
+                'session', 'sid', 'id', 'user', 'email', 'phone', 'mobile',
+                'tracking', 'utm_', 'fbclid', 'gclid', 'msclkid',
+                'ref', 'referrer', 'source', 'campaign',
+                'signature', 'hash', 'checksum', 'nonce',
+                'state', 'code', 'verification', 'confirm'
+            ];
+            
+            // Remove sensitive parameters
+            sensitiveParams.forEach(param => {
+                if (searchParams.has(param)) {
+                    searchParams.delete(param);
+                }
+            });
+            
+            // Remove any parameters that look like hashes or tokens (long alphanumeric strings)
+            const paramsToRemove: string[] = [];
+            searchParams.forEach((value, key) => {
+                // Check for long alphanumeric strings that might be tokens
+                if (value.length > 20 && /^[a-zA-Z0-9]+$/.test(value)) {
+                    paramsToRemove.push(key);
+                }
+                // Check for base64-like strings
+                if (value.length > 20 && /^[A-Za-z0-9+/=]+$/.test(value)) {
+                    paramsToRemove.push(key);
+                }
+            });
+            
+            paramsToRemove.forEach(param => searchParams.delete(param));
+            
+            return urlObj.toString();
+        } catch (error) {
+            // If URL parsing fails, return original URL
+            console.warn('Failed to parse URL for PII scrubbing:', error);
+            return url;
+        }
+    }
+
+    /**
+     * Clean a path by removing query parameters and scrubbing sensitive data
+     * @param path The path to clean
+     * @returns Cleaned path without sensitive query parameters
+     */
+    private cleanPath(path: string): string {
+        if (!path.includes('?')) {
+            return path;
+        }
+        
+        // Extract just the path part before query parameters
+        const pathOnly = path.split('?')[0];
+        
+        // If there are query parameters, scrub them
+        if (path.includes('?')) {
+            const fullUrl = `https://example.com${path}`;
+            const scrubbedUrl = this.scrubQueryParameters(fullUrl);
+            const scrubbedPath = scrubbedUrl.replace('https://example.com', '');
+            return scrubbedPath;
+        }
+        
+        return pathOnly;
+    }
+
     private initializeDefaultSettings(): void {
         this.defaultSettings = {
             wave: new Wave({
@@ -244,11 +318,14 @@ export class MLSettingsService {
         forceReset: boolean = false
     ): Promise<MLSettingsRecommendation[]> {
         try {
+            // Clean path to remove potential PII
+            const cleanPath = this.cleanPath(path);
+            
             // Record this behavior pattern
             const newPattern: UserBehaviorPattern = {
                 timestamp: Date.now(),
                 domain,
-                path,
+                path: cleanPath,
                 selector,
                 settings: existingSettings || {},
                 success: true,
@@ -309,11 +386,14 @@ export class MLSettingsService {
     }
 
     private findSimilarPatterns(domain: string, path: string, selector: string): UserBehaviorPattern[] {
+        // Clean the input path for comparison
+        const cleanPath = this.cleanPath(path);
+        
         return this.behaviorPatterns
             .filter(pattern => pattern.success && pattern.userRating >= 3)
             .sort((a, b) => {
-                const similarityA = this.calculateSimilarity(domain, path, selector, a);
-                const similarityB = this.calculateSimilarity(domain, path, selector, b);
+                const similarityA = this.calculateSimilarity(domain, cleanPath, selector, a);
+                const similarityB = this.calculateSimilarity(domain, cleanPath, selector, b);
                 return similarityB - similarityA;
             })
             .slice(0, 10); // Top 10 most similar patterns
@@ -657,6 +737,8 @@ export class MLSettingsService {
         artificialPatterns: number;
         userPatterns: number;
         averageConfidence: number;
+        piiScrubbingEnabled: boolean;
+        sensitiveParamsRemoved: string[];
     }> {
         const artificialCount = this.behaviorPatterns.length - (this.behaviorPatterns.length / (this.artificialWeightMultiplier + 1));
         const userCount = this.behaviorPatterns.length - artificialCount;
@@ -665,7 +747,13 @@ export class MLSettingsService {
             totalPatterns: this.behaviorPatterns.length,
             artificialPatterns: Math.round(artificialCount),
             userPatterns: Math.round(userCount),
-            averageConfidence: this.calculateAverageConfidence()
+            averageConfidence: this.calculateAverageConfidence(),
+            piiScrubbingEnabled: true,
+            sensitiveParamsRemoved: [
+                'token', 'auth', 'key', 'secret', 'password', 'session', 'id', 'user',
+                'email', 'phone', 'tracking', 'utm_', 'fbclid', 'gclid', 'msclkid',
+                'ref', 'referrer', 'source', 'campaign', 'signature', 'hash'
+            ]
         };
     }
 
@@ -732,10 +820,14 @@ export class MLSettingsService {
         previousPath?: string,
         userSettings?: Partial<Options>
     ): Promise<void> {
+        // Clean paths to remove potential PII
+        const cleanPath = this.cleanPath(path);
+        const cleanPreviousPath = previousPath ? this.cleanPath(previousPath) : undefined;
+        
         const pattern: UserBehaviorPattern = {
             timestamp: Date.now(),
             domain,
-            path,
+            path: cleanPath,
             selector: userSettings?.wave?.selector || 'p',
             settings: userSettings || {},
             success: true,
@@ -744,11 +836,11 @@ export class MLSettingsService {
         };
 
         // Add navigation context if we have previous location
-        if (previousDomain || previousPath) {
+        if (previousDomain || cleanPreviousPath) {
             // Store navigation context in a way that doesn't conflict with Options type
             (pattern.settings as any)._navigationContext = {
-                from: { domain: previousDomain, path: previousPath },
-                to: { domain, path },
+                from: { domain: previousDomain, path: cleanPreviousPath },
+                to: { domain, path: cleanPath },
                 timestamp: Date.now()
             };
         }
