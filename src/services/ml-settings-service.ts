@@ -720,6 +720,46 @@ export class MLSettingsService {
     public getStatisticalBounds(): StatisticalBounds {
         return { ...this.statisticalBounds };
     }
+
+    /**
+     * Record domain path change for ML warehousing
+     * This helps track user navigation patterns and improve recommendations
+     */
+    async recordDomainPathChange(
+        domain: string, 
+        path: string, 
+        previousDomain?: string, 
+        previousPath?: string,
+        userSettings?: Partial<Options>
+    ): Promise<void> {
+        const pattern: UserBehaviorPattern = {
+            timestamp: Date.now(),
+            domain,
+            path,
+            selector: userSettings?.wave?.selector || 'p',
+            settings: userSettings || {},
+            success: true,
+            duration: 0,
+            userRating: 0
+        };
+
+        // Add navigation context if we have previous location
+        if (previousDomain || previousPath) {
+            // Store navigation context in a way that doesn't conflict with Options type
+            (pattern.settings as any)._navigationContext = {
+                from: { domain: previousDomain, path: previousPath },
+                to: { domain, path },
+                timestamp: Date.now()
+            };
+        }
+
+        this.behaviorPatterns.push(pattern);
+        
+        // Recalculate statistical bounds with new data
+        this.calculateStatisticalBounds();
+        
+        console.log(`🌊 ML: Recorded domain path change: ${previousDomain || 'unknown'}${previousPath || ''} → ${domain}${path}`);
+    }
 }
 
 export default MLSettingsService;

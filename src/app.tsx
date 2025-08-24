@@ -27,6 +27,7 @@ import {CState, NameAccessMapInterface, Named, State, StateNames} from "./util/s
 import StateMachine from "./util/state-machine";
 
 import SettingsService from "./services/settings";
+import MLSettingsService from "./services/ml-settings-service";
 //import SelectorService from "./services/selector";
 import {Observer} from "rxjs";
 import RemoveSelectorMessage from "./models/messages/remove-selector";
@@ -43,6 +44,7 @@ const WaveReader = styled.div`
 `;
 
 const settingsService = new SettingsService();
+const mlSettingsService = new MLSettingsService();
 //const selectorService = new SelectorService(settingsService);
 
 const startPageCss = (wave: Wave) => {
@@ -547,11 +549,26 @@ const App: FunctionComponent = () => {
         setOptions(settings); // Update the local options state
         setSaved(true);
         
+        // Record settings change for ML warehousing
+        try {
+            await mlSettingsService.recordBehaviorPattern({
+                timestamp: Date.now(),
+                domain: domain,
+                path: path,
+                selector: settings.wave.selector as string,
+                settings: settings,
+                success: true,
+                duration: 0,
+                userRating: 5 // High rating for user-initiated changes
+            });
+        } catch (error) {
+            console.warn('Failed to record settings change for ML:', error);
+        }
         
         console.log("🌊 Popup: Settings saved successfully");
     };
 
-    const selectorUpdated = (message: SelectorUpdated) => {
+    const selectorUpdated = async (message: SelectorUpdated) => {
         console.log("🌊 Popup: selectorUpdated called with selector:", message.selector);
         
         // Update local state
@@ -569,6 +586,22 @@ const App: FunctionComponent = () => {
         
         // Handle the state machine update
         AppStateMachine.handleState(message);
+        
+        // Record selector change for ML warehousing
+        try {
+            await mlSettingsService.recordBehaviorPattern({
+                timestamp: Date.now(),
+                domain: domain,
+                path: path,
+                selector: message.selector || 'p',
+                settings: options,
+                success: true,
+                duration: 0,
+                userRating: 4 // Good rating for selector updates
+            });
+        } catch (error) {
+            console.warn('Failed to record selector change for ML:', error);
+        }
     }
 
     const onGo = () => {
@@ -598,9 +631,25 @@ const App: FunctionComponent = () => {
         }
     }, []);
 
-    const onDomainPathChange = (domain: string, path: string) => {
+    const onDomainPathChange = async (domain: string, path: string) => {
+        const previousDomain = domain;
+        const previousPath = path;
+        
         setDomain(domain);
         setPath(path);
+        
+        // Record domain path change for ML warehousing
+        try {
+            await mlSettingsService.recordDomainPathChange(
+                domain, 
+                path, 
+                previousDomain, 
+                previousPath,
+                options
+            );
+        } catch (error) {
+            console.warn('Failed to record domain path change for ML:', error);
+        }
     }
 
     return (
