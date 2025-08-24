@@ -1,19 +1,35 @@
 import React, { Component, ReactNode } from 'react';
+import ComponentMiddlewareErrorBoundary from '../component-middleware/error-boundary/ErrorBoundaryTomes';
 
 interface ErrorBoundaryState {
     hasError: boolean;
     error?: Error;
+    errorInfo?: React.ErrorInfo;
 }
 
 interface ErrorBoundaryProps {
     children: ReactNode;
     fallback?: ReactNode;
+    componentName?: string;
+    maxRecoveryAttempts?: number;
+    onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
+    onRecovery?: (attempts: number) => void;
+    onReset?: () => void;
+    enableDevelopmentMode?: boolean;
+    customErrorBoundaryId?: string;
 }
 
 // Check if we're in development mode - use a simple approach
 const isDevelopment = typeof window !== 'undefined' && window.location && 
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
+/**
+ * Legacy Error Boundary Component
+ * 
+ * This component maintains backward compatibility while providing access to
+ * the new component-middleware features. It wraps the new ErrorBoundary
+ * component and provides the same API.
+ */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     constructor(props: ErrorBoundaryProps) {
         super(props);
@@ -34,90 +50,44 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             console.error('🌊 ErrorBoundary error details:', errorInfo);
             console.error('🌊 ErrorBoundary error:', error);
         }
+        this.setState({ errorInfo });
+
+        // Call the onError callback if provided
+        if (this.props.onError) {
+            this.props.onError(error, errorInfo);
+        }
     }
 
     render() {
         if (this.state.hasError) {
-            // You can render any custom fallback UI
-            return this.props.fallback || (
-                <div style={{
-                    padding: '20px',
-                    border: '1px solid #ff6b6b',
-                    borderRadius: '8px',
-                    backgroundColor: '#fff5f5',
-                    color: '#d63031',
-                    margin: '10px',
-                    fontSize: '14px',
-                    position: 'fixed',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    zIndex: 10001,
-                    maxWidth: '400px',
-                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-                }}>
-                    <h3 style={{ margin: '0 0 10px 0', color: '#d63031' }}>
-                        🌊 Wave Reader Error
-                    </h3>
-                    <p style={{ margin: '0 0 10px 0' }}>
-                        Something went wrong with the selector UI. This might be due to:
-                    </p>
-                    <ul style={{ margin: '0 0 10px 0', paddingLeft: '20px' }}>
-                        <li>CSS injection issues in Shadow DOM</li>
-                        <li>React component mounting problems</li>
-                        <li>Browser compatibility issues</li>
-                    </ul>
-                    <button 
-                        onClick={() => this.setState({ hasError: false })}
-                        style={{
-                            padding: '8px 16px',
-                            backgroundColor: '#d63031',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            marginRight: '8px'
-                        }}
-                    >
-                        Try Again
-                    </button>
-                    <button 
-                        onClick={() => this.setState({ hasError: false, error: undefined })}
-                        style={{
-                            padding: '8px 16px',
-                            backgroundColor: '#6c757d',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '12px'
-                        }}
-                    >
-                        Dismiss
-                    </button>
-                    {isDevelopment && this.state.error && (
-                        <details style={{ marginTop: '10px', fontSize: '12px' }}>
-                            <summary style={{ cursor: 'pointer', color: '#d63031' }}>
-                                Error Details
-                            </summary>
-                            <pre style={{ 
-                                margin: '10px 0 0 0', 
-                                padding: '10px', 
-                                backgroundColor: '#f8f9fa',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                overflow: 'auto',
-                                maxHeight: '200px'
-                            }}>
-                                {this.state.error.toString()}
-                            </pre>
-                        </details>
-                    )}
-                </div>
+            // Use the new component-middleware error boundary
+            return (
+                <ComponentMiddlewareErrorBoundary
+                    componentName={this.props.componentName}
+                    maxRecoveryAttempts={this.props.maxRecoveryAttempts}
+                    onError={this.props.onError}
+                    onRecovery={this.props.onRecovery}
+                    onReset={this.props.onReset}
+                    enableDevelopmentMode={this.props.enableDevelopmentMode}
+                    customErrorBoundaryId={this.props.customErrorBoundaryId}
+                    fallback={this.props.fallback}
+                >
+                    {/* This won't render due to the error, but it maintains the component structure */}
+                    <div style={{ display: 'none' }} />
+                </ComponentMiddlewareErrorBoundary>
             );
         }
 
         return this.props.children;
     }
-} 
+}
+
+// Re-export the new component-middleware ErrorBoundary for direct use
+export { default as ModernErrorBoundary } from '../component-middleware/error-boundary/ErrorBoundaryTomes';
+
+// Re-export utility functions
+export { 
+    withErrorBoundary, 
+    useErrorBoundary, 
+    createErrorBoundary 
+} from '../component-middleware/error-boundary/ErrorBoundaryTomes'; 

@@ -1,196 +1,125 @@
-import React from 'react';
-import { TomeConnector, useTomeConnector } from './index';
-import { GoButtonTomes } from '../../component-middleware/go-button/GoButtonTomes';
+import React, { useState, useEffect } from 'react';
+import { createViewStateMachine } from 'log-view-machine';
 
 /**
- * Structural Example Component
- * 
- * Demonstrates how to use the structural system with tome integration.
- * This shows how components can be wrapped with TomeConnector to get
- * state management and logging capabilities.
+ * StructuralExample demonstrates the structural system patterns
+ * Note: Full structural system not yet available, using createViewStateMachine for now
  */
-
 export const StructuralExample: React.FC = () => {
-  const handleStateChange = (state: string, model: any) => {
-    console.log('Go Button state changed:', { state, model });
-  };
+  const [machineState, setMachineState] = useState('idle');
+  const [machine, setMachine] = useState<any>(null);
 
-  const handleLogEntry = (entry: any) => {
-    console.log('Go Button log entry:', entry);
+  useEffect(() => {
+    // Create a simple state machine using createViewStateMachine
+    const testMachine = createViewStateMachine({
+      machineId: 'structural-example',
+      xstateConfig: {
+        id: 'structural-example',
+        initial: 'idle',
+        states: {
+          idle: {
+            on: { ACTIVATE: 'active' }
+          },
+          active: {
+            on: { DEACTIVATE: 'idle', START: 'running' }
+          },
+          running: {
+            on: { STOP: 'active', ERROR: 'error' }
+          },
+          error: {
+            on: { RESTART: 'idle' }
+          }
+        }
+      }
+    });
+
+    setMachine(testMachine);
+    
+    // Get initial state
+    setMachineState('idle');
+    
+    console.log("🌊 Structural example machine created:", testMachine);
+    
+    return () => {
+      // Cleanup if needed
+      console.log("🌊 Cleaning up structural example machine");
+    };
+  }, []);
+
+  const sendEvent = (eventType: string) => {
+    if (machine) {
+      try {
+        // Try to use the machine's send method if available
+        if (typeof machine.send === 'function') {
+          machine.send({ type: eventType });
+          console.log(`🌊 Sent event: ${eventType}`);
+        } else {
+          console.log(`🌊 Machine send method not available, event: ${eventType}`);
+        }
+      } catch (error) {
+        console.error(`🌊 Error sending event ${eventType}:`, error);
+      }
+    }
   };
 
   return (
     <div className="structural-example">
       <h2>Structural System Example</h2>
-      <p>This demonstrates the integration between React components and log-view-machine tomes.</p>
+      <p>This demonstrates the structural system patterns that will be available in log-view-machine.</p>
       
       <div className="example-section">
-        <h3>Go Button with Tome Integration</h3>
-        <p>The go button below is wrapped with TomeConnector, giving it:</p>
+        <h3>Component Organization</h3>
+        <p>The structural system provides:</p>
         <ul>
-          <li>State management via log-view-machine</li>
-          <li>Built-in logging for debugging</li>
-          <li>Event-driven state transitions</li>
-          <li>Automatic view updates</li>
-          <li>Local component reference for performance</li>
-          <li>Copied logStates from the tome for consistency</li>
+          <li>Declarative application structure</li>
+          <li>Component-tome mapping</li>
+          <li>Automatic routing and navigation</li>
+          <li>State machine management</li>
         </ul>
-        
-        <TomeConnector
-          componentName="go-button"
-          initialModel={{
-            displayText: 'Start Waving!',
-            buttonSize: 'large',
-            buttonStyle: 'primary',
-            waveSymbol: '🌊'
-          }}
-          onStateChange={handleStateChange}
-          onLogEntry={handleLogEntry}
-        >
-          <div className="go-button-wrapper">
-            <button 
-              className="example-go-button"
-              onClick={() => {
-                // This would typically be handled by the tome
-                console.log('Go button clicked!');
-              }}
-            >
-              🌊 Start Waving!
-            </button>
-            <p className="example-description">
-              Click the button to see state changes and logging in the console.
-            </p>
-          </div>
-        </TomeConnector>
       </div>
-      
+
       <div className="example-section">
-        <h3>Direct Tome Usage</h3>
-        <p>You can also create and use tomes directly:</p>
-        
-        <div className="tome-example">
-          <button 
-            onClick={() => {
-              const tome = GoButtonTomes.create({
-                displayText: 'Custom Button',
-                buttonSize: 'small',
-                buttonStyle: 'secondary'
-              });
-              
-              console.log('Created tome:', tome);
-              
-              // Send events to the tome
-              if (tome && typeof (tome as any).send === 'function') {
-                (tome as any).send({ type: 'GO' });
-              } else {
-                console.log('Tome created but send method not available');
-              }
-            }}
-          >
-            Create and Use Tome
-          </button>
-          <p>Check the console to see the tome being created and used.</p>
+        <h3>Current Implementation</h3>
+        <p>Using createViewStateMachine from log-view-machine:</p>
+        <div className="state-machine-demo">
+          <p><strong>Current State:</strong> {machineState}</p>
+          <p><strong>Machine Status:</strong> {machine ? 'Created' : 'Not Created'}</p>
+          <div className="controls">
+            <button onClick={() => sendEvent('ACTIVATE')} disabled={machineState !== 'idle'}>
+              Activate
+            </button>
+            <button onClick={() => sendEvent('START')} disabled={machineState !== 'active'}>
+              Start
+            </button>
+            <button onClick={() => sendEvent('STOP')} disabled={machineState !== 'running'}>
+              Stop
+            </button>
+            <button onClick={() => sendEvent('DEACTIVATE')} disabled={machineState !== 'active'}>
+              Deactivate
+            </button>
+            <button onClick={() => sendEvent('ERROR')} disabled={machineState === 'error'}>
+              Trigger Error
+            </button>
+            <button onClick={() => sendEvent('RESTART')} disabled={machineState !== 'error'}>
+              Restart
+            </button>
+          </div>
+          <p className="note">
+            Note: This is a demonstration of createViewStateMachine. 
+            The full structural system will provide enhanced state management capabilities.
+          </p>
         </div>
       </div>
-      
-      <div className="example-section">
-        <h3>Using TomeConnector Hook</h3>
-        <p>You can also use the hook version for more control:</p>
-        
-        <TomeConnectorHookExample />
-      </div>
-      
-      <div className="example-section">
-        <h3>Component Structure</h3>
-        <p>The application follows this component hierarchy:</p>
-        <pre className="structure-tree">
-{`wave-tabs (navigation)
-├── wave-reader (main content)
-│   ├── go-button (control)
-│   └── selector-input (input)
-├── settings (configuration)
-└── about (information)
 
-background (services)
-└── interchange (communication)
-
-content (scripts)
-└── wave-reader-content
-    └── selector-hierarchy (content control)`}
-        </pre>
-      </div>
-      
       <div className="example-section">
-        <h3>Routing Configuration</h3>
-        <p>Routes are configured declaratively in the structure configuration:</p>
+        <h3>Future Features</h3>
+        <p>When the structural system is fully available, this will include:</p>
         <ul>
-          <li><code>/wave-tabs</code> - Main navigation</li>
-          <li><code>/wave-tabs/wave-reader</code> - Main content area</li>
-          <li><code>/wave-tabs/wave-reader/go-button</code> - Go button control</li>
-          <li><code>/wave-tabs/settings</code> - Settings panel</li>
-          <li><code>/wave-tabs/about</code> - About information</li>
+          <li>StructuralRouter with built-in navigation</li>
+          <li>StructuralTomeConnector for enhanced connectivity</li>
+          <li>Automatic state management</li>
+          <li>Type-safe configuration</li>
         </ul>
-      </div>
-      
-      <div className="example-section">
-        <h3>Next Steps</h3>
-        <p>To continue integrating the structural system:</p>
-        <ol>
-          <li>Wrap more components with TomeConnector</li>
-          <li>Create tomes for other components (selector-input, settings, etc.)</li>
-          <li>Use the AppRouter for navigation between components</li>
-          <li>Add more state management and logging to tomes</li>
-          <li>Customize the routing and navigation structure</li>
-        </ol>
-      </div>
-    </div>
-  );
-};
-
-// Example component using the TomeConnector hook
-const TomeConnectorHookExample: React.FC = () => {
-  const { 
-    currentState, 
-    model, 
-    sendEvent, 
-    updateModel, 
-    componentInstance,
-    getComponentMethod 
-  } = useTomeConnector('go-button');
-  
-  const handleClick = () => {
-    sendEvent({ type: 'GO' });
-  };
-  
-  const updateText = (newText: string) => {
-    updateModel({ displayText: newText });
-  };
-  
-  const handleCustomMethod = () => {
-    // Try to get a custom method from the component instance
-    const customMethod = getComponentMethod('customMethod');
-    if (customMethod) {
-      customMethod();
-    } else {
-      console.log('Custom method not available');
-    }
-  };
-  
-  return (
-    <div className="hook-example">
-      <h4>Hook-based TomeConnector</h4>
-      <p>Current State: <strong>{currentState}</strong></p>
-      <p>Display Text: <strong>{model.displayText || 'Not set'}</strong></p>
-      
-      <div className="hook-controls">
-        <button onClick={handleClick}>Send GO Event</button>
-        <button onClick={() => updateText('Updated Text!')}>Update Text</button>
-        <button onClick={handleCustomMethod}>Try Custom Method</button>
-      </div>
-      
-      <div className="hook-info">
-        <p><strong>Component Instance:</strong> {componentInstance ? 'Available' : 'Not available'}</p>
-        <p><strong>Model Keys:</strong> {Object.keys(model).join(', ') || 'None'}</p>
       </div>
     </div>
   );

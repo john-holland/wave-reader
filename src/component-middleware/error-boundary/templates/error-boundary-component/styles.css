@@ -1,0 +1,545 @@
+/* Error Boundary Component Styles */
+/* Comprehensive styling for all error boundary states and views */
+
+/* Base Error Boundary Styles */
+.error-boundary-normal,
+.error-boundary-recovering {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  margin: 2rem 0;
+  text-align: center;
+}
+
+/* Normal State Styles */
+.normal-content {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: rgba(76, 175, 80, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.status-icon {
+  font-size: 2rem;
+  animation: pulse 2s infinite;
+}
+
+.status-text {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #2e7d32;
+}
+
+.normal-description {
+  margin: 0 0 2rem 0;
+  color: #555;
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.boundary-info {
+  text-align: left;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 8px;
+  padding: 1.5rem;
+  border-left: 4px solid #667eea;
+}
+
+.boundary-info h4 {
+  margin: 0 0 1rem 0;
+  color: #667eea;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.boundary-info ul {
+  margin: 0;
+  padding-left: 1.5rem;
+  color: #555;
+}
+
+.boundary-info li {
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+}
+
+/* Recovering State Styles */
+.recovering-content {
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.recovering-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  animation: spin 1s linear infinite;
+}
+
+.recovering-content h3 {
+  margin: 0 0 0.5rem 0;
+  color: #ff9800;
+  font-size: 1.8rem;
+  font-weight: 600;
+}
+
+.recovering-content p {
+  margin: 0 0 1.5rem 0;
+  color: #666;
+  font-size: 1.1rem;
+}
+
+.recovering-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(102, 126, 234, 0.2);
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  margin: 1rem auto;
+  animation: spin 1s linear infinite;
+}
+
+.recovering-note {
+  margin: 1rem 0 0 0;
+  color: #666;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+/* Generic Editor Integration */
+.generic-editor.error-editor {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+}
+
+.generic-editor.error-editor.max-retries {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+}
+
+.generic-editor.error-editor.development {
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+}
+
+/* Error Content Enhancements */
+.error-content {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  text-align: center;
+}
+
+.error-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  animation: pulse 2s infinite;
+}
+
+.error-content h2 {
+  margin: 0 0 1rem 0;
+  color: #d63031;
+  font-size: 1.8rem;
+  font-weight: 600;
+}
+
+.error-content p {
+  margin: 0 0 1.5rem 0;
+  color: #555;
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+/* Error Actions */
+.error-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin: 2rem 0;
+  flex-wrap: wrap;
+}
+
+/* Button Styles */
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 120px;
+  justify-content: center;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #5a6fd8, #6a4190);
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, #6c757d, #495057);
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: linear-gradient(135deg, #5a6268, #343a40);
+}
+
+.btn-warning {
+  background: linear-gradient(135deg, #ffc107, #e0a800);
+  color: #212529;
+}
+
+.btn-info {
+  background: linear-gradient(135deg, #17a2b8, #138496);
+  color: white;
+}
+
+/* Error Info */
+.error-info {
+  margin: 2rem 0;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.error-info h4 {
+  margin: 0 0 1rem 0;
+  color: #d63031;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.error-info ul {
+  margin: 0;
+  padding-left: 1.5rem;
+  color: #555;
+}
+
+.error-info li {
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+}
+
+/* Error Details */
+.error-details {
+  margin: 2rem 0;
+  text-align: left;
+}
+
+.error-summary {
+  cursor: pointer;
+  color: #d63031;
+  font-weight: 600;
+  font-size: 1.1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+.error-summary:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+}
+
+.error-stack-container {
+  margin-top: 1rem;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.error-stack-section {
+  margin-bottom: 1.5rem;
+}
+
+.error-stack-section:last-child {
+  margin-bottom: 0;
+}
+
+.error-stack-section h4 {
+  margin: 0 0 0.5rem 0;
+  color: #d63031;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.error-stack {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 1rem;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  overflow-x: auto;
+  max-height: 200px;
+  overflow-y: auto;
+  color: #495057;
+  margin: 0;
+}
+
+/* Development View Styles */
+.development-info {
+  margin: 2rem 0;
+  text-align: left;
+  background: rgba(52, 152, 219, 0.1);
+  border-radius: 8px;
+  padding: 1.5rem;
+  border-left: 4px solid #3498db;
+}
+
+.development-info h4 {
+  margin: 0 0 1rem 0;
+  color: #3498db;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.state-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.state-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid rgba(52, 152, 219, 0.2);
+}
+
+.state-label {
+  font-weight: 600;
+  color: #333;
+}
+
+.state-value {
+  color: #3498db;
+  font-weight: 500;
+}
+
+/* Animations */
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .error-boundary-normal,
+  .error-boundary-recovering {
+    padding: 1.5rem;
+    margin: 1rem 0;
+  }
+  
+  .error-content {
+    padding: 1.5rem;
+  }
+  
+  .error-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .btn {
+    width: 100%;
+    max-width: 300px;
+  }
+  
+  .state-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .boundary-info,
+  .development-info {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .error-boundary-normal,
+  .error-boundary-recovering {
+    padding: 1rem;
+  }
+  
+  .error-content {
+    padding: 1rem;
+  }
+  
+  .error-icon {
+    font-size: 3rem;
+  }
+  
+  .error-content h2 {
+    font-size: 1.5rem;
+  }
+  
+  .recovering-icon {
+    font-size: 2.5rem;
+  }
+  
+  .recovering-content h3 {
+    font-size: 1.5rem;
+  }
+  
+  .status-icon {
+    font-size: 1.5rem;
+  }
+  
+  .status-text {
+    font-size: 1rem;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .error-boundary-normal,
+  .error-boundary-recovering {
+    background: rgba(44, 62, 80, 0.95);
+    color: #ecf0f1;
+  }
+  
+  .status-indicator {
+    background: rgba(76, 175, 80, 0.2);
+    border-color: rgba(76, 175, 80, 0.5);
+  }
+  
+  .status-text {
+    color: #81c784;
+  }
+  
+  .boundary-info {
+    background: rgba(116, 185, 255, 0.2);
+    border-left-color: #74b9ff;
+  }
+  
+  .boundary-info h4 {
+    color: #74b9ff;
+  }
+  
+  .boundary-info ul {
+    color: #ecf0f1;
+  }
+  
+  .recovering-content h3 {
+    color: #ffb74d;
+  }
+  
+  .recovering-spinner {
+    border-color: rgba(116, 185, 255, 0.3);
+    border-top-color: #74b9ff;
+  }
+  
+  .error-stack {
+    background: #34495e;
+    color: #ecf0f1;
+    border-color: #2c3e50;
+  }
+  
+  .state-item {
+    background: #34495e;
+    color: #ecf0f1;
+    border-color: #74b9ff;
+  }
+  
+  .state-label {
+    color: #ecf0f1;
+  }
+  
+  .state-value {
+    color: #74b9ff;
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .status-icon,
+  .error-icon {
+    animation: none;
+  }
+  
+  .recovering-icon,
+  .recovering-spinner {
+    animation: none;
+  }
+  
+  .btn:hover {
+    transform: none;
+  }
+  
+  .error-summary:hover {
+    transform: none;
+  }
+}
+
+/* Focus States */
+.btn:focus,
+.error-summary:focus {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+/* Print Styles */
+@media print {
+  .error-boundary-normal,
+  .error-boundary-recovering {
+    background: white;
+    color: black;
+  }
+  
+  .btn,
+  .error-actions {
+    display: none;
+  }
+  
+  .recovering-spinner {
+    display: none;
+  }
+}

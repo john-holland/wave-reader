@@ -1,34 +1,24 @@
-// First-class structural system from log-view-machine
-export {
-  StructuralRouter,
-  Route,
-  RouteFallback,
-  useRouter,
-  StructuralTomeConnector,
-  useStructuralTomeConnector,
-  StructuralSystem,
-  createStructuralSystem,
-  useStructuralSystem,
-  DefaultStructuralConfig,
-  createStructuralConfig,
-  type AppStructureConfig,
-  type AppStructureNode,
-  type ComponentTomeMapping,
-  type RouteConfig,
-  type NavigationItem,
-  type RoutingConfig,
-  type TomeDefinition
-} from 'log-view-machine';
+// Structural system components
+// Note: Full structural system from log-view-machine not yet available in published package
+// Using createViewStateMachine that is available
 
-// Legacy exports for backward compatibility
-export { default as AppRouter } from './AppRouter';
-export { default as TomeConnector } from './TomeConnector';
-export { useTomeConnector } from './TomeConnector';
+// Export createViewStateMachine from log-view-machine
+export { createViewStateMachine } from 'log-view-machine';
 
-// Configuration exports
+// Export existing structural components
 export {
   AppStructure,
   ComponentTomeMapping,
   RoutingConfig,
   TomeConfig
 } from './app-structure';
+
+// Export the structural example
+export { default as StructuralExample } from './StructuralExample';
+
+// TODO: When structural system is available in log-view-machine, update to include:
+// - StructuralRouter
+// - StructuralTomeConnector  
+// - StructuralSystem
+// - createStructuralConfig
+// - And all associated types

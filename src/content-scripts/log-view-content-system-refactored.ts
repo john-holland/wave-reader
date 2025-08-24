@@ -164,7 +164,7 @@ export class LogViewContentSystem {
         const result = await this.viewStateMachine.processMessage(messageData, 'extension');
         
         // Execute actions
-        await this.actionExecutor.executeActions(result.actions);
+        await this.actionExecutor.executeActions(result.actions.map(action => action.type));
         
         // Render views
         this.viewRenderer.renderViews(result.views, this.shadowRoot!);
@@ -183,7 +183,7 @@ export class LogViewContentSystem {
         const result = await this.viewStateMachine.processMessage(message, 'popup');
         
         // Execute actions
-        await this.actionExecutor.executeActions(result.actions);
+        await this.actionExecutor.executeActions(result.actions.map(action => action.type));
         
         // Render views
         this.viewRenderer.renderViews(result.views, this.shadowRoot!);
@@ -336,8 +336,8 @@ export class LogViewContentSystem {
             this.logMessage('ml-applied', `Applied ML recommendation with confidence ${recommendation.confidence}`);
             
             // Apply wave animation if currently active
-            const currentState = this.overarchingMachine.getCurrentState();
-            if (currentState.subMachines.content.waveAnimation.isActive) {
+            const currentState = this.getCurrentState();
+            if (currentState && currentState.subMachines && currentState.subMachines.content && currentState.subMachines.content.waveAnimation && currentState.subMachines.content.waveAnimation.isActive) {
                 await this.startWaveAnimation(recommendation.settings);
             }
         }
@@ -361,11 +361,11 @@ export class LogViewContentSystem {
 
     // Public methods for external access
     public getCurrentState() {
-        return this.overarchingMachine.getCurrentState();
+        return this.viewStateMachine ? this.viewStateMachine.getCurrentState() : { name: 'base', subMachines: {} };
     }
 
     public getCurrentViews() {
-        return this.overarchingMachine.getCurrentViews();
+        return this.viewStateMachine ? this.viewStateMachine.getCurrentViews() : [];
     }
 
     public getSessionId() {
@@ -379,7 +379,7 @@ export class LogViewContentSystem {
             shadowRoot: !!this.shadowRoot,
             selectorService: !!this.hierarchySelectorService,
             mlService: !!this.mlService,
-            overarchingMachine: this.overarchingMachine.getHealthStatus(),
+            overarchingMachine: this.viewStateMachine ? this.viewStateMachine.getHealthStatus() : { status: 'not-available' },
             robotProxy: await this.robotProxy.healthCheck()
         };
     }
@@ -397,7 +397,9 @@ export class LogViewContentSystem {
         }
         
         // Destroy state machines
-        this.overarchingMachine.destroy();
+        if (this.viewStateMachine) {
+            this.viewStateMachine.destroy();
+        }
         this.robotProxy.destroy();
         
         this.logMessage('system-destroyed', 'Refactored content system destroyed');
@@ -474,9 +476,9 @@ class ViewRenderer {
 
 // Action Executor for handling action execution
 class ActionExecutor {
-    private contentSystem: LogViewContentSystemRefactored;
+    private contentSystem: LogViewContentSystem;
 
-    constructor(contentSystem: LogViewContentSystemRefactored) {
+    constructor(contentSystem: LogViewContentSystem) {
         this.contentSystem = contentSystem;
     }
 
@@ -532,11 +534,11 @@ console.log("🌊 Refactored Log-View: Initializing content system...");
 // Wait for DOM to be ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        new LogViewContentSystemRefactored();
+        new LogViewContentSystem();
     });
 } else {
-    new LogViewContentSystemRefactored();
+    new LogViewContentSystem();
 }
 
 // Export for testing
-export default LogViewContentSystemRefactored;
+export default LogViewContentSystem;

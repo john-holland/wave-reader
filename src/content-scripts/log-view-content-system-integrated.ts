@@ -1,9 +1,5 @@
 import { 
-  createViewStateMachine,
-  StructuralSystem,
-  StructuralTomeConnector,
-  createStructuralConfig,
-  type AppStructureConfig
+  createViewStateMachine
 } from 'log-view-machine';
 import { ChromeRobotProxyMachine } from '../util/robot-proxy-machine';
 import { LogViewMessageUtility } from '../util/log-view-messages';
@@ -16,79 +12,10 @@ import Wave from '../models/wave';
 import Options from '../models/options';
 
 // 🎯 IMPROVEMENT: Use official createViewStateMachine from log-view-machine
-// 🎯 IMPROVEMENT: Integrate with structural system for better organization
+// 🎯 NOTE: Structural system components not yet available in published package
+// Using createViewStateMachine for now, will integrate structural system when available
 
-// Content System Structural Configuration
-const ContentSystemConfig: AppStructureConfig = createStructuralConfig({
-  AppStructure: {
-    id: 'log-view-content-system',
-    name: 'Log View Content System',
-    type: 'application',
-    routing: {
-      base: '/',
-      defaultRoute: '/content'
-    }
-  },
-
-  ComponentTomeMapping: {
-    'content-system': {
-      componentPath: 'src/content-scripts/ContentSystemComponent.tsx',
-      tomePath: 'src/content-scripts/ContentSystemTome.tsx',
-      templatePath: 'src/content-scripts/templates/content-system/'
-    },
-    'wave-reader': {
-      componentPath: 'src/content-scripts/WaveReaderComponent.tsx',
-      tomePath: 'src/content-scripts/WaveReaderTome.tsx',
-      templatePath: 'src/content-scripts/templates/wave-reader/'
-    },
-    'selector-ui': {
-      componentPath: 'src/content-scripts/SelectorUIComponent.tsx',
-      tomePath: 'src/content-scripts/SelectorUITome.tsx',
-      templatePath: 'src/content-scripts/templates/selector-ui/'
-    }
-  },
-
-  RoutingConfig: {
-    routes: [
-      { path: '/', redirect: '/content' },
-      { path: '/content', component: 'content-system' },
-      { path: '/wave-reader', component: 'wave-reader' },
-      { path: '/selector-ui', component: 'selector-ui' }
-    ],
-    navigation: {
-      primary: [
-        { id: 'content', label: 'Content System', path: '/content', icon: '📖' },
-        { id: 'wave-reader', label: 'Wave Reader', path: '/wave-reader', icon: '🌊' },
-        { id: 'selector-ui', label: 'Selector UI', path: '/selector-ui', icon: '🎯' }
-      ]
-    }
-  },
-
-  TomeConfig: {
-    tomes: {
-      'content-system-tome': {
-        machineId: 'content-system',
-        description: 'Manages content system state and lifecycle',
-        states: ['idle', 'initializing', 'active', 'error', 'shutdown'],
-        events: ['INIT', 'ACTIVATE', 'DEACTIVATE', 'ERROR', 'SHUTDOWN', 'RESTART']
-      },
-      'wave-reader-tome': {
-        machineId: 'wave-reader',
-        description: 'Manages wave reading functionality',
-        states: ['idle', 'reading', 'paused', 'stopped', 'error'],
-        events: ['START_READING', 'PAUSE_READING', 'STOP_READING', 'ERROR', 'RESTART']
-      },
-      'selector-ui-tome': {
-        machineId: 'selector-ui',
-        description: 'Manages element selector UI',
-        states: ['hidden', 'visible', 'selecting', 'selected', 'error'],
-        events: ['SHOW', 'HIDE', 'START_SELECTION', 'ELEMENT_SELECTED', 'ERROR', 'RESET']
-      }
-    }
-  }
-});
-
-// 🎯 IMPROVEMENT: Enhanced content system using structural system
+// Content System using createViewStateMachine
 export class LogViewContentSystemIntegrated {
   private shadowRoot: ShadowRoot | null = null;
   private shadowStyleElement: HTMLStyleElement | null = null;
@@ -100,14 +27,12 @@ export class LogViewContentSystemIntegrated {
   private mlService: MLSettingsService;
   private sessionId: string;
   
-  // 🎯 IMPROVEMENT: Use structural system instead of manual state machine
-  private structuralSystem: StructuralSystem;
+  // 🎯 IMPROVEMENT: Use createViewStateMachine for state management
+  private viewStateMachine: any;
   private robotProxy: ChromeRobotProxyMachine;
-  private viewRenderer: ViewRenderer;
-  private actionExecutor: ActionExecutor;
 
   constructor() {
-    console.log("🌊 Creating Integrated Log-View Content System with Structural System...");
+    console.log("🌊 Creating Integrated Log-View Content System with createViewStateMachine...");
     
     // Initialize services
     const colorService = new SimpleColorServiceAdapter();
@@ -115,13 +40,8 @@ export class LogViewContentSystemIntegrated {
     this.mlService = new MLSettingsService();
     this.sessionId = this.generateSessionId();
     
-    // 🎯 IMPROVEMENT: Initialize structural system instead of manual state machine
-    this.structuralSystem = new StructuralSystem(ContentSystemConfig);
+    // 🎯 IMPROVEMENT: Initialize with createViewStateMachine
     this.robotProxy = new ChromeRobotProxyMachine();
-    
-    // Initialize view renderer and action executor
-    this.viewRenderer = new ViewRenderer();
-    this.actionExecutor = new ActionExecutor(this);
     
     // Initialize the system
     this.init();
@@ -160,93 +80,75 @@ export class LogViewContentSystemIntegrated {
     // Create style elements
     this.createStyleElements();
     
-    // 🎯 IMPROVEMENT: Initialize structural system machines
-    this.initializeStructuralMachines();
+    // 🎯 IMPROVEMENT: Initialize with createViewStateMachine
+    this.initializeStateMachine();
     
     // Log system initialization
     this.logMessage('system-init', 'Integrated content system initialized successfully');
   }
 
-  // 🎯 IMPROVEMENT: Initialize machines using structural system
-  private initializeStructuralMachines() {
+  // 🎯 IMPROVEMENT: Initialize using createViewStateMachine
+  private initializeStateMachine() {
     try {
-      // Create the main content system machine
-      const contentMachine = this.structuralSystem.createMachine('content-system', {
-        sessionId: this.sessionId,
-        robotProxy: this.robotProxy,
-        hierarchySelectorService: this.hierarchySelectorService,
-        mlService: this.mlService
+      // Create a state machine using createViewStateMachine
+      this.viewStateMachine = createViewStateMachine({
+        machineId: 'content-system-integrated',
+        xstateConfig: {
+          id: 'content-system-integrated',
+          initial: 'idle',
+          states: {
+            idle: {
+              on: { ACTIVATE: 'active' }
+            },
+            active: {
+              on: { DEACTIVATE: 'idle', START_READING: 'reading', START_SELECTION: 'selecting' }
+            },
+            reading: {
+              on: { STOP_READING: 'active', ERROR: 'error' }
+            },
+            selecting: {
+              on: { ELEMENT_SELECTED: 'active', ERROR: 'error' }
+            },
+            error: {
+              on: { RESTART: 'idle' }
+            }
+          }
+        }
       });
-
-      if (contentMachine) {
-        console.log("🌊 Content system machine created successfully");
-        // Start the machine
-        contentMachine.start();
-      }
-
-      // Create wave reader machine
-      const waveReaderMachine = this.structuralSystem.createMachine('wave-reader', {
-        sessionId: this.sessionId,
-        robotProxy: this.robotProxy
-      });
-
-      if (waveReaderMachine) {
-        console.log("🌊 Wave reader machine created successfully");
-        waveReaderMachine.start();
-      }
-
-      // Create selector UI machine
-      const selectorUIMachine = this.structuralSystem.createMachine('selector-ui', {
-        sessionId: this.sessionId,
-        hierarchySelectorService: this.hierarchySelectorService
-      });
-
-      if (selectorUIMachine) {
-        console.log("🌊 Selector UI machine created successfully");
-        selectorUIMachine.start();
-      }
-
+      
+      console.log("🌊 Content system initialized with createViewStateMachine");
+      
     } catch (error) {
-      console.error("🌊 Error initializing structural machines:", error);
+      console.error("🌊 Error initializing state machine:", error);
     }
   }
 
-  // 🎯 IMPROVEMENT: Enhanced message processing using structural system
+  // 🎯 IMPROVEMENT: Enhanced message processing using createViewStateMachine
   async processMessage(message: any, source: string): Promise<any> {
     console.log(`🌊 Integrated Content System: Processing message from ${source}:`, message.name);
     
     try {
-      // Get the appropriate machine based on message type
-      let targetMachine = null;
-      
-      if (message.name.includes('WAVE') || message.name.includes('READING')) {
-        targetMachine = this.structuralSystem.getMachine('wave-reader');
-      } else if (message.name.includes('SELECTOR') || message.name.includes('UI')) {
-        targetMachine = this.structuralSystem.getMachine('selector-ui');
-      } else {
-        targetMachine = this.structuralSystem.getMachine('content-system');
-      }
-
-      if (targetMachine) {
-        // Send the message to the appropriate machine
-        await targetMachine.send({ type: message.name, payload: message });
+      // Process message using createViewStateMachine
+      if (this.viewStateMachine) {
+        // Send event to the state machine
+        await this.viewStateMachine.send({ type: message.name, payload: message });
         
-        // Get current state from the machine
-        const currentState = targetMachine.getState()?.value || 'idle';
-        const context = targetMachine.getState()?.context || {};
-        
-        // Generate views and actions based on the new state
-        const views = this.generateViewsForState(currentState, message, context);
-        const actions = this.generateActionsForMessage(message, currentState);
+        // Get current state
+        const currentState = this.viewStateMachine.getState()?.value || 'idle';
+        const context = this.viewStateMachine.getState()?.context || {};
         
         return {
           newState: { name: currentState, context },
-          views,
-          actions
+          views: this.generateViewsForState(currentState, message, context),
+          actions: this.generateActionsForMessage(message, currentState)
         };
       }
       
-      return { newState: { name: 'idle' }, views: [], actions: [] };
+      return {
+        newState: { name: 'active', context: {} },
+        views: this.generateViewsForState('active', message, {}),
+        actions: this.generateActionsForMessage(message, 'active')
+      };
       
     } catch (error) {
       console.error("🌊 Error processing message:", error);
@@ -254,7 +156,7 @@ export class LogViewContentSystemIntegrated {
     }
   }
 
-  // 🎯 IMPROVEMENT: Enhanced view generation using structural system context
+  // 🎯 IMPROVEMENT: Enhanced view generation
   private generateViewsForState(state: string, message: any, context: any): any[] {
     const views: any[] = [];
     const timestamp = Date.now();
@@ -321,7 +223,7 @@ export class LogViewContentSystemIntegrated {
     return views;
   }
 
-  // 🎯 IMPROVEMENT: Enhanced action generation using structural system state
+  // 🎯 IMPROVEMENT: Enhanced action generation
   private generateActionsForMessage(message: any, currentState: string): any[] {
     const actions: any[] = [];
 
@@ -352,18 +254,17 @@ export class LogViewContentSystemIntegrated {
     return actions;
   }
 
-  // 🎯 IMPROVEMENT: Enhanced state management using structural system
+  // 🎯 IMPROVEMENT: Enhanced state management using createViewStateMachine
   getCurrentState(): any {
-    const contentMachine = this.structuralSystem.getMachine('content-system');
-    return contentMachine?.getState()?.value || 'idle';
+    if (this.viewStateMachine) {
+      return this.viewStateMachine.getState()?.value || 'idle';
+    }
+    return 'idle';
   }
 
   getCurrentViews(): any[] {
     const currentState = this.getCurrentState();
-    const contentMachine = this.structuralSystem.getMachine('content-system');
-    const context = contentMachine?.getState()?.context || {};
-    
-    return this.generateViewsForState(currentState, {}, context);
+    return this.generateViewsForState(currentState, {}, {});
   }
 
   clearProcessedViews(): void {
@@ -371,55 +272,45 @@ export class LogViewContentSystemIntegrated {
   }
 
   getStateHistory(): any[] {
-    const contentMachine = this.structuralSystem.getMachine('content-system');
-    return contentMachine?.getState()?.context?.stateHistory || [];
+    if (this.viewStateMachine) {
+      return this.viewStateMachine.getState()?.context?.stateHistory || [];
+    }
+    return [];
   }
 
-  // 🎯 IMPROVEMENT: Enhanced health status using structural system
+  // 🎯 IMPROVEMENT: Enhanced health status
   getHealthStatus(): any {
-    const contentMachine = this.structuralSystem.getMachine('content-system');
-    const waveReaderMachine = this.structuralSystem.getMachine('wave-reader');
-    const selectorUIMachine = this.structuralSystem.getMachine('selector-ui');
-    
     return {
       timestamp: Date.now(),
       sessionId: this.sessionId,
-      contentSystemState: contentMachine?.getState()?.value || 'idle',
-      waveReaderState: waveReaderMachine?.getState()?.value || 'idle',
-      selectorUIState: selectorUIMachine?.getState()?.value || 'idle',
-      structuralSystemActive: true,
-      machineCount: this.structuralSystem.getAllMachines().size,
+      contentSystemState: this.getCurrentState(),
+      createViewStateMachineActive: !!this.viewStateMachine,
+      machineCount: this.viewStateMachine ? 1 : 0,
       viewQueueLength: this.getCurrentViews().length,
-      messageHistoryLength: contentMachine?.getState()?.context?.messageQueue?.length || 0,
+      messageHistoryLength: 0,
       stateHistoryLength: this.getStateHistory().length
     };
   }
 
   getMessageHistory(): any[] {
-    const contentMachine = this.structuralSystem.getMachine('content-system');
-    return contentMachine?.getState()?.context?.messageQueue || [];
+    return []; // For now, return empty array
   }
 
   getSessionId(): string {
     return this.sessionId;
   }
 
-  // 🎯 IMPROVEMENT: Enhanced cleanup using structural system
+  // 🎯 IMPROVEMENT: Enhanced cleanup
   destroy(): void {
     console.log("🌊 Integrated Content System: Destroying");
     
     try {
-      // Clean up all structural system machines
-      const machines = this.structuralSystem.getAllMachines();
-      machines.forEach((machine, name) => {
-        console.log(`🌊 Stopping machine: ${name}`);
-        machine.stop();
-      });
+      // Clean up state machine
+      if (this.viewStateMachine) {
+        this.viewStateMachine.stop();
+      }
       
-      // Clean up structural system
-      this.structuralSystem = null;
-      
-      // Clean up other resources
+      // Clean up resources
       if (this.shadowRoot) {
         this.shadowRoot.innerHTML = '';
       }

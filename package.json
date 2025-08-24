@@ -91,6 +91,7 @@
     "sass": "^1.69.0",
     "sass-loader": "^13.3.2",
     "style-loader": "^3.3.3",
+    "tome-connector-studio": "file:../log-view-machine/editor-build/tome-connector-studio-1.2.0.tgz",
     "ts-jest": "^29.1.1",
     "ts-loader": "^9.2.8",
     "typescript": "^5.9.2",

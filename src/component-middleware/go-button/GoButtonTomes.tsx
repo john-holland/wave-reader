@@ -193,7 +193,7 @@ function renderIdleView(context: any) {
   return (
     <div className="go-button-idle">
       <button 
-        className={`go-button go-button-idle go-button-${model.buttonSize} go-button-${model.buttonStyle}`}
+        className={['go-button', 'go-button-idle', `go-button-${model.buttonSize}`, `go-button-${model.buttonStyle}`].join(' ')}
         disabled={model.disabled}
         aria-label={model.accessibility.ariaLabel}
         role={model.accessibility.role}
@@ -216,7 +216,7 @@ function renderGoingView(context: any) {
   return (
     <div className="go-button-going">
       <button 
-        className={`go-button go-button-going go-button-${model.buttonSize} go-button-${model.buttonStyle}`}
+        className={['go-button', 'go-button-going', `go-button-${model.buttonSize}`, `go-button-${model.buttonStyle}`].join(' ')}
         aria-label={model.accessibility.ariaLabel}
         role={model.accessibility.role}
         tabIndex={model.accessibility.tabIndex}
@@ -248,7 +248,7 @@ function renderStoppingView(context: any) {
   return (
     <div className="go-button-stopping">
       <button 
-        className={`go-button go-button-stopping go-button-${model.buttonSize} go-button-${model.buttonStyle}`}
+        className={['go-button', 'go-button-stopping', `go-button-${model.buttonSize}`, `go-button-${model.buttonStyle}`].join(' ')}
         disabled
         aria-label={model.accessibility.ariaLabel}
         role={model.accessibility.role}
@@ -278,7 +278,7 @@ function renderLoadingView(context: any) {
   return (
     <div className="go-button-loading">
       <button 
-        className={`go-button go-button-loading go-button-${model.buttonSize} go-button-${model.buttonStyle}`}
+        className={['go-button', 'go-button-loading', `go-button-${model.buttonSize}`, `go-button-${model.buttonStyle}`].join(' ')}
         disabled
         aria-label={model.accessibility.ariaLabel}
         role={model.accessibility.role}
@@ -306,7 +306,7 @@ function renderErrorView(context: any) {
   return (
     <div className="go-button-error">
       <button 
-        className={`go-button go-button-error go-button-${model.buttonSize} go-button-${model.buttonStyle}`}
+        className={['go-button', 'go-button-error', `go-button-${model.buttonSize}`, `go-button-${model.buttonStyle}`].join(' ')}
         aria-label={model.accessibility.ariaLabel}
         role={model.accessibility.role}
         tabIndex={model.accessibility.tabIndex}
@@ -348,7 +348,7 @@ function renderDisabledView(context: any) {
   return (
     <div className="go-button-disabled">
       <button 
-        className={`go-button go-button-disabled go-button-${model.buttonSize} go-button-${model.buttonStyle}`}
+        className={['go-button', 'go-button-disabled', `go-button-${model.buttonSize}`, `go-button-${model.buttonStyle}`].join(' ')}
         disabled
         aria-label={model.accessibility.ariaLabel}
         role={model.accessibility.role}
@@ -378,7 +378,7 @@ function renderWaveAnimationView(context: any) {
   return (
     <div className="go-button-wave-animation">
       <button 
-        className={`go-button go-button-wave-animation go-button-${model.buttonSize} go-button-${model.buttonStyle}`}
+        className={['go-button', 'go-button-wave-animation', `go-button-${model.buttonSize}`, `go-button-${model.buttonStyle}`].join(' ')}
         aria-label={model.accessibility.ariaLabel}
         role={model.accessibility.role}
         tabIndex={model.accessibility.tabIndex}
@@ -418,7 +418,7 @@ function renderAutoStopView(context: any) {
   return (
     <div className="go-button-auto-stop">
       <button 
-        className={`go-button go-button-auto-stop go-button-${model.buttonSize} go-button-${model.buttonStyle}`}
+        className={['go-button', 'go-button-auto-stop', `go-button-${model.buttonSize}`, `go-button-${model.buttonStyle}`].join(' ')}
         aria-label={model.accessibility.ariaLabel}
         role={model.accessibility.role}
         tabIndex={model.accessibility.tabIndex}
@@ -457,7 +457,7 @@ function renderCompletedView(context: any) {
   return (
     <div className="go-button-completed">
       <button 
-        className={`go-button go-button-completed go-button-${model.buttonSize} go-button-${model.buttonStyle}`}
+        className={['go-button', 'go-button-completed', `go-button-${model.buttonSize}`, `go-button-${model.buttonStyle}`].join(' ')}
         aria-label={model.accessibility.ariaLabel}
         role={model.accessibility.role}
         tabIndex={model.accessibility.tabIndex}

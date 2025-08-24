@@ -20,6 +20,8 @@ import { Settings } from "./components/settings";
 
 import WaveTabs from './components/wave-tabs';
 import About from './components/about';
+import ErrorTestComponent from './components/ErrorTestComponent';
+import ErrorDemoComponent from './components/ErrorDemoComponent';
 import InstalledDetails = chrome.runtime.InstalledDetails;
 import {CState, NameAccessMapInterface, Named, State, StateNames} from "./util/state";
 import StateMachine from "./util/state-machine";
@@ -624,6 +626,8 @@ const App: FunctionComponent = () => {
                     onDomainPathChange={onDomainPathChange}
                 />
                 <About tab-name={"About"} />
+                <ErrorTestComponent tab-name={"Error Test"} />
+                <ErrorDemoComponent tab-name={"Error Demo"} />
             </WaveTabs>
         </WaveReader>
     );
