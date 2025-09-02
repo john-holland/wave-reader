@@ -6,30 +6,11 @@ const mockMessageRouter = {
   isConnected: true
 };
 
-// Mock existing tome module
-const mockExistingTome = {
-  sendEvent: jest.fn().mockReturnValue('existing-result'),
-  getCurrentState: jest.fn().mockReturnValue({ state: 'idle', data: {} })
-};
-
-// Mock dynamic import
-const mockImportModule = jest.fn().mockResolvedValue(mockExistingTome);
-
-// Mock the global import function
-Object.defineProperty(global, 'import', {
-  value: mockImportModule,
-  writable: true
-});
-
 describe('TomeIntegrationBridge', () => {
   let bridge: TomeIntegrationBridge;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
-    // Reset the mock import
-    mockImportModule.mockResolvedValue(mockExistingTome);
-    
     bridge = new TomeIntegrationBridge(mockMessageRouter);
   });
 
@@ -42,8 +23,7 @@ describe('TomeIntegrationBridge', () => {
   describe('createBridge', () => {
     const mockConfig: TomeBridgeConfig = {
       componentName: 'test-component',
-      existingTomePath: '../component-middleware/test/TestTomes.tsx',
-      structuralTomeConfig: {
+      tomeConfig: {
         id: 'test-component',
         name: 'Test Component',
         xstateConfig: { initial: 'idle', states: {} }
@@ -56,21 +36,8 @@ describe('TomeIntegrationBridge', () => {
 
       expect(result).toBeDefined();
       expect(result.componentName).toBe('test-component');
-      expect(result.existingTome).toBe(mockExistingTome);
-      expect(result.structuralTome).toBe(mockConfig.structuralTomeConfig);
+      expect(result.tomeConfig).toBe(mockConfig.tomeConfig);
       expect(result.messageRouter).toBe(mockMessageRouter);
-    });
-
-    it('should handle import errors gracefully', async () => {
-      mockImportModule.mockRejectedValue(new Error('Import failed'));
-
-      const result = await bridge.createBridge(mockConfig);
-
-      // Should handle import errors gracefully and create bridge with null existingTome
-      expect(result).toBeDefined();
-      expect(result.componentName).toBe('test-component');
-      expect(result.existingTome).toBeNull();
-      expect(result.structuralTome).toBe(mockConfig.structuralTomeConfig);
     });
 
     it('should store bridge in internal map', async () => {
@@ -80,23 +47,13 @@ describe('TomeIntegrationBridge', () => {
       expect(storedBridge).toBeDefined();
       expect(storedBridge.componentName).toBe('test-component');
     });
-
-    it('should handle missing existingTome gracefully', async () => {
-      mockImportModule.mockResolvedValue(null);
-
-      const result = await bridge.createBridge(mockConfig);
-      
-      expect(result.existingTome).toBeNull();
-      expect(result.sendToExisting).toBeDefined();
-    });
   });
 
   describe('getBridge', () => {
     it('should return bridge for existing component', async () => {
       const mockConfig: TomeBridgeConfig = {
         componentName: 'existing-component',
-        existingTomePath: 'path/to/tome',
-        structuralTomeConfig: {},
+        tomeConfig: {},
         messageRouter: mockMessageRouter
       };
 
@@ -117,8 +74,7 @@ describe('TomeIntegrationBridge', () => {
     beforeEach(async () => {
       const mockConfig: TomeBridgeConfig = {
         componentName: 'test-component',
-        existingTomePath: 'path/to/tome',
-        structuralTomeConfig: {},
+        tomeConfig: {},
         messageRouter: mockMessageRouter
       };
 
@@ -130,8 +86,7 @@ describe('TomeIntegrationBridge', () => {
       const result = await bridge.sendMessage('test-component', event);
 
       expect(result).toBeDefined();
-      expect(result.existing).toBe('existing-result');
-      expect(result.structural).toEqual({ success: true });
+      expect(result.result).toEqual({ success: true });
       expect(result.bridge).toBeDefined();
     });
 
@@ -142,39 +97,19 @@ describe('TomeIntegrationBridge', () => {
         .rejects.toThrow('No bridge found for component: non-existent');
     });
 
-    it('should call existing tome sendEvent when available', async () => {
-      const event = { type: 'TEST_EVENT', data: {} };
+    it('should call message router sendMessage', async () => {
+      const event = { type: 'TEST_EVENT', data: { value: 'test' } };
       await bridge.sendMessage('test-component', event);
 
-      expect(mockExistingTome.sendEvent).toHaveBeenCalledWith(event);
-    });
-
-    it('should handle existing tome without sendEvent method', async () => {
-      const mockTomeWithoutSendEvent = { getCurrentState: jest.fn() };
-      mockImportModule.mockResolvedValue(mockTomeWithoutSendEvent);
-
-      const mockConfig: TomeBridgeConfig = {
-        componentName: 'no-send-event',
-        existingTomePath: 'path/to/tome',
-        structuralTomeConfig: {},
-        messageRouter: mockMessageRouter
-      };
-
-      await bridge.createBridge(mockConfig);
-      
-      const event = { type: 'TEST_EVENT', data: {} };
-      const result = await bridge.sendMessage('no-send-event', event);
-
-      expect(result.existing).toBeNull();
-      expect(result.structural).toEqual({ success: true });
+      expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith('TEST_EVENT', 'test-component', { value: 'test' });
     });
   });
 
   describe('getAllBridges', () => {
     it('should return all created bridges', async () => {
       const configs = [
-        { componentName: 'component1', existingTomePath: 'path1', structuralTomeConfig: {}, messageRouter: mockMessageRouter },
-        { componentName: 'component2', existingTomePath: 'path2', structuralTomeConfig: {}, messageRouter: mockMessageRouter }
+        { componentName: 'component1', tomeConfig: {}, messageRouter: mockMessageRouter },
+        { componentName: 'component2', tomeConfig: {}, messageRouter: mockMessageRouter }
       ];
 
       for (const config of configs) {
@@ -196,8 +131,7 @@ describe('TomeIntegrationBridge', () => {
     it('should clear all bridges', async () => {
       const mockConfig: TomeBridgeConfig = {
         componentName: 'test-component',
-        existingTomePath: 'path/to/tome',
-        structuralTomeConfig: {},
+        tomeConfig: {},
         messageRouter: mockMessageRouter
       };
 
@@ -215,123 +149,43 @@ describe('TomeIntegrationBridge', () => {
     beforeEach(async () => {
       const mockConfig: TomeBridgeConfig = {
         componentName: 'test-component',
-        existingTomePath: 'path/to/tome',
-        structuralTomeConfig: {},
+        tomeConfig: { id: 'test', name: 'Test' },
         messageRouter: mockMessageRouter
       };
 
       testBridge = await bridge.createBridge(mockConfig);
     });
 
-    describe('sendToExisting', () => {
-      it('should call existing tome sendEvent', () => {
-        const event = { type: 'TEST_EVENT', data: {} };
-        const result = testBridge.sendToExisting(event);
-
-        expect(mockExistingTome.sendEvent).toHaveBeenCalledWith(event);
-        expect(result).toBe('existing-result');
-      });
-
-      it('should return null when existingTome is null', async () => {
-        mockImportModule.mockResolvedValue(null);
-        
-        const mockConfig: TomeBridgeConfig = {
-          componentName: 'null-tome',
-          existingTomePath: 'path/to/tome',
-          structuralTomeConfig: {},
-          messageRouter: mockMessageRouter
-        };
-
-        const nullBridge = await bridge.createBridge(mockConfig);
-        const result = nullBridge.sendToExisting({ type: 'TEST' });
-
-        expect(result).toBeNull();
-      });
-    });
-
-    describe('sendToStructural', () => {
+    describe('sendEvent', () => {
       it('should call message router sendMessage', async () => {
         const event = { type: 'TEST_EVENT', data: { value: 'test' } };
-        const result = await testBridge.sendToStructural(event);
+        const result = await testBridge.sendEvent(event);
 
         expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith('TEST_EVENT', 'test-component', { value: 'test' });
         expect(result).toEqual({ success: true });
       });
     });
 
-    describe('getExistingState', () => {
-      it('should return existing tome state', () => {
-        const state = testBridge.getExistingState();
-        
-        expect(mockExistingTome.getCurrentState).toHaveBeenCalled();
-        expect(state).toEqual({ state: 'idle', data: {} });
-      });
-
-      it('should return null when existingTome is null', async () => {
-        mockImportModule.mockResolvedValue(null);
-        
-        const mockConfig: TomeBridgeConfig = {
-          componentName: 'null-tome',
-          existingTomePath: 'path/to/tome',
-          structuralTomeConfig: {},
-          messageRouter: mockMessageRouter
-        };
-
-        const nullBridge = await bridge.createBridge(mockConfig);
-        const state = nullBridge.getExistingState();
-
-        expect(state).toBeNull();
-      });
-    });
-
-    describe('getStructuralState', () => {
+    describe('getState', () => {
       it('should return null (placeholder implementation)', () => {
-        const state = testBridge.getStructuralState();
+        const state = testBridge.getState();
         expect(state).toBeNull();
       });
     });
 
-    describe('syncStates', () => {
-      it('should log state synchronization', () => {
-        const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-        
-        testBridge.syncStates();
-        
-        expect(consoleSpy).toHaveBeenCalledWith(
-          'Syncing states for test-component:',
-          { existingState: { state: 'idle', data: {} }, structuralState: null }
-        );
-        
-        consoleSpy.mockRestore();
+    describe('getTomeConfig', () => {
+      it('should return tome configuration', () => {
+        const config = testBridge.getTomeConfig();
+        expect(config).toEqual({ id: 'test', name: 'Test' });
       });
     });
   });
 
   describe('error handling', () => {
-    it('should handle bridge creation errors gracefully', async () => {
-      const mockConfig: TomeBridgeConfig = {
-        componentName: 'error-component',
-        existingTomePath: 'path/to/tome',
-        structuralTomeConfig: {},
-        messageRouter: mockMessageRouter
-      };
-
-      // Mock import to throw error
-      mockImportModule.mockRejectedValue(new Error('Import failed'));
-
-      const result = await bridge.createBridge(mockConfig);
-
-      // Should handle import errors gracefully and create bridge with null existingTome
-      expect(result).toBeDefined();
-      expect(result.componentName).toBe('error-component');
-      expect(result.existingTome).toBeNull();
-    });
-
     it('should handle message sending errors', async () => {
       const mockConfig: TomeBridgeConfig = {
         componentName: 'error-component',
-        existingTomePath: 'path/to/tome',
-        structuralTomeConfig: {},
+        tomeConfig: {},
         messageRouter: mockMessageRouter
       };
 

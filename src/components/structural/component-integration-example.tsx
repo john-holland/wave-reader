@@ -20,7 +20,8 @@ const EnhancedGoButton = () => {
     isConnected,
     startWaveReader,
     stopWaveReader,
-    messageStats
+    messageStats,
+    sendMessage
   } = useWaveReaderMessageRouter({
     componentName: 'go-button',
     autoProcess: true,
@@ -103,6 +104,31 @@ const EnhancedGoButton = () => {
     }
   };
 
+  const handleGoAction = async () => {
+    if (!isConnected) return;
+
+    try {
+      const result = await sendMessage('GO_ACTION', 'go-button', {
+        timestamp: Date.now(),
+        action: 'go',
+        component: 'go-button'
+      });
+
+      // setMessageStats(prev => ({
+      //   totalMessages: prev.totalMessages + 1,
+      //   successRate: result.success ? 100 : 0
+      // }));
+
+      console.log('Go action result:', result);
+    } catch (error) {
+      console.error('Failed to send go action:', error);
+      // setMessageStats(prev => ({
+      //   totalMessages: prev.totalMessages + 1,
+      //   successRate: 0
+      // }));
+    }
+  };
+
   return (
     <div className="enhanced-go-button">
       <h3>Enhanced Go Button (Dual System Integration)</h3>
@@ -162,7 +188,8 @@ const EnhancedWaveTabs = () => {
   const {
     isConnected,
     changeTab,
-    messageStats
+    messageStats,
+    sendMessage
   } = useWaveReaderMessageRouter({
     componentName: 'wave-tabs',
     autoProcess: true,
@@ -192,28 +219,28 @@ const EnhancedWaveTabs = () => {
   }, [isConnected]);
 
   const handleTabChange = async (tabId: string) => {
-    setActiveTab(tabId);
-    
-    if (isConnected) {
-      try {
-        // Send through structural system
-        const structuralResult = await changeTab(tabId);
-        
-        // Also send through existing tome system if bridge is available
-        if (tomeBridge) {
-          const bridgeResult = await tomeBridge.sendMessage('wave-tabs', {
-            type: 'TAB_SELECT',
-            data: { tabId }
-          });
-          console.log('Bridge result:', bridgeResult);
-        }
+    if (!isConnected) return;
 
-        if (structuralResult.success) {
-          console.log('Tab changed successfully');
-        }
-      } catch (error) {
-        console.error('Failed to change tab:', error);
-      }
+    try {
+      const result = await sendMessage('TAB_CHANGE', 'wave-tabs', {
+        from: activeTab,
+        to: tabId,
+        timestamp: Date.now()
+      });
+
+      setActiveTab(tabId);
+      // setMessageStats(prev => ({
+      //   totalMessages: prev.totalMessages + 1,
+      //   successRate: result.success ? 100 : 0
+      // }));
+
+      console.log('Tab change result:', result);
+    } catch (error) {
+      console.error('Failed to change tab:', error);
+      // setMessageStats(prev => ({
+      //   totalMessages: prev.totalMessages + 1,
+      //   successRate: 0
+      // }));
     }
   };
 
