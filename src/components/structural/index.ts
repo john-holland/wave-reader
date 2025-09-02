@@ -1,61 +1,24 @@
-// Structural system components for Wave Reader
-// Full structural system integration with log-view-machine
-
-// Export createViewStateMachine from log-view-machine
-export { createViewStateMachine } from 'log-view-machine';
-
-// Export structural system components
-export { 
-  StructuralSystem, 
+// Export log-view-machine structural system components
+export {
+  StructuralSystem,
   createStructuralSystem,
-  useStructuralSystem 
-} from 'log-view-machine';
-
-// Export structural tome connector
-export { 
+  useStructuralSystem,
   StructuralTomeConnector,
-  useStructuralTomeConnector 
-} from 'log-view-machine';
-
-// Export structural router
-export { 
+  useStructuralTomeConnector,
   StructuralRouter,
   Route,
   RouteFallback,
-  useRouter 
+  useRouter
 } from 'log-view-machine';
 
-// Export structural config utilities
-export { 
-  createStructuralConfig,
-  type AppStructureConfig 
-} from 'log-view-machine';
-
-// Export existing structural components
-export {
-  AppStructure,
-  ComponentTomeMapping,
-  RoutingConfig,
-  TomeConfig
-} from './app-structure';
-
-// Export the structural example
-export { default as StructuralExample } from './StructuralExample';
-
-// Export TomeConnector for component integration
-export { default as TomeConnector, useTomeConnector } from './TomeConnector';
-
-// Export AppRouter for routing
-export { default as AppRouter, useRouter as useAppRouter } from './AppRouter';
-
-// Export new wave-reader structural system
-export { default as WaveReaderMainTome } from './wave-reader-tome-config';
-export { default as WaveReaderStructuralConfig } from './wave-reader-structural-config';
-export { default as WaveReaderMessageRouter, waveReaderMessageRouter } from './wave-reader-message-router';
-export { default as useWaveReaderMessageRouter } from './useWaveReaderMessageRouter';
+// Export wave-reader specific structural components
+export { WaveReaderMainTome, WaveReaderStructuralConfig } from './wave-reader-structural-config';
+export { WaveReaderMessageRouter, waveReaderMessageRouter } from './wave-reader-message-router';
+export { useWaveReaderMessageRouter } from './useWaveReaderMessageRouter';
 
 // Export individual tome configurations
 export {
+  WaveReaderMainTome as WaveReaderMainTome,
   WaveTabsTome,
   WaveReaderTome,
   GoButtonTome,
@@ -64,8 +27,25 @@ export {
   AboutTome
 } from './wave-reader-tome-config';
 
-// Export message types and interfaces
+// Export tome integration bridge
+export {
+  TomeIntegrationBridge,
+  useTomeIntegrationBridge,
+  type TomeBridgeConfig
+} from './tome-integration-bridge';
+
+// Export component integration examples
+export {
+  ComponentIntegrationExample,
+  EnhancedGoButton,
+  EnhancedWaveTabs
+} from './component-integration-example';
+
+// Export message types
 export type {
   WaveReaderMessage,
   MessageRoutingResult
 } from './wave-reader-message-router';
+
+// Export app router (renamed to avoid conflicts)
+export { useRouter as useAppRouter } from './AppRouter';

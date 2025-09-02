@@ -1,14 +1,15 @@
-import { createTomeConfig } from 'log-view-machine';
-
 /**
  * Wave Reader Tome Configuration
  * 
  * This configuration defines the state machines, message routing, and component
  * relationships for the Wave Reader application using the structural system.
+ * 
+ * IMPORTANT: This integrates with the existing robotproxy ProxyStateMachine system
+ * that's already implemented in the component-middleware components.
  */
 
-// Wave Reader Main Application Tome
-export const WaveReaderMainTome = createTomeConfig({
+// Wave Reader Main Application Tome Configuration
+export const WaveReaderMainTome = {
   id: 'wave-reader-main-tome',
   name: 'Wave Reader Main Application',
   description: 'Main application state machine coordinating all wave reader components',
@@ -86,11 +87,12 @@ export const WaveReaderMainTome = createTomeConfig({
       }
     },
     
-    // Wave Tabs Component Tome
+    // Wave Tabs Component Tome - References existing component-middleware
     waveTabs: {
       id: 'wave-tabs',
       name: 'Wave Tabs Navigation',
-      description: 'Manages tab navigation and content switching',
+      description: 'Manages tab navigation and content switching - integrates with existing WaveTabsTomes',
+      componentPath: 'src/component-middleware/wave-tabs/WaveTabsTomes.tsx',
       xstateConfig: {
         id: 'wave-tabs',
         initial: 'idle',
@@ -122,11 +124,12 @@ export const WaveReaderMainTome = createTomeConfig({
       }
     },
     
-    // Wave Reader Core Component Tome
+    // Wave Reader Core Component Tome - References existing component-middleware
     waveReader: {
       id: 'wave-reader',
       name: 'Wave Reader Core',
-      description: 'Manages wave reading functionality and animations',
+      description: 'Manages wave reading functionality and animations - integrates with existing wave-reader middleware',
+      componentPath: 'src/component-middleware/wave-reader/',
       xstateConfig: {
         id: 'wave-reader',
         initial: 'idle',
@@ -189,11 +192,12 @@ export const WaveReaderMainTome = createTomeConfig({
       }
     },
     
-    // Go Button Component Tome
+    // Go Button Component Tome - References existing component-middleware
     goButton: {
       id: 'go-button',
       name: 'Go Button Control',
-      description: 'Manages the go button state and wave reader activation',
+      description: 'Manages the go button state and wave reader activation - integrates with existing GoButtonTomes',
+      componentPath: 'src/component-middleware/go-button/GoButtonTomes.tsx',
       xstateConfig: {
         id: 'go-button',
         initial: 'inactive',
@@ -231,11 +235,12 @@ export const WaveReaderMainTome = createTomeConfig({
       }
     },
     
-    // Selector Input Component Tome
+    // Selector Input Component Tome - References existing component-middleware
     selectorInput: {
       id: 'selector-input',
       name: 'Selector Input Management',
-      description: 'Manages CSS selector input and validation',
+      description: 'Manages CSS selector input and validation - integrates with existing SelectorInputTomes',
+      componentPath: 'src/component-middleware/selector-input/SelectorInputTomes.tsx',
       xstateConfig: {
         id: 'selector-input',
         initial: 'empty',
@@ -293,11 +298,12 @@ export const WaveReaderMainTome = createTomeConfig({
       }
     },
     
-    // Settings Component Tome
+    // Settings Component Tome - References existing component-middleware
     settings: {
       id: 'settings',
       name: 'Settings Management',
-      description: 'Manages application settings and configuration',
+      description: 'Manages application settings and configuration - integrates with existing settings middleware',
+      componentPath: 'src/component-middleware/settings/',
       xstateConfig: {
         id: 'settings',
         initial: 'loading',
@@ -344,11 +350,12 @@ export const WaveReaderMainTome = createTomeConfig({
       }
     },
     
-    // About Component Tome
+    // About Component Tome - References existing component-middleware
     about: {
       id: 'about',
       name: 'About Information',
-      description: 'Manages about page and version information',
+      description: 'Manages about page and version information - integrates with existing about component',
+      componentPath: 'src/components/about.tsx',
       xstateConfig: {
         id: 'about',
         initial: 'loading',
@@ -382,7 +389,7 @@ export const WaveReaderMainTome = createTomeConfig({
     }
   },
   
-  // Message routing configuration
+  // Message routing configuration - Integrates with robotproxy ProxyStateMachine system
   routing: {
     // Main application routing
     mainApp: {
@@ -450,7 +457,7 @@ export const WaveReaderMainTome = createTomeConfig({
       }
     }
   }
-});
+};
 
 // Export individual tome configurations for component use
 export const WaveTabsTome = WaveReaderMainTome.machines.waveTabs;
