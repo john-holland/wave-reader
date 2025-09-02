@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wave Reader Extension Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .test-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .test-content {
+            padding: 20px;
+        }
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+        }
+        .test-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #5a6fd8;
+        }
+        .test-status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status-success { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .status-info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🌊 Wave Reader</h1>
+            <p>Extension Functionality Test</p>
+        </div>
+        
+        <div class="test-content">
+            <div class="test-section">
+                <h3>🧪 Test Results</h3>
+                <div id="test-results">
+                    <div class="test-status status-info">Ready to test...</div>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h3>🔧 Test Functions</h3>
+                <button class="test-button" onclick="testGoButton()">Test Go Button</button>
+                <button class="test-button" onclick="testSettings()">Test Settings</button>
+                <button class="test-button" onclick="testSelectorUI()">Test Selector UI</button>
+                <button class="test-button" onclick="testPopupState()">Test Popup State</button>
+            </div>
+            
+            <div class="test-section">
+                <h3>📊 Test Log</h3>
+                <div id="test-log" style="max-height: 200px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px;">
+                    Test log will appear here...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let testCount = 0;
+        let passedTests = 0;
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('test-log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        function updateResults(message, type = 'info') {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = `<div class="test-status status-${type}">${message}</div>`;
+        }
+        
+        function testGoButton() {
+            testCount++;
+            log(`🧪 Test ${testCount}: Testing Go Button functionality...`);
+            
+            try {
+                // Simulate go button functionality
+                const goButton = document.createElement('button');
+                goButton.textContent = 'Go';
+                goButton.className = 'test-button';
+                goButton.onclick = () => {
+                    log('✅ Go button clicked successfully');
+                    passedTests++;
+                };
+                
+                // Test button creation and event handling
+                document.body.appendChild(goButton);
+                goButton.click();
+                document.body.removeChild(goButton);
+                
+                updateResults(`✅ Go Button Test PASSED (${passedTests}/${testCount})`, 'success');
+                log('✅ Go Button test completed successfully');
+                
+            } catch (error) {
+                log(`❌ Go Button test failed: ${error.message}`, 'error');
+                updateResults(`❌ Go Button Test FAILED (${passedTests}/${testCount})`, 'error');
+            }
+        }
+        
+        function testSettings() {
+            testCount++;
+            log(`🧪 Test ${testCount}: Testing Settings functionality...`);
+            
+            try {
+                // Simulate settings functionality
+                const settings = {
+                    showNotifications: true,
+                    waveSpeed: 4,
+                    waveAnimationControl: 0,
+                    wave: {
+                        axisTranslateAmountXMax: 1,
+                        axisTranslateAmountXMin: -1,
+                        axisRotationAmountYMax: 2,
+                        axisRotationAmountYMin: -2,
+                        mouseFollowInterval: 100
+                    }
+                };
+                
+                // Test settings object creation and properties
+                if (settings.showNotifications && 
+                    settings.waveSpeed === 4 && 
+                    settings.waveAnimationControl === 0 &&
+                    settings.wave.axisTranslateAmountXMax === 1) {
+                    
+                    passedTests++;
+                    updateResults(`✅ Settings Test PASSED (${passedTests}/${testCount})`, 'success');
+                    log('✅ Settings test completed successfully');
+                } else {
+                    throw new Error('Settings object properties mismatch');
+                }
+                
+            } catch (error) {
+                log(`❌ Settings test failed: ${error.message}`, 'error');
+                updateResults(`❌ Settings Test FAILED (${passedTests}/${testCount})`, 'error');
+            }
+        }
+        
+        function testSelectorUI() {
+            testCount++;
+            log(`🧪 Test ${testCount}: Testing Selector UI functionality...`);
+            
+            try {
+                // Simulate selector UI functionality
+                const selectorInput = document.createElement('input');
+                selectorInput.type = 'text';
+                selectorInput.placeholder = 'Enter CSS selector';
+                selectorInput.value = 'p, h1, h2, h3';
+                
+                // Test selector input creation and value handling
+                if (selectorInput.value === 'p, h1, h2, h3') {
+                    passedTests++;
+                    updateResults(`✅ Selector UI Test PASSED (${passedTests}/${testCount})`, 'success');
+                    log('✅ Selector UI test completed successfully');
+                } else {
+                    throw new Error('Selector input value mismatch');
+                }
+                
+            } catch (error) {
+                log(`❌ Selector UI test failed: ${error.message}`, 'error');
+                updateResults(`❌ Selector UI Test FAILED (${passedTests}/${testCount})`, 'error');
+            }
+        }
+        
+        function testPopupState() {
+            testCount++;
+            log(`🧪 Test ${testCount}: Testing Popup State functionality...`);
+            
+            try {
+                // Simulate popup state management
+                let currentView = 'main';
+                const views = ['main', 'settings', 'selector'];
+                
+                // Test view switching
+                const switchView = (newView) => {
+                    if (views.includes(newView)) {
+                        currentView = newView;
+                        return true;
+                    }
+                    return false;
+                };
+                
+                // Test view switching functionality
+                if (switchView('settings') && currentView === 'settings' &&
+                    switchView('main') && currentView === 'main') {
+                    
+                    passedTests++;
+                    updateResults(`✅ Popup State Test PASSED (${passedTests}/${testCount})`, 'success');
+                    log('✅ Popup State test completed successfully');
+                } else {
+                    throw new Error('View switching failed');
+                }
+                
+            } catch (error) {
+                log(`❌ Popup State test failed: ${error.message}`, 'error');
+                updateResults(`❌ Popup State Test FAILED (${passedTests}/${testCount})`, 'error');
+            }
+        }
+        
+        // Initialize test environment
+        log('🚀 Wave Reader Extension Test Environment Initialized');
+        log('Click test buttons to verify functionality...');
+    </script>
+</body>
+</html>

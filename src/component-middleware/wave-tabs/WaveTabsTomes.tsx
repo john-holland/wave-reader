@@ -788,7 +788,12 @@ const WaveTabsTomes: FunctionComponent<WaveTabsTomesProps> = ({
       </WaveTabsHeader>
       
       <WaveTabsContent>
-        {tabs.length === 0 ? (
+        {/* Render children if provided, otherwise fall back to internal tab management */}
+        {children ? (
+          <div className="wave-tabs-children">
+            {children}
+          </div>
+        ) : tabs.length === 0 ? (
           <TabView isActive={false}>
             <TabHeader>
               <TabTitle>No Tabs Available</TabTitle>

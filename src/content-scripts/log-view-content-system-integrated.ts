@@ -1,47 +1,49 @@
-import { 
-  createViewStateMachine
-} from 'log-view-machine';
-import { ChromeRobotProxyMachine } from '../util/robot-proxy-machine';
-import { LogViewMessageUtility } from '../util/log-view-messages';
-import { MessageFactory } from '../models/messages/log-view-messages';
-import { MountOrFindSelectorHierarchyComponent } from '../components/selector-hierarchy';
+import { LogViewContentSystemTomes } from './log-view-content-system-tome';
+import { LogViewShadowSystemTomes } from './log-view-shadow-system-tome';
+import { ContentSystemDOMService } from '../services/content-system-dom-service';
+import { ContentSystemMessageService } from '../services/content-system-message-service';
+import { MLSettingsService } from '../services/ml-settings-service';
 import { SelectorHierarchy } from '../services/selector-hierarchy';
 import { SimpleColorServiceAdapter } from '../services/simple-color-service';
-import { MLSettingsService } from '../services/ml-settings-service';
-import Wave from '../models/wave';
 import Options from '../models/options';
 
-// 🎯 IMPROVEMENT: Use official createViewStateMachine from log-view-machine
-// 🎯 NOTE: Structural system components not yet available in published package
-// Using createViewStateMachine for now, will integrate structural system when available
-
-// Content System using createViewStateMachine
+/**
+ * Integrated Content System with Proxy State Machine
+ * 
+ * This system integrates the main content system with the shadow system proxy,
+ * providing a unified message routing architecture that can connect Tomes structurally.
+ */
 export class LogViewContentSystemIntegrated {
-  private shadowRoot: ShadowRoot | null = null;
-  private shadowStyleElement: HTMLStyleElement | null = null;
-  private mainDocumentStyleElement: HTMLStyleElement | null = null;
-  private selectorUiRoot: HTMLDivElement | null = null;
-  private hierarchySelectorService: SelectorHierarchy;
-  private setHierarchySelector: any = undefined;
-  private hierarchySelectorMount: any = undefined;
+  private contentTome: any;
+  private shadowTome: any;
+  private domService: ContentSystemDOMService;
+  private messageService: ContentSystemMessageService;
   private mlService: MLSettingsService;
-  private sessionId: string;
+  private selectorService: SelectorHierarchy;
+  private colorService: SimpleColorServiceAdapter;
   
-  // 🎯 IMPROVEMENT: Use createViewStateMachine for state management
-  private viewStateMachine: any;
-  private robotProxy: ChromeRobotProxyMachine;
+  private going: boolean = false;
+  private latestOptions: Options | undefined;
+  private sessionId: string;
+  private messageHistory: any[] = [];
+  private proxyState: 'idle' | 'active' | 'shadow-active' | 'both-active' = 'idle';
 
   constructor() {
-    console.log("🌊 Creating Integrated Log-View Content System with createViewStateMachine...");
+    console.log("🌊 Creating Log-View-Machine Integrated Content System...");
+    
+    // Generate session ID first
+    this.sessionId = `integrated-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     // Initialize services
-    const colorService = new SimpleColorServiceAdapter();
-    this.hierarchySelectorService = new SelectorHierarchy(colorService);
+    this.colorService = new SimpleColorServiceAdapter();
+    this.selectorService = new SelectorHierarchy(this.colorService);
     this.mlService = new MLSettingsService();
-    this.sessionId = this.generateSessionId();
+    this.domService = new ContentSystemDOMService();
+    this.messageService = new ContentSystemMessageService(this.sessionId);
     
-    // 🎯 IMPROVEMENT: Initialize with createViewStateMachine
-    this.robotProxy = new ChromeRobotProxyMachine();
+    // Initialize Tomes
+    this.contentTome = LogViewContentSystemTomes.create({});
+    this.shadowTome = LogViewShadowSystemTomes.create({});
     
     // Initialize the system
     this.init();
@@ -49,295 +51,369 @@ export class LogViewContentSystemIntegrated {
     // Set up message listeners
     this.setupMessageListeners();
     
-    console.log("🌊 Integrated Log-View Content System initialized successfully");
-  }
-
-  private generateSessionId(): string {
-    return `content-integrated-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    console.log("🌊 Log-View-Machine Integrated Content System initialized successfully");
   }
 
   private init() {
-    // Create shadow DOM container
-    const container = document.createElement('div');
-    container.id = 'wave-reader-log-view-content-integrated';
-    container.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 0;
-      height: 0;
-      pointer-events: none;
-      z-index: 2147483647;
-    `;
-    document.body.appendChild(container);
-    this.shadowRoot = container.attachShadow({ mode: 'open' });
-
-    if (!this.shadowRoot) {
-      console.error("🌊 ERROR: Shadow root is null after creation");
+    // Wait for document.body to be available
+    if (!document.body) {
+      setTimeout(() => this.init(), 100);
       return;
     }
-
-    // Create style elements
-    this.createStyleElements();
     
-    // 🎯 IMPROVEMENT: Initialize with createViewStateMachine
-    this.initializeStateMachine();
+    // Initialize DOM service
+    this.domService.initialize();
+    
+    // Set up message routing
+    this.setupMessageRouting();
     
     // Log system initialization
     this.logMessage('system-init', 'Integrated content system initialized successfully');
   }
 
-  // 🎯 IMPROVEMENT: Initialize using createViewStateMachine
-  private initializeStateMachine() {
-    try {
-      // Create a state machine using createViewStateMachine
-      this.viewStateMachine = createViewStateMachine({
-        machineId: 'content-system-integrated',
-        xstateConfig: {
-          id: 'content-system-integrated',
-          initial: 'idle',
-          states: {
-            idle: {
-              on: { ACTIVATE: 'active' }
-            },
-            active: {
-              on: { DEACTIVATE: 'idle', START_READING: 'reading', START_SELECTION: 'selecting' }
-            },
-            reading: {
-              on: { STOP_READING: 'active', ERROR: 'error' }
-            },
-            selecting: {
-              on: { ELEMENT_SELECTED: 'active', ERROR: 'error' }
-            },
-            error: {
-              on: { RESTART: 'idle' }
-            }
-          }
-        }
-      });
-      
-      console.log("🌊 Content system initialized with createViewStateMachine");
-      
-    } catch (error) {
-      console.error("🌊 Error initializing state machine:", error);
-    }
-  }
+  private setupMessageRouting() {
+    // Set up routing between content and shadow Tomes
+    this.contentTome.subscribe((state: any) => {
+      console.log("🌊 Integrated System: Content Tome state changed", state);
+      this.handleContentTomeStateChange(state);
+    });
 
-  // 🎯 IMPROVEMENT: Enhanced message processing using createViewStateMachine
-  async processMessage(message: any, source: string): Promise<any> {
-    console.log(`🌊 Integrated Content System: Processing message from ${source}:`, message.name);
-    
-    try {
-      // Process message using createViewStateMachine
-      if (this.viewStateMachine) {
-        // Send event to the state machine
-        await this.viewStateMachine.send({ type: message.name, payload: message });
-        
-        // Get current state
-        const currentState = this.viewStateMachine.getState()?.value || 'idle';
-        const context = this.viewStateMachine.getState()?.context || {};
-        
-        return {
-          newState: { name: currentState, context },
-          views: this.generateViewsForState(currentState, message, context),
-          actions: this.generateActionsForMessage(message, currentState)
-        };
-      }
-      
-      return {
-        newState: { name: 'active', context: {} },
-        views: this.generateViewsForState('active', message, {}),
-        actions: this.generateActionsForMessage(message, 'active')
-      };
-      
-    } catch (error) {
-      console.error("🌊 Error processing message:", error);
-      return { newState: { name: 'error' }, views: [], actions: [] };
-    }
-  }
-
-  // 🎯 IMPROVEMENT: Enhanced view generation
-  private generateViewsForState(state: string, message: any, context: any): any[] {
-    const views: any[] = [];
-    const timestamp = Date.now();
-
-    switch (state) {
-      case 'active':
-        views.push({
-          type: 'content',
-          component: 'ContentSystem',
-          props: { 
-            isActive: true, 
-            message: 'Content system active',
-            context: context
-          },
-          priority: 2,
-          timestamp
-        });
-        break;
-        
-      case 'reading':
-        views.push({
-          type: 'content',
-          component: 'WaveReader',
-          props: { 
-            isActive: true, 
-            message: 'Wave reading in progress',
-            context: context
-          },
-          priority: 3,
-          timestamp
-        });
-        break;
-        
-      case 'selecting':
-        views.push({
-          type: 'overlay',
-          component: 'SelectorUI',
-          props: { 
-            isActive: true, 
-            message: 'Element selection active',
-            context: context
-          },
-          priority: 4,
-          timestamp
-        });
-        break;
-        
-      case 'error':
-        views.push({
-          type: 'notification',
-          component: 'ErrorDisplay',
-          props: { 
-            isActive: true, 
-            message: 'System error occurred',
-            error: context.error || 'Unknown error',
-            context: context
-          },
-          priority: 5,
-          timestamp
-        });
-        break;
-    }
-
-    return views;
-  }
-
-  // 🎯 IMPROVEMENT: Enhanced action generation
-  private generateActionsForMessage(message: any, currentState: string): any[] {
-    const actions: any[] = [];
-
-    switch (message.name) {
-      case 'START_READING':
-        if (currentState !== 'reading') {
-          actions.push({ type: 'ACTIVATE_WAVE_READER' });
-        }
-        break;
-
-      case 'STOP_READING':
-        if (currentState === 'reading') {
-          actions.push({ type: 'DEACTIVATE_WAVE_READER' });
-        }
-        break;
-
-      case 'START_SELECTION':
-        if (currentState !== 'selecting') {
-          actions.push({ type: 'SHOW_SELECTOR_UI' });
-        }
-        break;
-
-      case 'ELEMENT_SELECTED':
-        actions.push({ type: 'PROCESS_SELECTION', payload: message.payload });
-        break;
-    }
-
-    return actions;
-  }
-
-  // 🎯 IMPROVEMENT: Enhanced state management using createViewStateMachine
-  getCurrentState(): any {
-    if (this.viewStateMachine) {
-      return this.viewStateMachine.getState()?.value || 'idle';
-    }
-    return 'idle';
-  }
-
-  getCurrentViews(): any[] {
-    const currentState = this.getCurrentState();
-    return this.generateViewsForState(currentState, {}, {});
-  }
-
-  clearProcessedViews(): void {
-    // Views are managed by React components now
-  }
-
-  getStateHistory(): any[] {
-    if (this.viewStateMachine) {
-      return this.viewStateMachine.getState()?.context?.stateHistory || [];
-    }
-    return [];
-  }
-
-  // 🎯 IMPROVEMENT: Enhanced health status
-  getHealthStatus(): any {
-    return {
-      timestamp: Date.now(),
-      sessionId: this.sessionId,
-      contentSystemState: this.getCurrentState(),
-      createViewStateMachineActive: !!this.viewStateMachine,
-      machineCount: this.viewStateMachine ? 1 : 0,
-      viewQueueLength: this.getCurrentViews().length,
-      messageHistoryLength: 0,
-      stateHistoryLength: this.getStateHistory().length
-    };
-  }
-
-  getMessageHistory(): any[] {
-    return []; // For now, return empty array
-  }
-
-  getSessionId(): string {
-    return this.sessionId;
-  }
-
-  // 🎯 IMPROVEMENT: Enhanced cleanup
-  destroy(): void {
-    console.log("🌊 Integrated Content System: Destroying");
-    
-    try {
-      // Clean up state machine
-      if (this.viewStateMachine) {
-        this.viewStateMachine.stop();
-      }
-      
-      // Clean up resources
-      if (this.shadowRoot) {
-        this.shadowRoot.innerHTML = '';
-      }
-      
-    } catch (error) {
-      console.error("🌊 Error during cleanup:", error);
-    }
-  }
-
-  // ... rest of the existing methods (createStyleElements, setupMessageListeners, etc.)
-  // These would remain largely the same but could be enhanced to work with the structural system
-
-  private createStyleElements() {
-    // Implementation would be similar to the original
-    // but could be enhanced to work with the structural system
+    this.shadowTome.subscribe((state: any) => {
+      console.log("🌊 Integrated System: Shadow Tome state changed", state);
+      this.handleShadowTomeStateChange(state);
+    });
   }
 
   private setupMessageListeners() {
-    // Implementation would be similar to the original
-    // but could be enhanced to work with the structural system
+    // Listen for messages from the popup and background
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        this.handleRuntimeMessage(message, sender, sendResponse);
+        return true; // Keep message channel open
+      });
+    }
+
+    // Listen for window.postMessage from background script
+    window.addEventListener('message', (event) => {
+      if (event.data?.source === 'wave-reader-extension') {
+        this.handleWindowMessage(event.data.message);
+      }
+    });
   }
 
-  private logMessage(type: string, message: string) {
-    // Implementation would be similar to the original
-    // but could be enhanced to work with the structural system
+  private handleRuntimeMessage(message: any, sender: any, sendResponse: any) {
+    console.log("🌊 Integrated System: Handling runtime message", message);
+    
+    try {
+      switch (message.name) {
+        case 'start':
+          this.handleStart(message);
+          sendResponse({ success: true, state: this.proxyState });
+          break;
+        case 'stop':
+          this.handleStop(message);
+          sendResponse({ success: true, state: this.proxyState });
+          break;
+        case 'toggle':
+          this.handleToggle(message);
+          sendResponse({ success: true, state: this.proxyState });
+          break;
+        case 'ping':
+          this.handlePing(message);
+          sendResponse({ success: true, state: this.proxyState });
+          break;
+        default:
+          console.log("🌊 Integrated System: Unknown runtime message type:", message.name);
+          sendResponse({ success: false, error: 'Unknown message type' });
+      }
+    } catch (error: any) {
+      console.error("🌊 Integrated System: Error handling runtime message:", error);
+      sendResponse({ success: false, error: error.message });
+    }
+  }
+
+  private handleWindowMessage(message: any) {
+    console.log("🌊 Integrated System: Handling window message", message);
+    
+    try {
+      switch (message.name) {
+        case 'start':
+          this.handleStart(message);
+          break;
+        case 'stop':
+          this.handleStop(message);
+          break;
+        case 'toggle':
+          this.handleToggle(message);
+          break;
+        case 'ping':
+          this.handlePing(message);
+          break;
+        default:
+          console.log("🌊 Integrated System: Unknown window message type:", message.name);
+      }
+    } catch (error: any) {
+      console.error("🌊 Integrated System: Error handling window message:", error);
+    }
+  }
+
+  private handleStart(message: any) {
+    console.log("🌊 Integrated System: Handling start message", { 
+      message, 
+      hasOptions: !!message.options 
+    });
+    
+    this.going = true;
+    
+    // Extract options from the start message
+    if (message.options) {
+      this.latestOptions = message.options;
+      console.log("🌊 Integrated System: Options extracted and set", { 
+        latestOptions: this.latestOptions,
+        hasWave: !!this.latestOptions?.wave 
+      });
+    } else {
+      console.warn("🌊 Integrated System: No options found in start message");
+      this.messageService.logMessage('start-warning', 'No options in start message');
+    }
+    
+    // Route message to both Tomes
+    this.routeMessageToTomes('start', message);
+    
+    // Apply wave animation
+    this.applyWaveAnimation();
+    
+    // Update proxy state
+    this.updateProxyState();
+    
+    this.messageService.logMessage('start', 'Integrated system started');
+    this.logMessage('start', 'Integrated system started');
+  }
+
+  private handleStop(message: any) {
+    console.log("🌊 Integrated System: Handling stop message");
+    
+    this.going = false;
+    
+    // Route message to both Tomes
+    this.routeMessageToTomes('stop', message);
+    
+    // Remove wave animation
+    this.removeWaveAnimation();
+    
+    // Update proxy state
+    this.updateProxyState();
+    
+    this.messageService.logMessage('stop', 'Integrated system stopped');
+    this.logMessage('stop', 'Integrated system stopped');
+  }
+
+  private handleToggle(message: any) {
+    console.log("🌊 Integrated System: Handling toggle message");
+    
+    if (this.going) {
+      this.handleStop(message);
+    } else {
+      this.handleStart(message);
+    }
+  }
+
+  private handlePing(message: any) {
+    console.log("🌊 Integrated System: Handling ping message");
+    
+    // Route ping to both Tomes
+    this.routeMessageToTomes('ping', message);
+    
+    // Send pong response
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      chrome.runtime.sendMessage({
+        from: 'integrated-content-system',
+        name: 'pong',
+        timestamp: Date.now(),
+        sessionId: this.sessionId,
+        proxyState: this.proxyState
+      });
+    }
+    
+    this.messageService.logMessage('ping', 'Ping responded with pong');
+    this.logMessage('ping', 'Ping responded with pong');
+  }
+
+  private routeMessageToTomes(messageName: string, messageData: any) {
+    console.log("🌊 Integrated System: Routing message to Tomes", { messageName, messageData });
+    
+    try {
+      // Send to content Tome
+      this.contentTome.send(messageName, messageData);
+      
+      // Send to shadow Tome
+      this.shadowTome.send(messageName, messageData);
+      
+      console.log("🌊 Integrated System: Message routed to both Tomes successfully");
+    } catch (error: any) {
+      console.error("🌊 Integrated System: Error routing message to Tomes:", error);
+    }
+  }
+
+  private handleContentTomeStateChange(state: any) {
+    console.log("🌊 Integrated System: Content Tome state changed", state);
+    
+    // Handle content Tome state changes
+    if (state.value === 'active') {
+      console.log("🌊 Integrated System: Content Tome is now active");
+    }
+    
+    // Update proxy state
+    this.updateProxyState();
+  }
+
+  private handleShadowTomeStateChange(state: any) {
+    console.log("🌊 Integrated System: Shadow Tome state changed", state);
+    
+    // Handle shadow Tome state changes
+    if (state.value === 'waving') {
+      console.log("🌊 Integrated System: Shadow Tome is now waving");
+    }
+    
+    // Update proxy state
+    this.updateProxyState();
+  }
+
+  private updateProxyState() {
+    const contentState = this.contentTome.getSnapshot().value;
+    const shadowState = this.shadowTome.getSnapshot().value;
+    
+    if (contentState === 'active' && shadowState === 'waving') {
+      this.proxyState = 'both-active';
+    } else if (contentState === 'active') {
+      this.proxyState = 'active';
+    } else if (shadowState === 'waving') {
+      this.proxyState = 'shadow-active';
+    } else {
+      this.proxyState = 'idle';
+    }
+    
+    console.log("🌊 Integrated System: Proxy state updated", {
+      proxyState: this.proxyState,
+      contentState,
+      shadowState
+    });
+  }
+
+  private applyWaveAnimation() {
+    console.log("🌊 Integrated System: Applying wave animation", {
+      hasOptions: !!this.latestOptions,
+      hasWave: !!this.latestOptions?.wave,
+      wave: this.latestOptions?.wave
+    });
+
+    if (!this.latestOptions?.wave) {
+      console.warn("🌊 Integrated System: No wave options available for animation");
+      this.messageService.logMessage('wave-animation-failed', 'No wave options available');
+      return;
+    }
+
+    const wave = this.latestOptions.wave;
+    const css = wave.cssTemplate;
+
+    console.log("🌊 Integrated System: Wave CSS template", {
+      css,
+      cssLength: css ? css.length : 0,
+      cssPreview: css ? css.substring(0, 200) + '...' : 'NO_CSS'
+    });
+
+    if (css) {
+      console.log("🌊 Integrated System: Calling DOM service to apply CSS animation...");
+      this.domService.applyWaveAnimation(css);
+      this.messageService.logMessage('wave-animation-applied', 'Wave animation applied');
+      console.log("🌊 Integrated System: Wave animation CSS applied to DOM");
+    } else {
+      console.warn("🌊 Integrated System: No CSS template available in wave");
+      this.messageService.logMessage('wave-animation-failed', 'No CSS template available');
+    }
+  }
+
+  private removeWaveAnimation() {
+    console.log("🌊 Integrated System: Removing wave animation");
+    this.domService.removeWaveAnimation();
+    this.messageService.logMessage('wave-animation-removed', 'Wave animation removed');
+  }
+
+  private logMessage(type: string, message: string, data?: any) {
+    const logEntry = {
+      type,
+      message,
+      data,
+      timestamp: Date.now(),
+      sessionId: this.sessionId,
+      url: window.location.href,
+      proxyState: this.proxyState,
+      contentState: this.contentTome.getSnapshot().value,
+      shadowState: this.shadowTome.getSnapshot().value
+    };
+    
+    this.messageHistory.push(logEntry);
+    console.log(`🌊 Integrated System [${type}]:`, message, data);
+  }
+
+  // Public methods for external access
+  public getCurrentState() {
+    return {
+      proxyState: this.proxyState,
+      contentState: this.contentTome.getSnapshot().value,
+      shadowState: this.shadowTome.getSnapshot().value,
+      going: this.going
+    };
+  }
+
+  public getSessionId() {
+    return this.sessionId;
+  }
+
+  public getMessageHistory() {
+    return this.messageHistory;
+  }
+
+  public isActive() {
+    return this.going;
+  }
+
+  public getTomeStates() {
+    return {
+      content: this.contentTome.getSnapshot(),
+      shadow: this.shadowTome.getSnapshot()
+    };
+  }
+
+  public destroy() {
+    console.log("🌊 Integrated System: Destroying system...");
+    
+    // Clean up Tomes
+    if (this.contentTome) {
+      this.contentTome.stop();
+    }
+    if (this.shadowTome) {
+      this.shadowTome.stop();
+    }
+    
+    // Clean up services
+    this.domService.cleanup();
+    
+    this.logMessage('system-destroyed', 'Integrated system destroyed');
   }
 }
 
-// 🎯 IMPROVEMENT: Export the integrated system
+// Initialize the integrated system when the script loads
+console.log("🌊 Log-View-Machine: Initializing integrated content system...");
+
+// Wait for DOM to be ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    new LogViewContentSystemIntegrated();
+  });
+} else {
+  new LogViewContentSystemIntegrated();
+}
+
+// Export for testing
 export default LogViewContentSystemIntegrated;

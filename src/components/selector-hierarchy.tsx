@@ -42,7 +42,7 @@ export const MountOrFindSelectorHierarchyComponent = ({
     
     // Add to UI root
     uiRoot.appendChild(mount);
-    
+
     // Render the component
     const component = (
         <SelectorHierarchy
@@ -52,8 +52,8 @@ export const MountOrFindSelectorHierarchyComponent = ({
             onConfirmSelector={onConfirmSelector}
         />
     );
-    
-    renderFunction(mount, component);
-    
+
+        renderFunction(mount, component);
+
     return mount;
 };

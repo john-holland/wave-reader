@@ -1,697 +1,892 @@
-import React, { FunctionComponent, useEffect, useState } from 'react'
+import React, { FunctionComponent, useEffect, useState, useCallback, useRef } from 'react'
 import styled from "styled-components";
 import './styles.scss';
-import SelectorInput from "./components/selector-input";
-import GoButton from "./components/go-button";
-import StartMessage from "./models/messages/start";
-import Wave from "./models/wave";
-import Options from "./models/options";
-import {getSyncObject, GetSyncObjectFunction, setSyncObject} from './util/sync';
-import StopMessage from "./models/messages/stop";
-import {fromMessage} from "./util/messages";
-import SelectorUpdated from "./models/messages/selector-updated";
-// todo: this should work, but jest returns a config is not defined
-import configured from './config/config';
-// todo: slightly less data driven shim
-const isDevelopment = configured.mode !== 'production'; //process.env.NODE_ENV !== 'production';
-import { guardLastError } from "./util/util";
-import UpdateWaveMessage from "./models/messages/update-wave";
-import { Settings } from "./components/settings";
-
+import { ErrorBoundary } from './components/error-boundary';
+import { Settings } from './components/settings';
 import WaveTabs from './components/wave-tabs';
 import About from './components/about';
 import ErrorTestComponent from './components/ErrorTestComponent';
 import ErrorDemoComponent from './components/ErrorDemoComponent';
-import InstalledDetails = chrome.runtime.InstalledDetails;
-import {CState, NameAccessMapInterface, Named, State, StateNames} from "./util/state";
-import StateMachine from "./util/state-machine";
-
+import { getSyncObject, setSyncObject } from './util/sync';
+import { guardLastError } from "./util/util";
+import configured from './config/config';
 import SettingsService from "./services/settings";
 import MLSettingsService from "./services/ml-settings-service";
-//import SelectorService from "./services/selector";
-import {Observer} from "rxjs";
-import RemoveSelectorMessage from "./models/messages/remove-selector";
-import StartSelectorChooseMessage from "./models/messages/start-selection-choose";
-import {SelectorsDefaultFactory} from "./models/defaults";
-import SelectionModeActivateMessage from "./models/messages/selection-mode-activate";
-import SelectionModeDeactivateMessage from "./models/messages/selection-mode-deactivate";
-import EndSelectorChooseMessage from "./models/messages/end-selection-choose";
-import AddSelectorMessage from "./models/messages/add-selector";
-import SelectionMadeMessage from "./models/messages/selection-made";
+import { SelectorsDefaultFactory } from "./models/defaults";
+import Options from "./models/options";
+import Wave from "./models/wave";
+import { StartMessage, StopMessage, ToggleMessage, MessageFactory, MessageUtility } from "./models/messages/simplified-messages";
+import { 
+  TomeConnector, 
+  useTomeConnector, 
+  AppRouter, 
+  useRouter,
+  AppStructure,
+  ComponentTomeMapping,
+  RoutingConfig,
+  TomeConfig
+} from './components/structural';
 
+// Check if we're in development mode
+const isDevelopment = configured.mode !== 'production';
+
+// Styled components optimized for Chrome extension popup
 const WaveReader = styled.div`
-  width: 800px;
+  width: 400px; // Smaller width for popup
+  max-height: 600px; // Limit height for popup
+  overflow-y: auto;
+  font-size: 14px; // Smaller font for popup
 `;
 
-const settingsService = new SettingsService();
-const mlSettingsService = new MLSettingsService();
-//const selectorService = new SelectorService(settingsService);
+const PopupHeader = styled.div`
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  padding: 15px;
+  text-align: center;
+  border-radius: 8px 8px 0 0;
+  
+  h1 {
+    margin: 0 0 5px 0;
+    font-size: 1.5rem; // Smaller for popup
+    font-weight: 700;
+  }
+  
+  p {
+    margin: 0;
+    font-size: 0.9rem;
+    opacity: 0.9;
+  }
+`;
 
-const startPageCss = (wave: Wave) => {
-    try {
-        // Get current settings instead of using defaults
-        settingsService.getCurrentSettings().then((currentOptions) => {
-            const options = new Options(currentOptions);
-            
-            if (options.showNotifications) {
-                try {
-                    const notifOptions = {
-                        type: "basic",
-                        iconUrl: "icons/waver48.png",
-                        title: "wave reader",
-                        message: "reading",
-                    };
+const PopupContent = styled.div`
+  padding: 15px;
+`;
 
-                    // @ts-ignore
-                    chrome.notifications.create("", notifOptions, guardLastError);
-                } catch (error) {
-                    console.warn("Could not create notification:", error);
-                }
-            }
-            options.wave = wave.update();
+const CompactButton = styled.button`
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin: 2px;
+  
+  &.btn-primary {
+    background: #667eea;
+    color: white;
+    
+    &:hover {
+      background: #5a6fd8;
+      transform: translateY(-1px);
+    }
+  }
+  
+  &.btn-success {
+    background: #28a745;
+    color: white;
+    
+    &:hover {
+      background: #218838;
+      transform: translateY(-1px);
+    }
+  }
+  
+  &.btn-secondary {
+    background: #6c757d;
+    color: white;
+    
+    &:hover {
+      background: #5a6268;
+      transform: translateY(-1px);
+    }
+  }
+  
+  &.btn-danger {
+    background: #dc3545;
+    color: white;
+    
+    &:hover {
+      background: #c82333;
+      transform: translateY(-1px);
+    }
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+  }
+`;
+
+const CompactInput = styled.input`
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-bottom: 10px;
+  
+  &:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+  }
+`;
+
+const CompactSection = styled.div`
+  background: #f8f9fa;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+  
+  h3 {
+    margin: 0 0 8px 0;
+    font-size: 1rem;
+    color: #2c3e50;
+  }
+`;
+
+const CompactSelectorItem = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  background: white;
+  font-size: 12px;
+  
+  .selector-text {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    background: #f8f9fa;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #495057;
+  }
+  
+  .selector-actions {
+    display: flex;
+    gap: 4px;
+  }
+`;
+
+interface StatusIndicatorProps {
+  isActive: boolean;
+}
+
+const StatusIndicator = styled.div<StatusIndicatorProps>`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: ${props => props.isActive ? '#d4edda' : '#f8f9fa'};
+  border: 1px solid ${props => props.isActive ? '#c3e6cb' : '#e9ecef'};
+  border-radius: 4px;
+  margin-bottom: 12px;
+  
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: ${props => props.isActive ? '#28a745' : '#6c757d'};
+    animation: ${props => props.isActive ? 'pulse 1.5s infinite' : 'none'};
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+`;
+
+// Unified App component using Tome architecture
+const AppUnified: FunctionComponent = () => {
+    const [selector, setSelector] = useState('p');
+    const [saved, setSaved] = useState(true);
+    const [going, setGoing] = useState(false);
+    const [selectors, setSelectors] = useState<string[]>([]);
+    const [currentView, setCurrentView] = useState('main');
+    const [isExtension, setIsExtension] = useState(false);
+    const [settings, setSettings] = useState<Options | null>(null);
+    const [showNotifications, setShowNotifications] = useState(true);
+
+    // Initialize services
+    const settingsService = new SettingsService();
+    const mlSettingsService = new MLSettingsService();
+
+    useEffect(() => {
+        // Check if we're running in a Chrome extension context
+        const checkExtensionContext = () => {
+            return typeof chrome !== 'undefined' && 
+                   chrome.runtime && 
+                   chrome.runtime.id;
+        };
+
+        const extensionContext = checkExtensionContext();
+        setIsExtension(Boolean(extensionContext));
+
+        // Initialize the app
+        const initializeApp = async () => {
             try {
-                chrome.runtime.sendMessage(new StartMessage({
-                    options: options
-                }));
-            } catch (error) {
-                console.warn("Could not send start message:", error);
-            }
-
-            setSyncObject("going", { going: true });
-        });
-    } catch (error) {
-        console.warn("Error in startPageCss:", error);
-    }
-}
-
-const stopPageCss = () => {
-    try {
-        chrome.runtime.sendMessage(new StopMessage());
-        setSyncObject("going", { going: false });
-    } catch (error) {
-        console.warn("Error in stopPageCss:", error);
-    }
-}
-
-const bootstrapConditionSettingsSetState = (going: boolean): Promise<Options> => {
-    return settingsService.getCurrentSettings().then((options) => {
-        return new Promise((resolve) => {
-            options = new Options(options);
-            setTimeout(() => {
-                if (going && options) {
-                    options.wave = options.wave.update();
-                    chrome.runtime.sendMessage(new StartMessage({
-                        options: options
-                    }));
-                } else if (!going && options) {
-                    chrome.runtime.sendMessage(new UpdateWaveMessage({ options }))
-                } else {
-                    chrome.runtime.sendMessage(new StopMessage())
-                }
-                resolve(options);
-            }, 100);
-        });
-    });
-}
-type GoingBox = {
-    going: boolean
-}
-const getGoingChromeStorage = (callback: { (going: boolean): void }) => getSyncObject("going", { going: false }, (result: GoingBox) => callback(result.going));
-
-const getGoingAsync = async (): Promise<boolean> => new Promise((resolve) => getGoingChromeStorage(resolve));
-
-type AppStatesProps = {
-    machine: StateMachine,
-    settingsService: SettingsService,
-    originState: string,
-    map: Map<string, State>,
-    setState: { (state: string | Named): Promise<State> },
-    setGoing: { (going: boolean): void },
-    getGoing: { (): boolean },
-    _getGoingAsync: { (): Promise<boolean> },
-    setOptions: { (options: Options): void },
-    bootstrapCondition: { (going: boolean): Promise<Options> },
-    onRunTimeInstalledListener: { (callback: {(details: InstalledDetails): void }): void },
-    onMessageListener: { (callback: {(message: any): boolean}): void },
-    optionsObserver: Observer<Options>,
-    getSyncObject_Going: GetSyncObjectFunction<GoingStorageProxy>,
-    bootstrapLock: SetReset
-}
-
-const chromeRunTimeInstalledListener = (callback: {(details: InstalledDetails): void}) => {
-    // maybe direct assignment would be prettier but i'm not sure if ts binds [this] for class method dispatch
-    chrome.runtime.onInstalled.addListener(callback);
-}
-
-const chromeOnMessageListener = (callback: { (message: any): boolean }) => {
-    chrome.runtime.onMessage.addListener(callback);
-}
-
-export type GoingStorageProxy = {
-    going: boolean
-}
-
-export class SetReset {
-    private _set: boolean
-    private name: string
-
-    private constructor(name: string = "unnamed lock", set: boolean = false) {
-        this.name = name;
-        this._set = set
-    }
-
-    reset() {
-        console.log(`set called for ${this.name}`)
-        this._set = false;
-    }
-
-    set() {
-        console.log(`set called for ${this.name}`)
-        this._set = true;
-    }
-
-    getSet() {
-        return this._set;
-    }
-
-    static set(name: string) {
-        console.log(`created set for ${this.name}`)
-        return new SetReset(name, true);
-    }
-    static unset(name: string) {
-        console.log(`created unset for ${this.name}`)
-        return new SetReset(name, false);
-    }
-}
-
-//todo chrome.runtime.onSuspend() handle this method and save state
-export const AppStates = ({
-  /* eslint-disable: typescript-eslint/no-unused-vars */
-    machine = new StateMachine(),
-    settingsService,
-    originState = "base",
-    // setState = async (state): Promise<State> => {
-    // todo: we should use state machine observable to support state tracking and auto saving
-    // },
-    map = new Map<string, State>(),
-    setGoing = (going) => { console.error("unset setGoing method in AppStates, goiing: ", going); },
-    //getGoing = () => { console.error("unset setGoing method in AppStates"); return false; },
-    _getGoingAsync = getGoingAsync,
-    //setOptions = (options) => { settingsService?.updateCurrentSettings(_ => options)},
-    bootstrapCondition = bootstrapConditionSettingsSetState,
-    onRunTimeInstalledListener = chromeRunTimeInstalledListener,
-    onMessageListener = chromeOnMessageListener,
-    getSyncObject_Going = getSyncObject,
-    bootstrapLock = SetReset.unset("bootstrap-lock"),
-    setOptions = (options: Options) => {
-        throw new Error("unset setOptions method" + JSON.stringify(options))
-    }
-/* eslint-enable: typescript-eslint/no-unused-vars */
-}: Partial<AppStatesProps>): NameAccessMapInterface => {
-    /* eslint-disable  @typescript-eslint/no-unused-vars */
-    const states: StateNames = {
-        "base": CState("base", ["base", "bootstrap", "update-wave", "wave"], true, () => {
-            return Promise.resolve(machine?.getState("base"))
-        }),
-        "bootstrap": CState("bootstrap", ["base"], true, async (message, state, previousState): Promise<State> => {
-            if (!bootstrapLock.getSet()) {
-                const going = (await _getGoingAsync()) || false;
-                setGoing(going);
-                bootstrapCondition(going).then(options => {
-                    machine?.handleState(options.state || machine?.getState(originState) as State).then(state => {
-                        settingsService?.updateCurrentSettings(null, update => {
-                            // check sub state? or let it error, and design better???
-                            update.state = state;
-                            return update;
-                        });
-                    });
-                });
-                bootstrapLock.set()
-            }
-
-            onRunTimeInstalledListener((details: InstalledDetails) => {
-                console.log(`install details: ${details}`);
-                // upon first load, get a default value for 'going'
-                getSyncObject_Going("going", {going: false}, (result) => {
-                    onMessageListener((message: any) => {
-                        const typedMessage = fromMessage(message);
-
-                        machine?.handleState(typedMessage);
-
-                        return true;
-                    });
-                });
-
-            });
-
-            return machine?.getState("base") as State;
-        }),
-        "update-wave": CState("update-wave", ["base"], true, async (message, state, previousState) => {
-            const settingsUpdated = message as UpdateWaveMessage;
-            
-            await settingsService?.updateCurrentSettings(settingsUpdated.options as Options,
-                (options) => {
-                    options.wave.selector = settingsUpdated?.options?.wave.selector;
-                    options.wave.update();
-                    setOptions(options);
-                    return options;
-            })
-            return previousState
-        }),
-        // selector selection mode
-        "selection mode activate": CState("selection mode activate", ["selection mode active"], true, async (message, state, previousState): Promise<State> => {
-            //setSettingsEnabled(false);
-            chrome.runtime.sendMessage(new StartSelectorChooseMessage({
-                selector: (await settingsService?.getCurrentSettings())?.wave?.selector || SelectorsDefaultFactory()[0]
-            }))
-            return Promise.resolve(machine?.getState("selection mode active") as State)
-        }),
-        "selection mode deactivate": CState("selection mode deactivate", ["base"], true, async (message, state, previousState): Promise<State> => {
-            //setSettingsEnabled(false);
-            chrome.runtime.sendMessage(new EndSelectorChooseMessage())
-            return Promise.resolve(machine?.getState("selection mode active") as State)
-        }),
-        "selection mode active": CState("selection mode active", ["selection made", "selection error report", "settings updated"], false, (message, state, previousState): Promise<State> => {
-            //  (disable settings tab)
-            const stateResult = machine?.getState("selection mode active");
-            return Promise.resolve(stateResult || machine?.getState("base") as State)
-
-            // return states.get("selection made (enable settings tab)")
-        }),
-        "selection made": CState("selection made (enable settings tab)", ["base"], false, (message, state, previousState): Promise<State> => {
-            //setSettingsEnabled(true);
-            machine?.handleState(new AddSelectorMessage({ selector: (message as SelectionMadeMessage)?.selector}))
-            const stateResult = machine?.getState("base");
-            return Promise.resolve(stateResult || machine?.getState("base") as State)
-        }),
-        "selection error report": CState("selection error report (user error, set red selection error note, revert to previous selector)", ["base"], false, (message, state, previousState) => {
-            // todo: maybe this isn't necessary -- it would be neat to have super states so the
-            //   dependent state machines could know when not to be active
-            return Promise.resolve(machine?.getState("selection mode active"))
-        }),
-        // selectors!
-        "add selector": CState("add selector", ["base"], true, (message, state, previousState): Promise<State> => {
-                // selectorUpdated(message)
-            settingsService?.updateCurrentSettings(null, (options) => {
-                options.wave.selector = (message as SelectorUpdated).selector as string || options.wave.selector;
-                options.selectors.push((message as SelectorUpdated).selector as string)
-                options.wave.update();
-                return options;
-            })
-            return Promise.resolve(previousState)
-        }),
-        // remove
-        "remove selector": CState("remove selector", ["confirm remove selector", "cancel remove selector"], false, (message, state, previousState): Promise<State> => {
-            const stateResult = machine?.getState("confirm remove selector");
-            return Promise.resolve(stateResult || machine?.getState("base") as State)
-        }),
-        "confirm remove selector": CState("confirm remove selector", ["base"], false, (message, state, previousState): Promise<State> => {
-            if (window.confirm("Are you sure you wish to remove this selector?")) {
-                settingsService?.updateCurrentSettings(null, options => {
-                    const remove = (message as RemoveSelectorMessage).selector || '';
-                    options.selectors.splice(options.selectors.indexOf(remove, 0), 1);
-                    return options;
-                })
-            }
-            const stateResult = machine?.getState("base");
-            return Promise.resolve(stateResult || machine?.getState("base") as State)
-        }),
-        // use
-        "use selector": CState("use selector", ["base"], false, (message, state, previousState): Promise<State> => {
-            const stateResult = machine?.getState("base");
-            return Promise.resolve(stateResult || machine?.getState("base") as State)
-        }),
-        // ~~ waves ~~
-        "start waving": CState("start waving", ["base", "waving"], true, (message, state, previousState): Promise<State> => {
-            const stateResult = machine?.getState("waving");
-            return Promise.resolve(stateResult || machine?.getState("base") as State)
-        }),
-        "waving": CState("start waving", ["base", "stop wave", "settings updated"], false, (message, state, previousState): Promise<State> => {
-            const stateResult = machine?.getState("waving");
-            return Promise.resolve(stateResult || machine?.getState("base") as State)
-        }),
-        "stop waving": CState("stop waving", ["base"], false, (message, state, previousState): Promise<State> => {
-            const stateResult = machine?.getState("base");
-            return Promise.resolve(stateResult || machine?.getState("base") as State)
-        }),
-    };
-
-    Object.keys(states).forEach(state => map.set(state, states[state]))
-
-    return new class implements NameAccessMapInterface {
-        getState(name: string): State | undefined {
-            return map.get(name);
-        }
-    }
-}
-
-const AppStateMachine = new StateMachine();
-
-const App: FunctionComponent = () => {
-    const [ selector, setSelector ] = useState('p');
-    const [ saved, setSaved ] = useState(true);
-    const [ going, setGoing ] = useState(false);
-    const [ options, setOptions ] = useState<Options>(Options.getDefaultOptions());
-    const [ domain, setDomain ] = useState<string>("");
-    const [ path, setPath ] = useState<string>("");
-    const [ selectors, setSelectors ] = useState<string[]>([]);
-    const [ selectorModeOn, setSelectorModeOn ] = useState<boolean>(false)
-
-    const appStateMap = AppStates({
-        machine: AppStateMachine,
-        setGoing: (going) => setGoing(going),
-        getGoing: (): boolean => { return going },
-        bootstrapCondition: bootstrapConditionSettingsSetState,
-        settingsService,
-        setOptions
-    })
-
-    useEffect(() => {
-        AppStateMachine.initialize(appStateMap, appStateMap.getState("bootstrap") as State)
-
-        settingsService.getCurrentDomainAndPaths().then(domainAndPath => {
-            setDomain(domainAndPath.domain);
-            setPath(domainAndPath.paths[0])
-        })
-
-        settingsService.getCurrentSettings().then(settings => {
-            console.log("🌊 Popup: Loading current settings:", settings);
-            setSelectors(settings.selectors);
-            setSelector(settings.wave.selector as string);
-            setOptions(settings); // Update the options state with current settings
-            setSaved(true);
-        }).catch(error => {
-            console.error("🌊 Popup: Failed to load settings:", error);
-        })
-
-        // Listen for messages from content script
-        const handleChromeMessage = (message: any, sender: any, sendResponse: any) => {
-            console.log("🌊 Popup received Chrome message:", message);
-            console.log("🌊 Message sender:", sender);
-            console.log("🌊 Message from:", message.from);
-            console.log("🌊 Message name:", message.name);
-            
-            if (message.from !== 'content-script' || message.name !== 'selection-made') {
-                console.log("🌊 Message not from content-script or not selection-made, ignoring");
-                return;
-            }
-
-            console.log("🌊 Popup handling selection-made with selector:", message.selector);
-            // Update the selector state
-            setSelector(message.selector);
-            setSelectors(prev => [...new Set(prev.concat([message.selector]))]);
-            setSaved(true);
-            
-            // Save the selector to storage
-            settingsService.updateCurrentSettings(null, (options) => {
-                options.wave.selector = message.selector;
-                options.selectors = [...new Set(options.selectors.concat([message.selector]))];
-                return options;
-            });
-            
-            // Handle the selection made state
-            AppStateMachine.handleState(new SelectionMadeMessage({ selector: message.selector }));
-        };
-
-        // Listen for Chrome messages from content script
-        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
-            console.log("🌊 Popup: Setting up Chrome message listener");
-            chrome.runtime.onMessage.addListener(handleChromeMessage);
-        } else {
-            console.log("🌊 Popup: Chrome APIs not available for message listening");
-        }
-
-        // Also listen for messages from background script
-        const handleBackgroundMessage = (message: any, sender: any, sendResponse: any) => {
-            console.log("🌊 Popup received background message:", message);
-            console.log("🌊 Message from:", message.from);
-            console.log("🌊 Message name:", message.name);
-            
-            if (message.from === 'background-script' && message.name === 'selection-made') {
-                console.log("🌊 Popup handling background selection-made with selector:", message.selector);
-                // Update the selector state
-                setSelector(message.selector);
-                setSelectors(prev => [...new Set(prev.concat([message.selector]))]);
-                setSaved(true);
-                
-                // Save the selector to storage
-                settingsService.updateCurrentSettings(null, (options) => {
-                    options.wave.selector = message.selector;
-                    options.selectors = [...new Set(options.selectors.concat([message.selector]))];
-                    return options;
-                });
-                
-                // Handle the selection made state
-                AppStateMachine.handleState(new SelectionMadeMessage({ selector: message.selector }));
-            }
-        };
-
-        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
-            console.log("🌊 Popup: Setting up background message listener");
-            chrome.runtime.onMessage.addListener(handleBackgroundMessage);
-        }
-
-        // Also keep postMessage listener for debugging
-        const handlePostMessage = (event: MessageEvent) => {
-            console.log("🌊 Popup received postMessage event:", event);
-            console.log("🌊 Event data:", event.data);
-            console.log("🌊 Event source:", event.source);
-            
-            if (!event.data || event.data.source !== 'wave-reader-extension') {
-                console.log("🌊 Message not from wave-reader-extension, ignoring");
-                return;
-            }
-
-            const message = event.data.message;
-            console.log("🌊 Popup received message:", message);
-
-            if (message.name === 'selection-made') {
-                console.log("🌊 Popup handling selection-made with selector:", message.selector);
-                // Update the selector state
-                setSelector(message.selector);
-                setSelectors(prev => [...new Set(prev.concat([message.selector]))]);
-                setSaved(true);
-                
-                // Save the selector to storage
-                settingsService.updateCurrentSettings(null, (options) => {
-                    options.wave.selector = message.selector;
-                    options.selectors = [...new Set(options.selectors.concat([message.selector]))];
-                    return options;
-                });
-                
-                // Handle the selection made state
-                AppStateMachine.handleState(new SelectionMadeMessage({ selector: message.selector }));
-            }
-        };
-
-        window.addEventListener('message', handlePostMessage);
-
-        // Add error handling for Chrome messaging
-        const sendChromeMessage = (message: any) => {
-            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-                try {
-                    chrome.runtime.sendMessage(message, (response: any) => {
-                        if (chrome.runtime.lastError) {
-                            console.warn("🌊 Chrome messaging error:", chrome.runtime.lastError);
+                if (extensionContext) {
+                    // Load saved settings and selectors from Chrome storage
+                    if (chrome.storage && chrome.storage.local) {
+                        const result = await chrome.storage.local.get([
+                            'waveReaderSettings', 
+                            'waveReaderSelectors',
+                            'currentSelector',
+                            'going'
+                        ]);
+                        
+                        if (result.waveReaderSelectors) {
+                            setSelectors(result.waveReaderSelectors);
                         }
-                    });
-                } catch (error: any) {
-                    console.warn("🌊 Chrome messaging error:", error);
+                        
+                        if (result.currentSelector) {
+                            setSelector(result.currentSelector);
+                        }
+
+                        if (result.going) {
+                            setGoing(result.going.going || false);
+                        }
+                    }
+
+                    // Load current settings
+                    const currentSettings = await settingsService.getCurrentSettings();
+                    if (currentSettings) {
+                        setSettings(new Options(currentSettings));
+                        setShowNotifications(currentSettings.showNotifications || true);
+                    }
+                } else {
+                    // Fallback to localStorage for non-extension context
+                    const savedSelectorsData = localStorage.getItem('waveReaderSelectors');
+                    const savedSelector = localStorage.getItem('waveReaderSelector');
+                    const savedGoing = localStorage.getItem('waveReaderGoing');
+                    
+                    if (savedSelectorsData) {
+                        setSelectors(JSON.parse(savedSelectorsData));
+                    }
+                    
+                    if (savedSelector) {
+                        setSelector(savedSelector);
+                    }
+
+                    if (savedGoing) {
+                        setGoing(JSON.parse(savedGoing));
+                    }
                 }
+                
+                console.log('🌊 Unified App: Initialized for Chrome extension context');
+            } catch (error) {
+                console.error('🌊 Unified App: Failed to initialize:', error);
             }
         };
 
-        // Test the connection to background script
-        sendChromeMessage({ from: 'popup', name: 'ping' });
-        console.log("🌊 Popup: Testing background script connection");
-
-        return () => {
-            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
-                chrome.runtime.onMessage.removeListener(handleChromeMessage);
-            }
-            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
-                chrome.runtime.onMessage.removeListener(handleBackgroundMessage);
-            }
-            window.removeEventListener('message', handlePostMessage);
-        };
+        initializeApp();
     }, []);
 
-    const selectorClicked = () => {
-        setSaved(false);
+    // Enhanced error handling for Chrome extension messaging
+    const sendExtensionMessage = async (message: any) => {
+        if (!isExtension) {
+            console.warn('🌊 Unified App: Not in extension context');
+            return null;
+        }
+
+        try {
+            return await chrome.runtime.sendMessage(message);
+        } catch (error: any) {
+            console.error('🌊 Unified App: Failed to send extension message:', error);
+            throw new Error(`Failed to communicate with extension: ${error.message || 'Unknown error'}`);
+        }
     };
 
-    const selectorModeClicked = (newSelectorModeOn: boolean) => {
-        setSelectorModeOn(newSelectorModeOn);
-        
-        if (newSelectorModeOn) {
-            console.log("🌊 Popup: Activating selector mode");
-            AppStateMachine.handleState(new SelectionModeActivateMessage());
+    // Start wave reading with enhanced functionality from app.tsx
+    const onGo = async () => {
+        try {
+            if (isExtension) {
+                // Get current settings and create wave
+                const currentOptions = await settingsService.getCurrentSettings();
+                const options = new Options(currentOptions);
+                
+                // Create wave with current selector
+                const wave = new Wave();
+                wave.selector = selector;
+                options.wave = wave.update();
+
+                // Show notification if enabled
+                if (options.showNotifications) {
+                    try {
+                        const notifOptions = {
+                            type: "basic",
+                            iconUrl: "icons/waver48.png",
+                            title: "wave reader",
+                            message: "reading",
+                        };
+
+                        // @ts-ignore
+                        chrome.notifications.create("", notifOptions, guardLastError);
+                    } catch (error) {
+                        console.warn("Could not create notification:", error);
+                    }
+                }
+
+                // Send start message
+                const startMessage = new StartMessage({ options });
+                await sendExtensionMessage(startMessage);
+                
+                // Update sync state
+                setSyncObject("going", { going: true });
+                setGoing(true);
+                setSaved(true);
+                
+                console.log('🌊 Unified App: Wave reader started via extension');
+            } else {
+                setGoing(true);
+                setSaved(true);
+                localStorage.setItem('waveReaderGoing', JSON.stringify(true));
+                console.log('🌊 Unified App: Wave reader started (non-extension mode)');
+            }
+        } catch (error: any) {
+            console.error('🌊 Unified App: Failed to start wave reader:', error);
+            alert(`Failed to start wave reader: ${error.message || 'Unknown error'}`);
+        }
+    };
+
+    // Stop wave reading
+    const onStop = async () => {
+        try {
+            if (isExtension) {
+                const stopMessage = new StopMessage();
+                await sendExtensionMessage(stopMessage);
+                
+                // Update sync state
+                setSyncObject("going", { going: false });
+                setGoing(false);
+                setSaved(true);
+                
+                console.log('🌊 Unified App: Wave reader stopped via extension');
+            } else {
+                setGoing(false);
+                setSaved(true);
+                localStorage.setItem('waveReaderGoing', JSON.stringify(false));
+                console.log('🌊 Unified App: Wave reader stopped (non-extension mode)');
+            }
+        } catch (error: any) {
+            console.error('🌊 Unified App: Failed to stop wave reader:', error);
+            alert(`Failed to stop wave reader: ${error.message || 'Unknown error'}`);
+        }
+    };
+
+    // Toggle wave reading
+    const onToggle = async () => {
+        if (going) {
+            await onStop();
         } else {
-            console.log("🌊 Popup: Deactivating selector mode");
-            AppStateMachine.handleState(new SelectionModeDeactivateMessage());
+            await onGo();
         }
-    }
-
-    const onSaved = async (settings: Options) => {
-        console.log("🌊 Popup: onSaved called with settings:", settings);
-        
-        // Save the settings to storage
-        await settingsService.updateCurrentSettings(settings, (options) => {
-            setSelector(options.wave.selector as string);
-            return options; // Replace with the new settings
-        });
-        
-        // Handle the state machine update
-        await AppStateMachine.handleState(new UpdateWaveMessage({
-            options: settings
-        }));
-
-        setOptions(settings); // Update the local options state
-        setSaved(true);
-        
-        // Record settings change for ML warehousing
-        try {
-            await mlSettingsService.recordBehaviorPattern({
-                timestamp: Date.now(),
-                domain: domain,
-                path: path,
-                selector: settings.wave.selector as string,
-                settings: settings,
-                success: true,
-                duration: 0,
-                userRating: 5 // High rating for user-initiated changes
-            });
-            
-            // Save domain/path-specific settings for future use
-            await mlSettingsService.saveDomainPathSettings(domain, path, settings);
-        } catch (error) {
-            console.warn('Failed to record settings change for ML:', error);
-        }
-        
-        console.log("🌊 Popup: Settings saved successfully");
     };
 
-    const selectorUpdated = async (message: SelectorUpdated) => {
-        console.log("🌊 Popup: selectorUpdated called with selector:", message.selector);
-        
-        // Update local state
-        setSelector(message.selector || 'p');
-        setSelectors([...new Set(selectors.concat([message.selector as string]))]);
-        setSaved(true);
-        
-        // Save to storage
-        settingsService.updateCurrentSettings(null, (options) => {
-            options.wave.selector = message.selector;
-            options.selectors = [...new Set(options.selectors.concat([message.selector as string]))];
-            options.wave.update();
-            return options;
-        });
-        
-        // Handle the state machine update
-        AppStateMachine.handleState(message);
-        
-        // Record selector change for ML warehousing
+    // Update selector
+    const onSelectorUpdate = async (newSelector: string) => {
         try {
-            await mlSettingsService.recordBehaviorPattern({
-                timestamp: Date.now(),
-                domain: domain,
-                path: path,
-                selector: message.selector || 'p',
-                settings: options,
-                success: true,
-                duration: 0,
-                userRating: 4 // Good rating for selector updates
+            if (isExtension) {
+                // Send message to background script
+                const response = await sendExtensionMessage({
+                    name: 'selector-updated',
+                    selector: newSelector,
+                    from: 'popup'
+                });
+                
+                if (response) {
+                    setSelector(newSelector);
+                    setSaved(true);
+                    
+                    // Save to Chrome storage
+                    if (chrome.storage && chrome.storage.local) {
+                        await chrome.storage.local.set({ currentSelector: newSelector });
+                    }
+                }
+            } else {
+                // Fallback for non-extension context
+                setSelector(newSelector);
+                setSaved(true);
+                localStorage.setItem('waveReaderSelector', newSelector);
+            }
+        } catch (error) {
+            console.error('🌊 Unified App: Failed to update selector:', error);
+        }
+    };
+
+    // Add selector
+    const onAddSelector = async (newSelector: string) => {
+        try {
+            if (isExtension) {
+                // Send message to background script
+                const response = await sendExtensionMessage({
+                    name: 'selector-added',
+                    selector: newSelector,
+                    from: 'popup'
+                });
+                
+                if (response) {
+                    setSelectors(prev => [...new Set([...prev, newSelector])]);
+                    setSaved(true);
+                    
+                    // Save to Chrome storage
+                    if (chrome.storage && chrome.storage.local) {
+                        await chrome.storage.local.set({ 
+                            waveReaderSelectors: [...selectors, newSelector] 
+                        });
+                    }
+                }
+            } else {
+                // Fallback for non-extension context
+                setSelectors(prev => [...new Set([...prev, newSelector])]);
+                setSaved(true);
+                localStorage.setItem('waveReaderSelectors', JSON.stringify([...selectors, newSelector]));
+            }
+        } catch (error) {
+            console.error('🌊 Unified App: Failed to add selector:', error);
+        }
+    };
+
+    // Remove selector
+    const onRemoveSelector = async (selectorToRemove: string) => {
+        try {
+            if (isExtension) {
+                // Send message to background script
+                const response = await sendExtensionMessage({
+                    name: 'selector-removed',
+                    selector: selectorToRemove,
+                    from: 'popup'
+                });
+                
+                if (response) {
+                    setSelectors(prev => prev.filter(s => s !== selectorToRemove));
+                    setSaved(true);
+                    
+                    // Save to Chrome storage
+                    if (chrome.storage && chrome.storage.local) {
+                        await chrome.storage.local.set({ 
+                            waveReaderSelectors: selectors.filter(s => s !== selectorToRemove) 
+                        });
+                    }
+                }
+            } else {
+                // Fallback for non-extension context
+                setSelectors(prev => prev.filter(s => s !== selectorToRemove));
+                setSaved(true);
+                localStorage.setItem('waveReaderSelectors', JSON.stringify(selectors.filter(s => s !== selectorToRemove)));
+            }
+        } catch (error) {
+            console.error('🌊 Unified App: Failed to remove selector:', error);
+        }
+    };
+
+    // Show settings
+    const onShowSettings = () => {
+        setCurrentView('settings');
+    };
+
+    // Go back to main view
+    const onGoBackToMain = () => {
+        setCurrentView('main');
+    };
+
+    // Handle selector mode
+    const onSelectorModeToggle = async (enabled: boolean) => {
+        if (enabled) {
+            setCurrentView('selector-selection');
+        } else {
+            setCurrentView('main');
+        }
+    };
+
+    // Update wave settings
+    const updateWaveSettings = (newSettings: Partial<Options>) => {
+        if (settings) {
+            const updatedSettings = new Options({
+                ...settings,
+                ...newSettings
             });
-        } catch (error) {
-            console.warn('Failed to record selector change for ML:', error);
+            setSettings(updatedSettings);
+            setSaved(false);
         }
-    }
+    };
 
-    const onGo = () => {
-        setGoing(true);
-
-        settingsService.updateCurrentSettings(null, (options) => {
-            options.going = true;
-            setSelectors(options.selectors);
-            // use workboots and send message with wave params to interpolate css
-            startPageCss(options.wave);
-            return options;
-        })
-    }
-
-    const onStop = () => {
-        setGoing(false);
-        stopPageCss();
-    }
-
-
-    useEffect(() => {
-        //if (configured.mode === "production") {
-        if (!isDevelopment) {
-            window.onblur = () => {
-                window.close();
-            }
-        }
-    }, []);
-
-    const onDomainPathChange = async (domain: string, path: string) => {
-        const previousDomain = domain;
-        const previousPath = path;
-        
-        setDomain(domain);
-        setPath(path);
-        
-        // Record domain path change for ML warehousing
+    // Save settings
+    const saveSettings = async () => {
         try {
-            await mlSettingsService.recordDomainPathChange(
-                domain, 
-                path, 
-                previousDomain, 
-                previousPath,
-                options
-            );
-            
-            // Check if we have domain/path-specific settings to load
-            const domainPathSettings = await mlSettingsService.getDomainPathSettings(domain, path, options);
-            if (domainPathSettings) {
-                // Apply domain/path-specific settings
-                const mergedSettings = new Options({ ...options, ...domainPathSettings });
-                setOptions(mergedSettings);
-                console.log(`🌊 Applied domain/path-specific settings for ${domain}${path}`);
+            if (isExtension && chrome.storage && chrome.storage.local) {
+                await chrome.storage.local.set({ 
+                    waveReaderSettings: settings 
+                });
+                setSaved(true);
+                console.log('🌊 Settings saved successfully');
+            } else {
+                localStorage.setItem('waveReaderSettings', JSON.stringify(settings));
+                setSaved(true);
+                console.log('🌊 Settings saved to localStorage');
             }
         } catch (error) {
-            console.warn('Failed to record domain path change for ML:', error);
+            console.error('🌊 Failed to save settings:', error);
         }
-    }
+    };
+
+    // Reset settings to defaults
+    const resetSettings = () => {
+        if (window.confirm('Are you sure you want to reset to default settings?')) {
+            const defaultSettings = new Options();
+            setSettings(defaultSettings);
+            setSaved(false);
+        }
+    };
+
+    // View components using withState pattern
+    const withState = <T extends Record<string, any>>(Component: React.ComponentType<T>, props: T) => {
+        return <Component {...props} />;
+    };
+
+    // Settings View Component
+    const SettingsView = () => (
+        <div>
+            <h3>⚙️ Settings</h3>
+            
+            {/* Save Status */}
+            <CompactSection>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h4>Status</h4>
+                    <span style={{ 
+                        color: saved ? '#28a745' : '#ffc107',
+                        fontWeight: 'bold'
+                    }}>
+                        {saved ? '✅ Saved' : '🌊 Unsaved Changes'}
+                    </span>
+                </div>
+            </CompactSection>
+
+            {/* Basic Settings */}
+            <CompactSection>
+                <h4>Basic Settings</h4>
+                <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                            type="checkbox"
+                            checked={showNotifications}
+                            onChange={(e) => {
+                                setShowNotifications(e.target.checked);
+                                if (settings) {
+                                    updateWaveSettings({ showNotifications: e.target.checked });
+                                }
+                            }}
+                        />
+                        Show Notifications
+                    </label>
+                </div>
+            </CompactSection>
+
+            {/* Wave Animation Settings */}
+            <CompactSection>
+                <h4>🌊 Wave Animation</h4>
+                
+                {/* Wave Speed */}
+                <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px' }}>
+                        Wave Speed: {settings?.wave?.waveSpeed || 4}s
+                    </label>
+                    <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        step="0.5"
+                        value={settings?.wave?.waveSpeed || 4}
+                        onChange={(e) => {
+                            if (settings?.wave) {
+                                const newWave = new Wave(settings.wave);
+                                newWave.waveSpeed = parseFloat(e.target.value);
+                                updateWaveSettings({ wave: newWave });
+                            }
+                        }}
+                        style={{ width: '100%' }}
+                    />
+                </div>
+
+                {/* Wave Control Type */}
+                <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px' }}>
+                        Animation Control:
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <input
+                                type="radio"
+                                name="waveControl"
+                                value="CSS"
+                                checked={settings?.waveAnimationControl === 0}
+                                onChange={() => updateWaveSettings({ waveAnimationControl: 0 })}
+                            />
+                            CSS
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <input
+                                type="radio"
+                                name="waveControl"
+                                value="MOUSE"
+                                checked={settings?.waveAnimationControl === 1}
+                                onChange={() => updateWaveSettings({ waveAnimationControl: 1 })}
+                            />
+                            Mouse
+                        </label>
+                    </div>
+                </div>
+
+                {/* Axis Translation */}
+                <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px' }}>
+                        X Translation: {settings?.wave?.axisTranslateAmountXMin || -1} to {settings?.wave?.axisTranslateAmountXMax || 1}
+                    </label>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <input
+                            type="number"
+                            placeholder="Min"
+                            value={settings?.wave?.axisTranslateAmountXMin || -1}
+                            onChange={(e) => {
+                                if (settings?.wave) {
+                                    const newWave = new Wave(settings.wave);
+                                    newWave.axisTranslateAmountXMin = parseFloat(e.target.value) || 0;
+                                    updateWaveSettings({ wave: newWave });
+                                }
+                            }}
+                            style={{ width: '50%', padding: '4px', fontSize: '12px' }}
+                        />
+                        <input
+                            type="number"
+                            placeholder="Max"
+                            value={settings?.wave?.axisTranslateAmountXMax || 1}
+                            onChange={(e) => {
+                                if (settings?.wave) {
+                                    const newWave = new Wave(settings.wave);
+                                    newWave.axisTranslateAmountXMax = parseFloat(e.target.value) || 0;
+                                    updateWaveSettings({ wave: newWave });
+                                }
+                            }}
+                            style={{ width: '50%', padding: '4px', fontSize: '12px' }}
+                        />
+                    </div>
+                </div>
+
+                {/* Axis Rotation */}
+                <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px' }}>
+                        Y Rotation: {settings?.wave?.axisRotationAmountYMin || -2}° to {settings?.wave?.axisRotationAmountYMax || 2}°
+                    </label>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <input
+                            type="number"
+                            placeholder="Min"
+                            value={settings?.wave?.axisRotationAmountYMin || -2}
+                            onChange={(e) => {
+                                if (settings?.wave) {
+                                    const newWave = new Wave(settings.wave);
+                                    newWave.axisRotationAmountYMin = parseFloat(e.target.value) || 0;
+                                    updateWaveSettings({ wave: newWave });
+                                }
+                            }}
+                            style={{ width: '50%', padding: '4px', fontSize: '12px' }}
+                        />
+                        <input
+                            type="number"
+                            placeholder="Max"
+                            value={settings?.wave?.axisRotationAmountYMax || 2}
+                            onChange={(e) => {
+                                if (settings?.wave) {
+                                    const newWave = new Wave(settings.wave);
+                                    newWave.axisRotationAmountYMax = parseFloat(e.target.value) || 0;
+                                    updateWaveSettings({ wave: newWave });
+                                }
+                            }}
+                            style={{ width: '50%', padding: '4px', fontSize: '12px' }}
+                        />
+                    </div>
+                </div>
+
+                {/* Mouse Follow Interval */}
+                <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px' }}>
+                        Mouse Follow Interval: {settings?.wave?.mouseFollowInterval || 100}ms
+                    </label>
+                    <input
+                        type="range"
+                        min="50"
+                        max="200"
+                        step="10"
+                        value={settings?.wave?.mouseFollowInterval || 100}
+                        onChange={(e) => {
+                            if (settings?.wave) {
+                                const newWave = new Wave(settings.wave);
+                                newWave.mouseFollowInterval = parseInt(e.target.value);
+                                updateWaveSettings({ wave: newWave });
+                            }
+                        }}
+                        style={{ width: '100%' }}
+                    />
+                </div>
+            </CompactSection>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <CompactButton 
+                    className="btn btn-primary" 
+                    onClick={saveSettings}
+                    disabled={saved}
+                >
+                    💾 Save Settings
+                </CompactButton>
+                <CompactButton 
+                    className="btn btn-secondary" 
+                    onClick={resetSettings}
+                >
+                    🔄 Reset to Defaults
+                </CompactButton>
+                <CompactButton 
+                    className="btn btn-secondary" 
+                    onClick={onGoBackToMain}
+                >
+                    ← Back
+                </CompactButton>
+            </div>
+        </div>
+    );
+
+    // Selector Selection View Component
+    const SelectorSelectionView = () => (
+        <div>
+            <h3>🎯 Select Element</h3>
+            <p style={{ fontSize: '12px', marginBottom: '12px' }}>
+                Click on any element on the page to select it
+            </p>
+            <div style={{ display: 'flex', gap: '8px' }}>
+                <CompactButton className="btn btn-primary" onClick={() => setCurrentView('main')}>
+                    ✅ Done
+                </CompactButton>
+                <CompactButton className="btn btn-secondary" onClick={() => setCurrentView('main')}>
+                    ❌ Cancel
+                </CompactButton>
+            </div>
+        </div>
+    );
+
+    // Main View Component
+    const MainView = () => (
+        <div>
+            <CompactSection>
+                <h3>CSS Selector</h3>
+                <CompactInput
+                    type="text"
+                    value={selector}
+                    onChange={(e) => setSelector(e.target.value)}
+                    placeholder="e.g., p, h1, .content"
+                />
+                
+                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                    <CompactButton 
+                        className="btn btn-primary" 
+                        onClick={onGo} 
+                        disabled={going}
+                    >
+                        🚀 Start
+                    </CompactButton>
+                    <CompactButton 
+                        className="btn btn-success" 
+                        onClick={onStop} 
+                        disabled={!going}
+                    >
+                        ⏹️ Stop
+                    </CompactButton>
+                    <CompactButton 
+                        className="btn btn-secondary" 
+                        onClick={onToggle}
+                    >
+                        🔄 Toggle
+                    </CompactButton>
+                    <CompactButton 
+                        className="btn btn-secondary" 
+                        onClick={() => onAddSelector(selector)}
+                    >
+                        ➕ Add
+                    </CompactButton>
+                    <CompactButton 
+                        className="btn btn-secondary" 
+                        onClick={onShowSettings}
+                    >
+                        ⚙️
+                    </CompactButton>
+                </div>
+            </CompactSection>
+            
+            {going && (
+                <StatusIndicator isActive={true}>
+                    <div className="status-dot"></div>
+                    <span>🌊 Reading: {selector}</span>
+                </StatusIndicator>
+            )}
+            
+            <CompactSection>
+                <h3>Saved Selectors</h3>
+                {selectors.length === 0 ? (
+                    <p style={{ fontSize: '12px', margin: 0 }}>No selectors saved yet</p>
+                ) : (
+                    selectors.map((savedSelector, index) => (
+                        <CompactSelectorItem key={index}>
+                            <span className="selector-text">{savedSelector}</span>
+                            <div className="selector-actions">
+                                <CompactButton 
+                                    className="btn btn-sm btn-secondary" 
+                                    onClick={() => onSelectorUpdate(savedSelector)}
+                                >
+                                    Use
+                                </CompactButton>
+                                <CompactButton 
+                                    className="btn btn-sm btn-danger" 
+                                    onClick={() => onRemoveSelector(savedSelector)}
+                                >
+                                    Remove
+                                </CompactButton>
+                            </div>
+                        </CompactSelectorItem>
+                    ))
+                )}
+            </CompactSection>
+        </div>
+    );
+
+    // Render the appropriate view based on current state using withState
+    const renderView = () => {
+        const viewMap = {
+            'settings': () => withState(SettingsView, {}),
+            'selector-selection': () => withState(SelectorSelectionView, {}),
+            'main': () => withState(MainView, {})
+        };
+
+        const viewRenderer = viewMap[currentView as keyof typeof viewMap];
+        return viewRenderer ? viewRenderer() : withState(MainView, {});
+    };
 
     return (
-        <WaveReader>
-            <GoButton onGo={onGo} onStop={onStop} going={going}/>
-            <WaveTabs>
-                <SelectorInput
-                    tab-name={"Selector"}
-                    selector={selector}
-                    selectors={selectors}
-                    saved={saved}
-                    selectorClicked={selectorClicked}
-                    onSave={async (selector: string) => selectorUpdated(new SelectorUpdated({ selector }))}
-                    selectorModeClicked={selectorModeClicked}
-                    selectorModeOn={selectorModeOn}
-                />
-                <Settings
-                    tab-name={"Settings"}
-                    initialSettings={options}
-                    onUpdateSettings={onSaved}
-                    domain={domain} path={path}
-                    settingsService={settingsService}
-                    onDomainPathChange={onDomainPathChange}
-                />
-                <About tab-name={"About"} />
-                <ErrorTestComponent tab-name={"Error Test"} />
-                <ErrorDemoComponent tab-name={"Error Demo"} />
-            </WaveTabs>
-        </WaveReader>
+        <ErrorBoundary>
+            <WaveReader>
+                <PopupHeader>
+                    <h1>🌊 Wave Reader</h1>
+                    <p>Motion Reader for Eye Tracking</p>
+                </PopupHeader>
+                
+                <PopupContent>
+                    {renderView()}
+                </PopupContent>
+            </WaveReader>
+        </ErrorBoundary>
     );
 };
 
-export default App;
+export default AppUnified;

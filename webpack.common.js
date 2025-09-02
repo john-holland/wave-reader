@@ -24,7 +24,22 @@ const config = {
         filename: "[name].js"
     },
     resolve: {
-        extensions: [".tsx", ".ts", ".js", ".jsx", ".*"]
+        extensions: [".tsx", ".ts", ".js", ".jsx", ".*"],
+        fallback: {
+            "path": require.resolve("path-browserify"),
+            "tty": require.resolve("tty-browserify"),
+            "util": require.resolve("util/"),
+            "fs": false,
+            "net": false,
+            "stream": require.resolve("stream-browserify"),
+            "zlib": require.resolve("browserify-zlib"),
+            "querystring": require.resolve("querystring-es3"),
+            "url": require.resolve("url/"),
+            "http": require.resolve("stream-http"),
+            "crypto": require.resolve("crypto-browserify"),
+            "vm": require.resolve("vm-browserify"),
+            "assert": require.resolve("assert/")
+        }
     },
     plugins: [
         new webpack.ProvidePlugin({

@@ -10,7 +10,7 @@ import {
     KeyChordDefaultFactory,
     SelectorsDefaultFactory
 } from "./defaults"
-import {State} from "../util/state";
+// Removed state dependency - using simplified approach
 
 export class WaveToggleConfig extends AttributeConstructor<WaveToggleConfig> {
     // a 1-4ish length array of keys
@@ -84,7 +84,8 @@ export interface DomainPathSettings {
 
 export default class Options extends AttributeConstructor<Options> {
     defaultSettings: boolean = false;
-    state: State | undefined = undefined;
+    // Removed state dependency - using simplified approach
+    state: any = undefined;
     showNotifications: boolean = ShowNotificationsDefault;
     going: boolean = GoingDefault;
     waveAnimationControl: WaveAnimationControl = WaveAnimationControlDefault;

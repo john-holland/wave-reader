@@ -1,6 +1,25 @@
 import React, { FunctionComponent, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import styled from 'styled-components';
-import { SelectorHierarchyMessageHandler } from './robotcopy-pact-config';
+// Simple message handler for selector hierarchy
+class SelectorHierarchyMessageHandler {
+    private handlers: Map<string, Function>;
+    
+    constructor() {
+        this.handlers = new Map();
+    }
+    
+    registerHandler(type: string, handler: Function) {
+        this.handlers.set(type, handler);
+    }
+    
+    async sendMessage(type: string, data: any) {
+        const handler = this.handlers.get(type);
+        if (handler) {
+            return await handler(data);
+        }
+        return null;
+    }
+}
 
 // Styled components for the Tomes-based selector hierarchy
 const SelectorHierarchyContainer = styled.div`
@@ -277,10 +296,10 @@ const SelectorHierarchyTomes: FunctionComponent<SelectorHierarchyTomesProps> = (
           messageHandlerRef.current = handler;
           
           // Register message handlers
-          handler.registerMessageHandler('HIERARCHY_READY', handleHierarchyReady);
-          handler.registerMessageHandler('ELEMENTS_SELECTED', handleElementsSelected);
-          handler.registerMessageHandler('PANELS_CREATED', handlePanelsCreated);
-          handler.registerMessageHandler('ERROR_OCCURRED', handleErrorOccurred);
+          handler.registerHandler('HIERARCHY_READY', handleHierarchyReady);
+          handler.registerHandler('ELEMENTS_SELECTED', handleElementsSelected);
+          handler.registerHandler('PANELS_CREATED', handlePanelsCreated);
+          handler.registerHandler('ERROR_OCCURRED', handleErrorOccurred);
           
           // Initialize hierarchy
           await initializeHierarchy();

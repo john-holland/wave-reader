@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { createViewStateMachine } from 'log-view-machine';
 import { ComponentTomeMapping, TomeConfig } from './app-structure';
 
 interface TomeConnectorProps {
@@ -19,6 +18,121 @@ interface TomeConnectorState {
   error: string | null;
 }
 
+// Simple browser-compatible tome machine
+class BrowserTomeMachine {
+  id: string;
+  machineId: string;
+  state: string;
+  model: any;
+  private listeners: Map<string, Function[]> = new Map();
+
+  constructor(machineId: string, initialState: string, initialModel: any) {
+    this.id = `${machineId}-${Date.now()}`;
+    this.machineId = machineId;
+    this.state = initialState;
+    this.model = { ...initialModel };
+  }
+
+  sendEvent(event: any) {
+    const { type, data } = event;
+    
+    // Handle state transitions based on event type
+    switch (type) {
+      case 'START_READING':
+        if (this.state === 'idle') {
+          this.state = 'reading';
+          this.model.going = true;
+          this.model.lastActivity = new Date().toISOString();
+        }
+        break;
+      
+      case 'STOP_READING':
+        if (this.state === 'reading') {
+          this.state = 'idle';
+          this.model.going = false;
+          this.model.lastActivity = new Date().toISOString();
+        }
+        break;
+      
+      case 'SELECTOR_UPDATE':
+        this.model.selector = data?.selector || this.model.selector;
+        this.model.lastActivity = new Date().toISOString();
+        break;
+      
+      case 'SETTINGS_UPDATE':
+        this.model.settings = { ...this.model.settings, ...data };
+        this.model.lastActivity = new Date().toISOString();
+        break;
+      
+      case 'ERROR':
+        this.state = 'error';
+        this.model.error = data?.message || 'Unknown error';
+        this.model.lastActivity = new Date().toISOString();
+        break;
+      
+      default:
+        console.warn(`Unknown event type: ${type}`);
+    }
+
+    // Notify listeners
+    this.notifyListeners('stateChange', { state: this.state, model: this.model });
+    this.notifyListeners('logEntry', { 
+      timestamp: new Date().toISOString(),
+      level: 'info',
+      message: `Event ${type} processed, state: ${this.state}`,
+      event,
+      data: this.model
+    });
+  }
+
+  updateModel(updates: any) {
+    this.model = { ...this.model, ...updates };
+    this.model.lastActivity = new Date().toISOString();
+    
+    // Notify listeners
+    this.notifyListeners('modelUpdate', { model: this.model });
+    this.notifyListeners('logEntry', {
+      timestamp: new Date().toISOString(),
+      level: 'info',
+      message: 'Model updated',
+      updates,
+      data: this.model
+    });
+  }
+
+  getState(): string {
+    return this.state;
+  }
+
+  getModel(): any {
+    return this.model;
+  }
+
+  addListener(event: string, callback: Function) {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, []);
+    }
+    this.listeners.get(event)!.push(callback);
+  }
+
+  removeListener(event: string, callback: Function) {
+    const callbacks = this.listeners.get(event);
+    if (callbacks) {
+      const index = callbacks.indexOf(callback);
+      if (index > -1) {
+        callbacks.splice(index, 1);
+      }
+    }
+  }
+
+  private notifyListeners(event: string, data: any) {
+    const callbacks = this.listeners.get(event);
+    if (callbacks) {
+      callbacks.forEach(callback => callback(data));
+    }
+  }
+}
+
 export const TomeConnector: React.FC<TomeConnectorProps> = ({
   componentName,
   initialModel = {},
@@ -35,9 +149,7 @@ export const TomeConnector: React.FC<TomeConnectorProps> = ({
     error: null
   });
 
-  const machineRef = useRef<any>(null);
-  const logEntriesRef = useRef<any[]>([]);
-  const componentRef = useRef<any>(null);
+  const machineRef = useRef<BrowserTomeMachine | null>(null);
 
   // Get tome configuration and component mapping
   const tomeConfig = useMemo(() => {
@@ -48,26 +160,53 @@ export const TomeConnector: React.FC<TomeConnectorProps> = ({
     return ComponentTomeMapping[componentName as keyof typeof ComponentTomeMapping];
   }, [componentName]);
 
-  // Create the component instance (local reference)
-  const componentInstance = useMemo(() => {
-    if (!componentMapping) return null;
+  // Create the tome machine instance
+  const tomeInstance = useMemo(() => {
+    if (!tomeConfig) return null;
     
     try {
-      // Dynamic import of the component's tome
-      const ComponentTome = require(componentMapping.tomePath).default;
-      if (ComponentTome && ComponentTome.create) {
-        return ComponentTome.create(initialModel);
-      }
-    } catch (error) {
-      console.warn(`Could not load tome for ${componentName}:`, error);
-    }
-    return null;
-  }, [componentName, componentMapping, initialModel]);
+      const machine = new BrowserTomeMachine(
+        tomeConfig.machineId,
+        'idle',
+        initialModel
+      );
+      
+      // Set up event listeners
+      machine.addListener('stateChange', (data: any) => {
+        setState(prev => ({
+          ...prev,
+          currentState: data.state,
+          model: data.model
+        }));
+        onStateChange?.(data.state, data.model);
+      });
 
-  // Store component reference
+      machine.addListener('logEntry', (entry: any) => {
+        setState(prev => ({
+          ...prev,
+          logEntries: [...prev.logEntries, entry].slice(-50) // Keep last 50 entries
+        }));
+        onLogEntry?.(entry);
+      });
+
+      machine.addListener('modelUpdate', (data: any) => {
+        setState(prev => ({
+          ...prev,
+          model: data.model
+        }));
+      });
+
+      return machine;
+    } catch (error) {
+      console.error(`Failed to create tome machine for ${componentName}:`, error);
+      return null;
+    }
+  }, [componentName, tomeConfig, initialModel, onStateChange, onLogEntry]);
+
+  // Store machine reference
   useEffect(() => {
-    componentRef.current = componentInstance;
-  }, [componentInstance]);
+    machineRef.current = tomeInstance;
+  }, [tomeInstance]);
 
   // Initialize the tome machine
   useEffect(() => {
@@ -84,94 +223,25 @@ export const TomeConnector: React.FC<TomeConnectorProps> = ({
           throw new Error(`No component mapping found for: ${componentName}`);
         }
 
-        // If we have a component instance, use its configuration
-        let machine;
-        if (componentInstance) {
-          // Use the component's existing machine if available
-          if (componentInstance.machine) {
-            machine = componentInstance.machine;
-          } else {
-            // Create machine using component's configuration
-            machine = createViewStateMachine({
-              machineId: tomeConfig.machineId,
-              xstateConfig: componentInstance.xstateConfig || {
-                id: tomeConfig.machineId,
-                initial: 'idle',
-                context: {
-                  model: initialModel,
-                  componentName,
-                  tomeId: `${componentName}-tome`
-                }
-              },
-              // Copy logStates from the component instance if available
-              logStates: componentInstance.logStates || createDefaultLogStates(componentName)
-            });
-          }
-        } else {
-          // Fallback: create basic machine with default configuration
-          machine = createViewStateMachine({
-            machineId: tomeConfig.machineId,
-            xstateConfig: {
-              id: tomeConfig.machineId,
-              initial: 'idle',
-              context: {
-                model: initialModel,
-                componentName,
-                tomeId: `${componentName}-tome`
-              },
-                           states: tomeConfig.states.reduce((acc: Record<string, any>, stateName: string) => {
-               acc[stateName] = {
-                 on: {
-                   ERROR: { target: 'error' },
-                   RESET: { target: 'idle' }
-                 }
-               };
-               return acc;
-             }, {} as Record<string, any>)
-            },
-            logStates: createDefaultLogStates(componentName)
-          });
+        if (!tomeInstance) {
+          throw new Error(`Failed to create tome instance for component: ${componentName}`);
         }
 
-        // Set up event handlers
-        machine.on('stateChange', (event: any) => {
-          const newState = event.state;
-          const newModel = event.context?.model || state.model;
-          
-          setState(prev => ({
-            ...prev,
-            currentState: newState,
-            model: newModel
-          }));
-
-          onStateChange?.(newState, newModel);
-        });
-
-        machine.on('logEntry', (entry: any) => {
-          logEntriesRef.current.push(entry);
-          setState(prev => ({
-            ...prev,
-            logEntries: [...prev.logEntries, entry]
-          }));
-
-          onLogEntry?.(entry);
-        });
-
-        // Store machine reference
-        machineRef.current = machine;
-
-        // Initialize the machine
-        await machine.executeServerState('idle', initialModel);
+        // Initialize with idle state
+        tomeInstance.sendEvent({ type: 'INITIALIZE', data: { componentName } });
 
         setState(prev => ({
           ...prev,
-          machine,
+          machine: tomeInstance,
+          currentState: tomeInstance.getState(),
+          model: tomeInstance.getModel(),
           isLoading: false,
-          currentState: 'idle'
+          error: null
         }));
 
+        console.log(`🌊 TomeConnector: Initialized ${componentName} with machine ${tomeInstance.id}`);
       } catch (error) {
-        console.error(`Failed to initialize tome for ${componentName}:`, error);
+        console.error(`🌊 TomeConnector: Failed to initialize ${componentName}:`, error);
         setState(prev => ({
           ...prev,
           isLoading: false,
@@ -181,194 +251,85 @@ export const TomeConnector: React.FC<TomeConnectorProps> = ({
     };
 
     initializeTome();
-  }, [componentName, initialModel, onStateChange, onLogEntry, tomeConfig, componentMapping, componentInstance]);
+  }, [componentName, tomeConfig, componentMapping, tomeInstance]);
 
-  // Send events to the machine
-  const sendEvent = (event: any) => {
-    if (machineRef.current) {
-      try {
-        machineRef.current.send(event);
-      } catch (error) {
-        console.error(`Failed to send event ${event.type}:`, error);
-        setState(prev => ({
-          ...prev,
-          error: `Failed to send event: ${event.type}`
-        }));
-      }
-    }
-  };
-
-  // Update model
-  const updateModel = (updates: any) => {
-    if (machineRef.current) {
-      try {
-        const newModel = { ...state.model, ...updates };
-        machineRef.current.executeServerState(state.currentState, newModel);
-        
-        setState(prev => ({
-          ...prev,
-          model: newModel
-        }));
-      } catch (error) {
-        console.error('Failed to update model:', error);
-        setState(prev => ({
-          ...prev,
-          error: 'Failed to update model'
-        }));
-      }
-    }
-  };
-
-  // Reset machine
-  const resetMachine = () => {
-    if (machineRef.current) {
-      try {
-        machineRef.current.send({ type: 'RESET' });
-        setState(prev => ({
-          ...prev,
-          error: null,
-          currentState: 'idle'
-        }));
-      } catch (error) {
-        console.error('Failed to reset machine:', error);
-      }
-    }
-  };
-
-  // Get component methods if available
-  const getComponentMethod = (methodName: string) => {
-    if (componentRef.current && typeof componentRef.current[methodName] === 'function') {
-      return componentRef.current[methodName].bind(componentRef.current);
-    }
-    return null;
-  };
-
-  // Render loading state
   if (state.isLoading) {
     return (
       <div className="tome-connector-loading">
-        <div className="loading-spinner"></div>
-        <p>Initializing {componentName} tome...</p>
+        <div className="loading-spinner">🌊</div>
+        <div>Initializing {componentName}...</div>
       </div>
     );
   }
 
-  // Render error state
   if (state.error) {
     return (
       <div className="tome-connector-error">
-        <h3>Error in {componentName}</h3>
-        <p>{state.error}</p>
-        <button onClick={resetMachine}>Reset</button>
+        <div className="error-icon">❌</div>
+        <div className="error-message">Error: {state.error}</div>
       </div>
     );
   }
 
-  // Render children with tome context
   return (
     <div className="tome-connector">
-      <div className="tome-header">
-        <h4>{componentName} Tome</h4>
-        <span className="tome-state">State: {state.currentState}</span>
-        <button onClick={resetMachine}>Reset</button>
-      </div>
-      
       <div className="tome-content">
         {children}
       </div>
       
-      <div className="tome-footer">
-        <div className="tome-logs">
-          <h5>Recent Logs</h5>
-          <div className="log-entries">
-            {state.logEntries.slice(-5).map((entry, index) => (
-              <div key={index} className="log-entry">
-                <span className="log-timestamp">
-                  {new Date(entry.timestamp).toLocaleTimeString()}
-                </span>
-                <span className="log-level">{entry.level}</span>
-                <span className="log-message">{entry.message}</span>
-              </div>
-            ))}
-          </div>
+      {process.env.NODE_ENV === 'development' && (
+        <div className="tome-debug-panel" style={{
+          position: 'fixed',
+          bottom: '10px',
+          left: '10px',
+          background: 'rgba(0,0,0,0.8)',
+          color: 'white',
+          padding: '10px',
+          borderRadius: '5px',
+          fontSize: '11px',
+          zIndex: 1000,
+          fontFamily: 'monospace',
+          maxWidth: '300px'
+        }}>
+          <div>🌊 {componentName} Tome</div>
+          <div>State: {state.currentState}</div>
+          <div>Machine: {machineRef.current?.id}</div>
+          <div>Logs: {state.logEntries.length}</div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
-
-// Create default logStates when component tome is not available
-function createDefaultLogStates(componentName: string) {
-  return {
-    idle: async (context: any) => {
-      await context.log(`${componentName} is idle`);
-      return context.view(renderDefaultIdleView(context, componentName));
-    },
-    error: async (context: any) => {
-      await context.log(`${componentName} encountered an error`);
-      return context.view(renderDefaultErrorView(context, componentName));
-    }
-  };
-}
-
-// Helper functions for rendering default views
-function renderDefaultIdleView(context: any, componentName: string) {
-  return (
-    <div className="tome-default-idle-view">
-      <p>Component {componentName} is idle</p>
-    </div>
-  );
-}
-
-function renderDefaultErrorView(context: any, componentName: string) {
-  return (
-    <div className="tome-default-error-view">
-      <p>Component {componentName} has an error</p>
-    </div>
-  );
-}
 
 // Hook to use tome connector
 export const useTomeConnector = (componentName: string) => {
   const [machine, setMachine] = useState<any>(null);
   const [currentState, setCurrentState] = useState<string>('idle');
   const [model, setModel] = useState<any>({});
-  const [componentInstance, setComponentInstance] = useState<any>(null);
 
   const sendEvent = (event: any) => {
     if (machine) {
-      machine.send(event);
+      machine.sendEvent(event);
     }
   };
 
   const updateModel = (updates: any) => {
     if (machine) {
-      const newModel = { ...model, ...updates };
-      machine.executeServerState(currentState, newModel);
-      setModel(newModel);
+      machine.updateModel(updates);
     }
-  };
-
-  const getComponentMethod = (methodName: string) => {
-    if (componentInstance && typeof componentInstance[methodName] === 'function') {
-      return componentInstance[methodName].bind(componentInstance);
-    }
-    return null;
   };
 
   return {
     machine,
     currentState,
     model,
-    componentInstance,
     sendEvent,
     updateModel,
-    getComponentMethod,
     setMachine,
     setCurrentState,
-    setModel,
-    setComponentInstance
+    setModel
   };
 };
 
 export default TomeConnector;
+

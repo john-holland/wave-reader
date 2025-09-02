@@ -1,6 +1,25 @@
 import React, { FunctionComponent, useEffect, useState } from 'react';
 import styled from 'styled-components';
-import { SelectorInputMessageHandler } from './robotcopy-pact-config';
+// Simple message handler for selector input
+class SelectorInputMessageHandler {
+    private handlers: Map<string, Function>;
+    
+    constructor() {
+        this.handlers = new Map();
+    }
+    
+    registerHandler(type: string, handler: Function) {
+        this.handlers.set(type, handler);
+    }
+    
+    async sendMessage(type: string, data: any) {
+        const handler = this.handlers.get(type);
+        if (handler) {
+            return await handler(data);
+        }
+        return null;
+    }
+}
 
 // Styled components for the Tomes-based selector input
 const SelectorInputContainer = styled.div`

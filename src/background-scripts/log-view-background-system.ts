@@ -1,15 +1,5 @@
-import { LogViewMessageUtility } from '../util/log-view-messages';
-import { MessageFactory } from '../models/messages/log-view-messages';
-import { 
-    BaseVentures, 
-    StartVentures, 
-    StopVentures, 
-    WavingVentures,
-    MLVentures,
-    WaveReaderVentures,
-    AnalyticsVentures,
-    ExtensionVentures
-} from '../util/venture-states';
+import { MessageUtility } from '../models/messages/simplified-messages';
+import { MessageFactory } from '../models/messages/simplified-messages';
 import { MLSettingsService } from '../services/ml-settings-service';
 
 // Log-View-Machine Background System
@@ -237,8 +227,8 @@ export class LogViewBackgroundSystem {
         // Create a proper message using our factory
         const properMessage = MessageFactory.createMessage(message.name, message.from, message);
         
-        // Route the message through our log-view system
-        const route = LogViewMessageUtility.routeMessage(
+        // Route the message through our message system
+        const route = MessageUtility.routeMessage(
             message.from, 
             'background-script', 
             properMessage, 

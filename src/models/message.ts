@@ -1,5 +1,5 @@
 import AttributeConstructor from "../util/attribute-constructor";
-import {Named} from "../util/state";
+// Removed state dependency - using simplified approach
 
 export interface MessageInterface {
     getName(): string;
@@ -7,7 +7,7 @@ export interface MessageInterface {
     getClientId(): string;
 }
 
-export default abstract class Message<T> extends AttributeConstructor<T> implements MessageInterface, Named {
+export default abstract class Message<T> extends AttributeConstructor<T> implements MessageInterface {
     name: string;
     from: string;
     clientId?: string;

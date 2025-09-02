@@ -38,6 +38,15 @@
       "matches": [
         "<all_urls>"
       ],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
       "js": ["shadowContent.js"],
       "run_at": "document_start",
       "all_frames": true,

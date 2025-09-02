@@ -1,274 +1,402 @@
-# Wave Reader Structural System
-
-This directory contains the structural components and configuration that define the hierarchical organization of the Wave Reader application, including routing, component nesting, and tome integration.
+# 🌊 Wave Reader Structural System
 
 ## Overview
 
-The structural system provides:
+The Wave Reader Structural System provides a comprehensive state management and message routing solution using the `log-view-machine` framework. This system enables components to communicate seamlessly through structured state machines with automatic message routing, error handling, and performance monitoring.
 
-- **Component Hierarchy**: Clear organization of how components are nested
-- **Routing Configuration**: Declarative routing with nested routes
-- **Tome Integration**: Mapping between UI components and log-view-machine tomes
-- **Navigation**: Built-in navigation with breadcrumbs and sidebar
-
-## Directory Structure
+## 🏗️ Architecture
 
 ```
-src/components/structural/
-├── app-structure.js          # Main structure configuration
-├── AppRouter.tsx            # Router component with navigation
-├── TomeConnector.tsx        # Connector for log-view-machine integration
-├── index.ts                 # Export file
-└── README.md                # This file
+┌─────────────────────────────────────────────────────────────┐
+│                Wave Reader Structural System                │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────┐    ┌─────────────────────────────┐ │
+│  │   Tome Configs     │    │   Message Router           │ │
+│  │                     │    │                             │ │
+│  │ • Main App Tome    │    │ • Priority-based routing   │ │
+│  │ • Component Tomes  │    │ • Error handling           │ │
+│  │ • State machines   │    │ • Performance monitoring   │ │
+│  └─────────────────────┘    └─────────────────────────────┘ │
+├─────────────────────────────────────────────────────────────┤
+│                Structural System Integration                │
+│              (log-view-machine framework)                  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Component Hierarchy
+## 🚀 Quick Start
 
-The application follows this nested structure:
-
-```
-wave-tabs (navigation)
-├── wave-reader (main content)
-│   ├── go-button (control)
-│   └── selector-input (input)
-├── settings (configuration)
-└── about (information)
-
-background (services)
-└── interchange (communication)
-
-content (scripts)
-└── wave-reader-content
-    └── selector-hierarchy (content control)
-```
-
-## Usage
-
-### 1. Basic Router Setup
+### 1. Basic Component Integration
 
 ```tsx
-import { AppRouter } from './components/structural';
+import { useWaveReaderMessageRouter } from './structural/useWaveReaderMessageRouter';
 
-function App() {
-  return (
-    <AppRouter 
-      initialRoute="/wave-tabs"
-      onRouteChange={(route) => console.log('Route changed to:', route)}
-    />
-  );
-}
-```
+const MyComponent = () => {
+  const {
+    isConnected,
+    startWaveReader,
+    stopWaveReader,
+    messageStats
+  } = useWaveReaderMessageRouter({
+    componentName: 'my-component',
+    autoProcess: true,
+    enableMetrics: true
+  });
 
-### 2. Using Tome Connector
+  const handleStart = async () => {
+    if (isConnected) {
+      const result = await startWaveReader();
+      if (result.success) {
+        console.log('Wave reader started successfully');
+      }
+    }
+  };
 
-```tsx
-import { TomeConnector } from './components/structural';
-
-function GoButton() {
-  return (
-    <TomeConnector 
-      componentName="go-button"
-      initialModel={{ displayText: 'go!' }}
-      onStateChange={(state, model) => console.log('State:', state, 'Model:', model)}
-    >
-      <button>Go!</button>
-    </TomeConnector>
-  );
-}
-```
-
-### 3. Using Router Hook
-
-```tsx
-import { useRouter } from './components/structural';
-
-function NavigationComponent() {
-  const { currentRoute, navigate, goBack } = useRouter();
-  
   return (
     <div>
-      <p>Current route: {currentRoute}</p>
-      <button onClick={() => navigate('/wave-tabs/settings')}>
-        Go to Settings
+      <button onClick={handleStart} disabled={!isConnected}>
+        Start Wave Reader
       </button>
-      <button onClick={goBack}>Go Back</button>
+      <div>Status: {isConnected ? '🟢 Connected' : '🔴 Disconnected'}</div>
+      <div>Messages: {messageStats.totalMessages}</div>
     </div>
   );
-}
+};
 ```
 
-### 4. Using Tome Connector Hook
+### 2. Advanced Message Routing
 
 ```tsx
-import { useTomeConnector } from './components/structural';
+const {
+  sendMessage,
+  sendMessageWithRetry,
+  broadcastMessage
+} = useWaveReaderMessageRouter({
+  componentName: 'advanced-component'
+});
 
-function ComponentWithTome() {
-  const { currentState, model, sendEvent, updateModel } = useTomeConnector('go-button');
-  
-  const handleClick = () => {
-    sendEvent({ type: 'GO' });
-  };
-  
-  const updateText = (newText: string) => {
-    updateModel({ displayText: newText });
-  };
-  
-  return (
-    <div>
-      <p>State: {currentState}</p>
-      <p>Text: {model.displayText}</p>
-      <button onClick={handleClick}>Go</button>
-      <button onClick={() => updateText('new text')}>Update Text</button>
-    </div>
+// Send a custom message
+await sendMessage('CUSTOM_EVENT', 'target-component', { data: 'value' }, 'high');
+
+// Send with retry logic
+await sendMessageWithRetry('IMPORTANT_EVENT', 'target-component', { data: 'value' }, 'critical', 5);
+
+// Broadcast to multiple components
+await broadcastMessage('NOTIFICATION', ['component1', 'component2'], { message: 'Hello' });
+```
+
+## 📚 Core Components
+
+### 1. Tome Configurations
+
+#### Main Application Tome
+```tsx
+import { WaveReaderMainTome } from './structural';
+
+// The main tome coordinates all components
+const mainTome = WaveReaderMainTome.machines.mainApp;
+```
+
+#### Component-Specific Tomes
+```tsx
+import { 
+  WaveTabsTome, 
+  WaveReaderTome, 
+  GoButtonTome,
+  SelectorInputTome,
+  SettingsTome,
+  AboutTome
+} from './structural';
+
+// Each component has its own state machine
+const waveReaderTome = WaveReaderTome;
+const goButtonTome = GoButtonTome;
+```
+
+### 2. Message Router
+
+#### Direct Usage
+```tsx
+import { waveReaderMessageRouter } from './structural';
+
+// Send a message directly
+const result = await waveReaderMessageRouter.sendMessage({
+  type: 'WAVE_READER_START',
+  source: 'my-component',
+  target: 'wave-reader',
+  priority: 'high',
+  data: { selector: '.target-element' }
+});
+```
+
+#### React Hook Usage
+```tsx
+const {
+  sendMessage,
+  routeMessage,
+  messageStats
+} = useWaveReaderMessageRouter({
+  componentName: 'my-component'
+});
+
+// The hook provides convenient methods
+await sendMessage('WAVE_READER_START', 'wave-reader', { selector: '.target' });
+```
+
+### 3. Structural System
+
+#### System Configuration
+```tsx
+import { WaveReaderStructuralConfig } from './structural';
+
+// The structural config defines the entire system
+const config = WaveReaderStructuralConfig;
+```
+
+## 🔄 Message Flow Examples
+
+### 1. Starting Wave Reader
+
+```tsx
+// 1. Go Button sends start message
+await sendMessage('WAVE_READER_START', 'wave-reader', { selector: '.target' }, 'high');
+
+// 2. Message router routes to wave-reader component
+// 3. Wave reader state machine transitions to 'starting' state
+// 4. Wave reader initializes and sends 'START_COMPLETE' event
+// 5. State machine transitions to 'reading' state
+// 6. Wave animation begins
+```
+
+### 2. Tab Navigation
+
+```tsx
+// 1. User clicks tab
+await sendMessage('TAB_CHANGE', 'wave-tabs', { tabId: 'settings' }, 'normal');
+
+// 2. Message router routes to wave-tabs component
+// 3. Tab state machine transitions to 'tabSelected' state
+// 4. Tab component updates UI
+// 5. Navigation occurs
+// 6. 'TAB_SELECTION_COMPLETE' event sent
+```
+
+### 3. Settings Update
+
+```tsx
+// 1. Settings component sends update
+await sendMessage('SETTING_CHANGE', 'settings', { 
+  waveSpeed: 1500,
+  waveColor: '#ff6b6b'
+}, 'normal');
+
+// 2. Message router routes to settings component
+// 3. Settings state machine transitions to 'modified' state
+// 4. Settings are updated
+// 5. 'SETTINGS_SAVED' event sent to main app
+```
+
+## 🎯 Priority Levels
+
+### Message Priorities
+
+- **`critical`**: Immediate processing, 1s timeout, 3 retries
+- **`high`**: High priority, 2s timeout, 2 retries  
+- **`normal`**: Standard priority, 5s timeout, 1 retry
+- **`low`**: Low priority, 10s timeout, no retries
+
+### Usage Examples
+
+```tsx
+// Critical: Error handling
+await sendMessage('ERROR', 'main-app', { error: 'Critical failure' }, 'critical');
+
+// High: Wave reader control
+await sendMessage('WAVE_READER_START', 'wave-reader', {}, 'high');
+
+// Normal: Settings updates
+await sendMessage('SETTING_CHANGE', 'settings', { theme: 'dark' }, 'normal');
+
+// Low: Analytics events
+await sendMessage('ANALYTICS', 'analytics', { event: 'user_action' }, 'low');
+```
+
+## 📊 Monitoring and Health
+
+### Health Checks
+
+```tsx
+const { healthCheck } = useWaveReaderMessageRouter({
+  componentName: 'my-component'
+});
+
+const health = await healthCheck();
+console.log('System Status:', health.status);
+console.log('Message:', health.message);
+console.log('Metrics:', health.metrics);
+```
+
+### Performance Metrics
+
+```tsx
+const { messageStats } = useWaveReaderMessageRouter({
+  componentName: 'my-component'
+});
+
+console.log('Total Messages:', messageStats.totalMessages);
+console.log('Success Rate:', messageStats.successRate.toFixed(1) + '%');
+console.log('Average Processing Time:', messageStats.averageProcessingTime + 'ms');
+console.log('Error Count:', messageStats.errorCount);
+console.log('Queue Sizes:', messageStats.queueSizes);
+```
+
+## 🛠️ Error Handling
+
+### Automatic Error Handling
+
+```tsx
+const { sendMessageWithRetry } = useWaveReaderMessageRouter({
+  componentName: 'my-component'
+});
+
+try {
+  // Send with automatic retry
+  const result = await sendMessageWithRetry(
+    'WAVE_READER_START', 
+    'wave-reader', 
+    {}, 
+    'high', 
+    3
   );
+} catch (error) {
+  console.error('Failed after retries:', error);
 }
 ```
 
-## Configuration
+### Custom Error Handling
 
-### Adding New Components
-
-1. **Update `app-structure.js`**:
-   ```javascript
-   // Add to ComponentTomeMapping
-   'new-component': {
-     componentPath: 'src/components/new-component.tsx',
-     tomePath: 'src/component-middleware/new-component/NewComponentTomes.tsx',
-     templatePath: 'src/component-middleware/new-component/templates/new-component-component/'
-   }
-   
-   // Add to RoutingConfig.routes
-   {
-     path: '/wave-tabs/new-component',
-     component: 'new-component'
-   }
-   
-   // Add to TomeConfig.tomes
-   'new-component-tome': {
-     machineId: 'new-component',
-     description: 'Description of new component',
-     states: ['idle', 'active'],
-     events: ['ACTIVATE', 'DEACTIVATE']
-   }
-   ```
-
-2. **Create the component** in `src/components/`
-3. **Create the tome** in `src/component-middleware/`
-4. **Create the template** in the component middleware directory
-
-### Customizing Routes
-
-Routes can be customized by modifying the `RoutingConfig.routes` array:
-
-```javascript
-{
-  path: '/custom-path',
-  component: 'component-name',
-  children: [
-    {
-      path: '/custom-path/child',
-      component: 'child-component'
-    }
-  ]
-}
+```tsx
+const { sendMessage } = useWaveReaderMessageRouter({
+  componentName: 'my-component',
+  onError: (error) => {
+    console.error('Message router error:', error);
+    // Handle error (show notification, retry, etc.)
+  }
+});
 ```
 
-### Customizing Navigation
+## 🔧 Configuration
 
-Navigation can be customized by modifying the `RoutingConfig.navigation` object:
+### Component Configuration
 
-```javascript
-navigation: {
-  primary: [
-    {
-      id: 'custom-nav',
-      label: 'Custom Navigation',
-      path: '/custom-path',
-      icon: '🚀',
-      children: [...]
-    }
-  ]
-}
+```tsx
+const {
+  isConnected,
+  messageStats
+} = useWaveReaderMessageRouter({
+  componentName: 'my-component',
+  autoProcess: true,        // Auto-process queued messages
+  enableMetrics: true,      // Enable performance metrics
+  onMessageReceived: (message) => {
+    console.log('Message received:', message);
+  },
+  onError: (error) => {
+    console.error('Error occurred:', error);
+  }
+});
 ```
 
-## Tome Integration
+### System Configuration
 
-Each component can have an associated "tome" that provides:
+The system is configured through `WaveReaderStructuralConfig` which includes:
 
-- **State Management**: Using log-view-machine
-- **Logging**: Built-in logging for debugging
-- **Event Handling**: State machine events and transitions
-- **View Rendering**: Dynamic view updates based on state
+- **Component Tome Mapping**: Maps components to their state machines
+- **Routing Configuration**: Defines application routes and navigation
+- **Message Routing**: Configures message flow between components
+- **Performance Settings**: Defines timeouts, queue sizes, and monitoring
+- **Error Handling**: Configures retry strategies and recovery mechanisms
 
-### Tome States
+## 📝 Best Practices
 
-Tomes define their states in the `TomeConfig.tomes` configuration:
+### 1. Component Design
 
-```javascript
-'go-button-tome': {
-  machineId: 'go-button',
-  description: 'Go button control with wave animation',
-  states: ['idle', 'going', 'stopping', 'loading', 'error'],
-  events: ['GO', 'STOP', 'LOAD', 'ERROR']
-}
-```
+- Use descriptive component names for message routing
+- Implement proper error handling and fallbacks
+- Use appropriate priority levels for different message types
+- Monitor message statistics for performance insights
 
-### Tome Events
+### 2. Message Design
 
-Events are sent to tomes using the `sendEvent` function:
+- Use consistent message type naming conventions
+- Include necessary data in message payloads
+- Set appropriate priority levels based on urgency
+- Handle message failures gracefully
 
-```javascript
-sendEvent({ type: 'GO', payload: { speed: 'fast' } });
-```
+### 3. State Management
 
-## Styling
+- Keep component state machines simple and focused
+- Use the structural system for cross-component communication
+- Implement proper state transitions and error states
+- Monitor state machine performance
 
-The structural components include CSS classes for styling:
+### 4. Performance
 
-- `.app-router` - Main router container
-- `.router-header` - Header with title and breadcrumbs
-- `.router-sidebar` - Navigation sidebar
-- `.router-main` - Main content area
-- `.router-footer` - Footer with back button
-- `.tome-connector` - Tome connector container
-- `.tome-header` - Tome header with state info
-- `.tome-content` - Tome content area
-- `.tome-footer` - Tome footer with logs
+- Use message batching for multiple updates
+- Monitor queue sizes and processing times
+- Implement appropriate timeouts and retry strategies
+- Use health checks for system monitoring
 
-## Best Practices
-
-1. **Component Naming**: Use kebab-case for component names and paths
-2. **Route Structure**: Keep routes shallow and logical
-3. **Tome States**: Define clear, descriptive state names
-4. **Event Types**: Use UPPER_CASE for event types
-5. **Error Handling**: Always handle errors in tome operations
-6. **State Updates**: Use the `updateModel` function for state changes
-7. **Navigation**: Use the `navigate` function for route changes
-
-## Troubleshooting
+## 🚨 Troubleshooting
 
 ### Common Issues
 
-1. **Component not found**: Check `ComponentTomeMapping` and file paths
-2. **Route not working**: Verify route configuration in `RoutingConfig.routes`
-3. **Tome not initializing**: Check tome configuration in `TomeConfig.tomes`
-4. **Import errors**: Ensure all paths in `ComponentTomeMapping` are correct
+1. **Message Router Not Connected**
+   - Check if `log-view-machine` is properly installed
+   - Verify structural system initialization
+   - Check console for connection errors
+
+2. **Messages Not Being Routed**
+   - Verify component names match configuration
+   - Check message type routing rules
+   - Ensure target components exist
+
+3. **Performance Issues**
+   - Monitor message queue sizes
+   - Check processing times and success rates
+   - Review priority level usage
+
+4. **State Machine Errors**
+   - Verify tome configurations
+   - Check state transition definitions
+   - Review event handling logic
 
 ### Debug Mode
 
-Enable debug logging by setting the environment variable:
+Enable debug mode for detailed logging:
 
-```bash
-DEBUG=wave-reader:structural npm start
+```tsx
+const { messageStats, lastError } = useWaveReaderMessageRouter({
+  componentName: 'my-component',
+  enableMetrics: true
+});
+
+// Debug information is available in development mode
+if (process.env.NODE_ENV === 'development') {
+  console.log('Message Stats:', messageStats);
+  console.log('Last Error:', lastError);
+}
 ```
 
-## Future Enhancements
+## 🔮 Future Enhancements
 
-- [ ] Parameter extraction from routes
-- [ ] Route guards and authentication
-- [ ] Lazy loading for components
-- [ ] Route transitions and animations
-- [ ] Deep linking support
-- [ ] Route history management
-- [ ] Breadcrumb customization
-- [ ] Navigation menu customization
+- **Real-time Metrics Dashboard**: WebSocket-based real-time monitoring
+- **Advanced Routing Rules**: Conditional routing based on message content
+- **Message Persistence**: Store and replay message history
+- **Load Balancing**: Distribute messages across multiple instances
+- **Plugin System**: Extensible message routing and processing
+
+## 📚 Additional Resources
+
+- [log-view-machine Documentation](../README.md)
+- [Structural System Architecture](./STRUCTURAL_SYSTEM_INTEGRATION_README.md)
+- [Tome Metadata System](./TOME_METADATA_SYSTEM_SUMMARY.md)
+- [Component Integration Examples](./StructuralExample.tsx)
