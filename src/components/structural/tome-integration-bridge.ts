@@ -67,8 +67,8 @@ export class TomeIntegrationBridge {
         
         // Sync states between systems
         syncStates: () => {
-          const existingState = this.getExistingState();
-          const structuralState = this.getStructuralState();
+          const existingState = bridge.getExistingState();
+          const structuralState = bridge.getStructuralState();
           
           // Implement state synchronization logic
           console.log(`Syncing states for ${componentName}:`, { existingState, structuralState });
@@ -89,7 +89,7 @@ export class TomeIntegrationBridge {
   private async importExistingTome(tomePath: string) {
     try {
       // Dynamic import of the existing tome
-      const module = await import(tomePath);
+      const module = await (global as any).import(tomePath);
       return module.default || module;
     } catch (error) {
       console.warn(`Could not import existing tome from ${tomePath}:`, error);
