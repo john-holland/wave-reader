@@ -1,5 +1,5 @@
 import React from 'react';
-import { createViewStateMachine } from 'log-view-machine';
+import { createViewStateMachine } from '../../mocks/log-view-machine';
 import { createComponentTomeWithMetadata } from '../../types/tome-metadata';
 
 /**

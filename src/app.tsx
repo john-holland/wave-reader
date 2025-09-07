@@ -17,14 +17,8 @@ import Options from "./models/options";
 import Wave from "./models/wave";
 import { StartMessage, StopMessage, ToggleMessage, MessageFactory, MessageUtility } from "./models/messages/simplified-messages";
 import { 
-  TomeConnector, 
-  useTomeConnector, 
-  AppRouter, 
-  useRouter,
-  AppStructure,
-  ComponentTomeMapping,
-  RoutingConfig,
-  TomeConfig
+  WaveReaderMessageRouter,
+  useWaveReaderMessageRouter
 } from './components/structural';
 
 // Check if we're in development mode
@@ -249,6 +243,9 @@ const AppUnified: FunctionComponent = () => {
 
                         if (result.going) {
                             setGoing(result.going.going || false);
+                        } else {
+                            // If no going state is stored, default to false
+                            setGoing(false);
                         }
                     }
 
@@ -257,6 +254,24 @@ const AppUnified: FunctionComponent = () => {
                     if (currentSettings) {
                         setSettings(new Options(currentSettings));
                         setShowNotifications(currentSettings.showNotifications || true);
+                    }
+
+                    // Check current state from content script
+                    try {
+                        const statusMessage = {
+                            name: 'get-status',
+                            from: 'popup'
+                        };
+                        const statusResponse = await sendExtensionMessage(statusMessage) as any;
+                        if (statusResponse && statusResponse.success && statusResponse.status) {
+                            // Update going state based on content script status
+                            const isGoing = statusResponse.status.going || false;
+                            setGoing(isGoing);
+                            console.log('🌊 Popup: Updated going state from content script:', isGoing);
+                        }
+                    } catch (error) {
+                        console.log('🌊 Popup: Could not get status from content script:', error);
+                        // Fall back to stored state
                     }
                 } else {
                     // Fallback to localStorage for non-extension context
@@ -309,9 +324,11 @@ const AppUnified: FunctionComponent = () => {
                 const currentOptions = await settingsService.getCurrentSettings();
                 const options = new Options(currentOptions);
                 
-                // Create wave with current selector
-                const wave = new Wave();
-                wave.selector = selector;
+                // Create wave with current selector and settings
+                const wave = new Wave({ 
+                    selector: selector,
+                    ...currentOptions.wave // Include all wave settings including waveSpeed
+                });
                 options.wave = wave.update();
 
                 // Show notification if enabled
@@ -597,7 +614,7 @@ const AppUnified: FunctionComponent = () => {
                     </label>
                     <input
                         type="range"
-                        min="1"
+                        min="0.5"
                         max="10"
                         step="0.5"
                         value={settings?.wave?.waveSpeed || 4}
@@ -612,34 +629,6 @@ const AppUnified: FunctionComponent = () => {
                     />
                 </div>
 
-                {/* Wave Control Type */}
-                <div style={{ marginBottom: '12px' }}>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px' }}>
-                        Animation Control:
-                    </label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <input
-                                type="radio"
-                                name="waveControl"
-                                value="CSS"
-                                checked={settings?.waveAnimationControl === 0}
-                                onChange={() => updateWaveSettings({ waveAnimationControl: 0 })}
-                            />
-                            CSS
-                        </label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <input
-                                type="radio"
-                                name="waveControl"
-                                value="MOUSE"
-                                checked={settings?.waveAnimationControl === 1}
-                                onChange={() => updateWaveSettings({ waveAnimationControl: 1 })}
-                            />
-                            Mouse
-                        </label>
-                    </div>
-                </div>
 
                 {/* Axis Translation */}
                 <div style={{ marginBottom: '12px' }}>
@@ -711,27 +700,6 @@ const AppUnified: FunctionComponent = () => {
                     </div>
                 </div>
 
-                {/* Mouse Follow Interval */}
-                <div style={{ marginBottom: '12px' }}>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px' }}>
-                        Mouse Follow Interval: {settings?.wave?.mouseFollowInterval || 100}ms
-                    </label>
-                    <input
-                        type="range"
-                        min="50"
-                        max="200"
-                        step="10"
-                        value={settings?.wave?.mouseFollowInterval || 100}
-                        onChange={(e) => {
-                            if (settings?.wave) {
-                                const newWave = new Wave(settings.wave);
-                                newWave.mouseFollowInterval = parseInt(e.target.value);
-                                updateWaveSettings({ wave: newWave });
-                            }
-                        }}
-                        style={{ width: '100%' }}
-                    />
-                </div>
             </CompactSection>
 
             {/* Actions */}

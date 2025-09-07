@@ -389,7 +389,6 @@ interface Settings {
   axisTranslateAmountXMin: number;
   axisRotationAmountYMax: number;
   axisRotationAmountYMin: number;
-  mouseFollowInterval: number;
   autoGenerateCss: boolean;
 }
 
@@ -436,7 +435,6 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
     axisTranslateAmountXMin: -10,
     axisRotationAmountYMax: 5,
     axisRotationAmountYMin: -5,
-    mouseFollowInterval: 50,
     autoGenerateCss: true,
     ...initialSettings
   });
@@ -527,7 +525,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
     handleSettingChange(key, value);
     
     // Auto-generate CSS if enabled
-    if (settings.autoGenerateCss && ['waveSpeed', 'axisTranslateAmountXMax', 'axisTranslateAmountXMin', 'axisRotationAmountYMax', 'axisRotationAmountYMin', 'mouseFollowInterval'].includes(key)) {
+    if (settings.autoGenerateCss && ['waveSpeed', 'axisTranslateAmountXMax', 'axisTranslateAmountXMin', 'axisRotationAmountYMax', 'axisRotationAmountYMin'].includes(key)) {
       // This would trigger CSS auto-generation
       console.log('⚙️ SettingsTomes: Auto-generating CSS from wave parameters');
     }
@@ -634,7 +632,6 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
           axisTranslateAmountXMin: -10,
           axisRotationAmountYMax: 5,
           axisRotationAmountYMin: -5,
-          mouseFollowInterval: 50,
           autoGenerateCss: true
         };
         
@@ -804,31 +801,6 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                 </SettingLabel>
               </SettingItem>
               
-              <SettingItem>
-                <SettingLabel>Wave Animation Control:</SettingLabel>
-                <RadioGroup>
-                  <RadioLabel>
-                    <SettingRadio
-                      type="radio"
-                      name="waveControl"
-                      value="CSS"
-                      checked={settings.waveAnimationControl === 'CSS'}
-                      onChange={(e) => handleSettingChange('waveAnimationControl', e.target.value)}
-                    />
-                    CSS Animation
-                  </RadioLabel>
-                  <RadioLabel>
-                    <SettingRadio
-                      type="radio"
-                      name="waveControl"
-                      value="MOUSE"
-                      checked={settings.waveAnimationControl === 'MOUSE'}
-                      onChange={(e) => handleSettingChange('waveAnimationControl', e.target.value)}
-                    />
-                    Mouse
-                  </RadioLabel>
-                </RadioGroup>
-              </SettingItem>
             </SettingGroup>
             
             <SettingsActions>
@@ -901,17 +873,6 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                 />
               </SettingItem>
               
-              <SettingItem>
-                <SettingLabel>Mouse Follow Interval (ms):</SettingLabel>
-                <SettingInput
-                  type="number"
-                  className="number"
-                  value={settings.mouseFollowInterval}
-                  disabled={settings.waveAnimationControl === 'CSS'}
-                  onChange={(e) => handleWaveSettingChange('mouseFollowInterval', parseInt(e.target.value))}
-                />
-                <HelpText>Only used with Mouse animation</HelpText>
-              </SettingItem>
             </SettingGroup>
             
             <SettingsActions>

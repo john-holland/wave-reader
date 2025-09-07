@@ -23,7 +23,8 @@ describe('TomeIntegrationBridge', () => {
   describe('createBridge', () => {
     const mockConfig: TomeBridgeConfig = {
       componentName: 'test-component',
-      tomeConfig: {
+      existingTomePath: '../component-middleware/test/TestTomes.tsx',
+      structuralTomeConfig: {
         id: 'test-component',
         name: 'Test Component',
         xstateConfig: { initial: 'idle', states: {} }
@@ -36,7 +37,7 @@ describe('TomeIntegrationBridge', () => {
 
       expect(result).toBeDefined();
       expect(result.componentName).toBe('test-component');
-      expect(result.tomeConfig).toBe(mockConfig.tomeConfig);
+      expect(result.structuralTome).toBe(mockConfig.structuralTomeConfig);
       expect(result.messageRouter).toBe(mockMessageRouter);
     });
 
@@ -53,7 +54,8 @@ describe('TomeIntegrationBridge', () => {
     it('should return bridge for existing component', async () => {
       const mockConfig: TomeBridgeConfig = {
         componentName: 'existing-component',
-        tomeConfig: {},
+        existingTomePath: '../component-middleware/existing/ExistingTomes.tsx',
+        structuralTomeConfig: {},
         messageRouter: mockMessageRouter
       };
 
@@ -74,7 +76,8 @@ describe('TomeIntegrationBridge', () => {
     beforeEach(async () => {
       const mockConfig: TomeBridgeConfig = {
         componentName: 'test-component',
-        tomeConfig: {},
+        existingTomePath: '../component-middleware/test/TestTomes.tsx',
+        structuralTomeConfig: {},
         messageRouter: mockMessageRouter
       };
 
@@ -86,7 +89,8 @@ describe('TomeIntegrationBridge', () => {
       const result = await bridge.sendMessage('test-component', event);
 
       expect(result).toBeDefined();
-      expect(result.result).toEqual({ success: true });
+      expect(result.existing).toBeDefined();
+      expect(result.structural).toBeDefined();
       expect(result.bridge).toBeDefined();
     });
 
@@ -108,8 +112,8 @@ describe('TomeIntegrationBridge', () => {
   describe('getAllBridges', () => {
     it('should return all created bridges', async () => {
       const configs = [
-        { componentName: 'component1', tomeConfig: {}, messageRouter: mockMessageRouter },
-        { componentName: 'component2', tomeConfig: {}, messageRouter: mockMessageRouter }
+        { componentName: 'component1', existingTomePath: '../component-middleware/component1/Component1Tomes.tsx', structuralTomeConfig: {}, messageRouter: mockMessageRouter },
+        { componentName: 'component2', existingTomePath: '../component-middleware/component2/Component2Tomes.tsx', structuralTomeConfig: {}, messageRouter: mockMessageRouter }
       ];
 
       for (const config of configs) {
@@ -131,7 +135,8 @@ describe('TomeIntegrationBridge', () => {
     it('should clear all bridges', async () => {
       const mockConfig: TomeBridgeConfig = {
         componentName: 'test-component',
-        tomeConfig: {},
+        existingTomePath: '../component-middleware/test/TestTomes.tsx',
+        structuralTomeConfig: {},
         messageRouter: mockMessageRouter
       };
 
@@ -149,7 +154,8 @@ describe('TomeIntegrationBridge', () => {
     beforeEach(async () => {
       const mockConfig: TomeBridgeConfig = {
         componentName: 'test-component',
-        tomeConfig: { id: 'test', name: 'Test' },
+        existingTomePath: '../component-middleware/test/TestTomes.tsx',
+        structuralTomeConfig: { id: 'test', name: 'Test' },
         messageRouter: mockMessageRouter
       };
 
@@ -185,7 +191,8 @@ describe('TomeIntegrationBridge', () => {
     it('should handle message sending errors', async () => {
       const mockConfig: TomeBridgeConfig = {
         componentName: 'error-component',
-        tomeConfig: {},
+        existingTomePath: '../component-middleware/test/TestTomes.tsx',
+        structuralTomeConfig: {},
         messageRouter: mockMessageRouter
       };
 

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wave Reader Animation Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        p {
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        
+        .test-section {
+            background: #f5f5f5;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        
+        .instructions {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #4caf50;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="status" id="status">Ready for testing</div>
+    
+    <div class="instructions">
+        <h2>🌊 Wave Reader Animation Test</h2>
+        <p><strong>Instructions:</strong></p>
+        <ol>
+            <li>Load the Wave Reader extension in Chrome</li>
+            <li>Click the extension icon to open the popup</li>
+            <li>Set the selector to "p" (for paragraphs)</li>
+            <li>Click "Start" to begin the wave animation</li>
+            <li>Observe the text elements moving with the wave effect</li>
+            <li>Click "Stop" to stop the animation</li>
+        </ol>
+    </div>
+
+    <h1>Test Page for Wave Reader Extension</h1>
+    
+    <div class="test-section">
+        <h2>Section 1: Basic Text</h2>
+        <p>This is the first paragraph that should be animated when the wave reader is active.</p>
+        <p>This is the second paragraph that should also be animated.</p>
+        <p>This is the third paragraph for testing multiple elements.</p>
+    </div>
+    
+    <div class="test-section">
+        <h2>Section 2: More Content</h2>
+        <p>Here's another paragraph to test the wave animation on different sections of the page.</p>
+        <p>This paragraph contains more text to see how the animation affects longer content.</p>
+        <p>Short paragraph.</p>
+        <p>This is a longer paragraph with more content to demonstrate how the wave animation works with different amounts of text. It should show the smooth wobbling motion that helps with eye tracking and reading comprehension.</p>
+    </div>
+    
+    <div class="test-section">
+        <h2>Section 3: Different Elements</h2>
+        <p>Testing with different paragraph lengths and content.</p>
+        <p>Another test paragraph.</p>
+        <p>This paragraph has some <strong>bold text</strong> and <em>italic text</em> to see how the animation affects formatted content.</p>
+    </div>
+
+    <script>
+        // Simple status indicator
+        function updateStatus(message, color = '#4caf50') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.style.backgroundColor = color;
+        }
+
+        // Listen for messages from the extension
+        window.addEventListener('message', (event) => {
+            if (event.data?.source === 'wave-reader-extension') {
+                console.log('Received message from extension:', event.data);
+                
+                if (event.data.message?.name === 'start') {
+                    updateStatus('🌊 Animation Started!', '#2196f3');
+                } else if (event.data.message?.name === 'stop') {
+                    updateStatus('⏹️ Animation Stopped', '#4caf50');
+                }
+            }
+        });
+
+        // Log when page loads
+        console.log('Wave Reader test page loaded');
+        updateStatus('Ready for testing');
+    </script>
+</body>
+</html>

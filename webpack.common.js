@@ -25,6 +25,9 @@ const config = {
     },
     resolve: {
         extensions: [".tsx", ".ts", ".js", ".jsx", ".*"],
+        alias: {
+            "log-view-machine": path.resolve(__dirname, "src/mocks/log-view-machine.ts")
+        },
         fallback: {
             "path": require.resolve("path-browserify"),
             "tty": require.resolve("tty-browserify"),
@@ -38,7 +41,11 @@ const config = {
             "http": require.resolve("stream-http"),
             "crypto": require.resolve("crypto-browserify"),
             "vm": require.resolve("vm-browserify"),
-            "assert": require.resolve("assert/")
+            "assert": require.resolve("assert/"),
+            "events": require.resolve("events/"),
+            "buffer": require.resolve("buffer/"),
+            "string_decoder": require.resolve("string_decoder/"),
+            "async_hooks": false
         }
     },
     plugins: [

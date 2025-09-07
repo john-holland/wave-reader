@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createViewStateMachine } from 'log-view-machine';
+import { createViewStateMachine } from '../../mocks/log-view-machine';
 
 /**
  * StructuralExample demonstrates the structural system patterns

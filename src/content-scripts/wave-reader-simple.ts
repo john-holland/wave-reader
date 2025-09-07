@@ -168,6 +168,7 @@ class WaveReaderShadowDOM {
                 this.updateOptions(message);
                 break;
             case 'toggle':
+            case 'toggle-wave-reader':
                 this.toggleWaving();
                 break;
             case 'start-selection-choose':

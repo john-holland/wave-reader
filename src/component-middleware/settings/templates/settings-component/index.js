@@ -396,23 +396,6 @@ function renderGeneralSettingsView(context) {
                    onchange="updateSetting('showNotifications', this.checked)">
           </div>
           
-          <div class="setting-item">
-            <label>Wave Animation Control:</label>
-            <div class="radio-group">
-              <label>
-                <input type="radio" name="waveControl" value="CSS" 
-                       ${context.model.waveAnimationControl === 'CSS' ? 'checked' : ''}
-                       onchange="updateSetting('waveAnimationControl', this.value)">
-                CSS Animation
-              </label>
-              <label>
-                <input type="radio" name="waveControl" value="MOUSE" 
-                       ${context.model.waveAnimationControl === 'MOUSE' ? 'checked' : ''}
-                       onchange="updateSetting('waveAnimationControl', this.value)">
-                Mouse
-              </label>
-            </div>
-          </div>
         </div>
         
         <div class="settings-actions">
@@ -477,14 +460,6 @@ function renderWaveSettingsView(context) {
                    onchange="updateWaveSetting('axisRotationAmountYMin', parseFloat(this.value))">
           </div>
           
-          <div class="setting-item">
-            <label>Mouse Follow Interval (ms):</label>
-            <input type="number" 
-                   value="${context.model.mouseFollowInterval}"
-                   ${context.model.waveAnimationControl === 'CSS' ? 'disabled' : ''}
-                   onchange="updateWaveSetting('mouseFollowInterval', parseInt(this.value))">
-            <span class="help-text">Only used with Mouse animation</span>
-          </div>
         </div>
         
         <div class="settings-actions">

@@ -32,6 +32,9 @@ export interface UseWaveReaderMessageRouterReturn {
     averageProcessingTime: number;
     errorCount: number;
     queueSizes: Record<string, number>;
+    successfulMessages: number;
+    failedMessages: number;
+    priorityDistribution: Record<string, number>;
   };
   lastMessageResult?: MessageRoutingResult;
   lastError?: string;
@@ -43,6 +46,16 @@ export interface UseWaveReaderMessageRouterReturn {
     message: string;
     metrics: any;
   }>;
+  
+  // Convenience operations
+  startWaveReader: (selector?: string) => Promise<MessageRoutingResult>;
+  stopWaveReader: () => Promise<MessageRoutingResult>;
+  updateWaveReader: (settings: any) => Promise<MessageRoutingResult>;
+  changeTab: (tabId: string) => Promise<MessageRoutingResult>;
+  updateSettings: (settings: any) => Promise<MessageRoutingResult>;
+  updateSelector: (selector: string) => Promise<MessageRoutingResult>;
+  enableGoButton: () => Promise<MessageRoutingResult>;
+  disableGoButton: () => Promise<MessageRoutingResult>;
 }
 
 export function useWaveReaderMessageRouter(options: UseWaveReaderMessageRouterOptions): UseWaveReaderMessageRouterReturn {
@@ -54,7 +67,10 @@ export function useWaveReaderMessageRouter(options: UseWaveReaderMessageRouterOp
     successRate: 0,
     averageProcessingTime: 0,
     errorCount: 0,
-    queueSizes: {}
+    queueSizes: {},
+    successfulMessages: 0,
+    failedMessages: 0,
+    priorityDistribution: {}
   });
   const [lastMessageResult, setLastMessageResult] = useState<MessageRoutingResult>();
   const [lastError, setLastError] = useState<string>();
@@ -275,7 +291,10 @@ export function useWaveReaderMessageRouter(options: UseWaveReaderMessageRouterOp
       successRate: 0,
       averageProcessingTime: 0,
       errorCount: 0,
-      queueSizes: {}
+      queueSizes: {},
+      successfulMessages: 0,
+      failedMessages: 0,
+      priorityDistribution: {}
     });
     setLastMessageResult(undefined);
     setLastError(undefined);

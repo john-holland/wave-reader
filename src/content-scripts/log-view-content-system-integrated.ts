@@ -42,8 +42,8 @@ export class LogViewContentSystemIntegrated {
     this.messageService = new ContentSystemMessageService(this.sessionId);
     
     // Initialize Tomes
-    this.contentTome = LogViewContentSystemTomes.create({});
-    this.shadowTome = LogViewShadowSystemTomes.create({});
+    this.contentTome = LogViewContentSystemTomes;
+    this.shadowTome = LogViewShadowSystemTomes;
     
     // Initialize the system
     this.init();
@@ -115,6 +115,7 @@ export class LogViewContentSystemIntegrated {
           sendResponse({ success: true, state: this.proxyState });
           break;
         case 'toggle':
+        case 'toggle-wave-reader':
           this.handleToggle(message);
           sendResponse({ success: true, state: this.proxyState });
           break;
@@ -144,6 +145,7 @@ export class LogViewContentSystemIntegrated {
           this.handleStop(message);
           break;
         case 'toggle':
+        case 'toggle-wave-reader':
           this.handleToggle(message);
           break;
         case 'ping':

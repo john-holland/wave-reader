@@ -387,7 +387,7 @@ describe('WaveReaderMessageRouter', () => {
       const results: any[] = [];
       
       // Send messages in reverse priority order
-      mockSystem.sendMessage.mockImplementation((message) => {
+      mockSystem.sendMessage.mockImplementation((message: any) => {
         results.push({ priority: message.priority, timestamp: Date.now() });
         return Promise.resolve({ success: true });
       });
@@ -419,7 +419,7 @@ describe('WaveReaderMessageRouter', () => {
       const priorities = ['critical', 'high', 'normal', 'low'];
       const results: any[] = [];
 
-      mockSystem.sendMessage.mockImplementation((message) => {
+      mockSystem.sendMessage.mockImplementation((message: any) => {
         results.push(message.priority);
         return Promise.resolve({ success: true });
       });

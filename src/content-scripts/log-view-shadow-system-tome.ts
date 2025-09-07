@@ -1,4 +1,4 @@
-import { createViewStateMachine } from 'log-view-machine';
+import { createViewStateMachine } from '../mocks/log-view-machine';
 import { createComponentTomeWithMetadata, ComponentTomeMetadata } from '../types/tome-metadata';
 
 // Shadow System Model Interface

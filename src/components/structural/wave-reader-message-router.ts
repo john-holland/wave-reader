@@ -1,4 +1,4 @@
-import { StructuralSystem } from 'log-view-machine';
+import { StructuralSystem } from '../../mocks/log-view-machine';
 import WaveReaderStructuralConfig from './wave-reader-structural-config';
 
 /**
@@ -26,6 +26,9 @@ export interface MessageRoutingResult {
   processingTime: number;
   error?: string;
   response?: any;
+  messageId?: string;
+  timestamp?: number;
+  retryCount?: number;
 }
 
 export class WaveReaderMessageRouter {
@@ -88,7 +91,10 @@ export class WaveReaderMessageRouter {
         success: false,
         targetComponent: fullMessage.target,
         processingTime: 0,
-        error: errorMessage
+        error: errorMessage,
+        messageId: fullMessage.id,
+        timestamp: fullMessage.timestamp,
+        retryCount: fullMessage.retryCount || 0
       };
     }
   }
@@ -96,7 +102,24 @@ export class WaveReaderMessageRouter {
   /**
    * Route a message based on the structural system configuration
    */
-  private async routeMessage(message: WaveReaderMessage): Promise<string> {
+  public async routeMessage(type: string, target: string, data?: any, priority: WaveReaderMessage['priority'] = 'normal'): Promise<MessageRoutingResult> {
+    const message: WaveReaderMessage = {
+      id: this.generateMessageId(),
+      type,
+      source: 'message-router',
+      target,
+      priority,
+      data,
+      timestamp: Date.now()
+    };
+
+    return await this.processMessage(message);
+  }
+
+  /**
+   * Internal route resolution method
+   */
+  private async resolveRoute(message: WaveReaderMessage): Promise<string> {
     const { type, source } = message;
     
     // Check global routing rules first
@@ -136,7 +159,7 @@ export class WaveReaderMessageRouter {
     
     try {
       // Route the message to the appropriate component
-      const targetComponent = await this.routeMessage(message);
+      const targetComponent = await this.resolveRoute(message);
       
       // Get the target machine from the structural system
       const targetMachine = this.structuralSystem.getMachine(targetComponent);
@@ -160,7 +183,10 @@ export class WaveReaderMessageRouter {
         success: true,
         targetComponent,
         processingTime,
-        response
+        response,
+        messageId: message.id,
+        timestamp: message.timestamp,
+        retryCount: message.retryCount || 0
       };
     } catch (error) {
       const processingTime = Date.now() - startTime;
@@ -266,9 +292,13 @@ export class WaveReaderMessageRouter {
     averageProcessingTime: number;
     errorCount: number;
     queueSizes: Record<string, number>;
+    successfulMessages: number;
+    failedMessages: number;
+    priorityDistribution: Record<string, number>;
   } {
     const totalMessages = this.messageHistory.length;
     const successfulMessages = this.messageHistory.filter(m => !this.processingMessages.has(m.id)).length;
+    const failedMessages = totalMessages - successfulMessages;
     const successRate = totalMessages > 0 ? (successfulMessages / totalMessages) * 100 : 0;
     
     const allProcessingTimes = Array.from(this.performanceMetrics.values()).flat();
@@ -283,12 +313,41 @@ export class WaveReaderMessageRouter {
       queueSizes[priority] = queue.length;
     });
 
+    // Calculate priority distribution
+    const priorityDistribution: Record<string, number> = {};
+    this.messageHistory.forEach(message => {
+      priorityDistribution[message.priority] = (priorityDistribution[message.priority] || 0) + 1;
+    });
+
     return {
       totalMessages,
       successRate,
       averageProcessingTime,
       errorCount,
-      queueSizes
+      queueSizes,
+      successfulMessages,
+      failedMessages,
+      priorityDistribution
+    };
+  }
+
+  /**
+   * Get queue status information
+   */
+  getQueueStatus(): {
+    messageQueueSize: number;
+    retryQueueSize: number;
+    isProcessing: boolean;
+    processingCount: number;
+  } {
+    const totalQueued = Array.from(this.messageQueue.values()).reduce((sum, queue) => sum + queue.length, 0);
+    const processingCount = this.processingMessages.size;
+    
+    return {
+      messageQueueSize: totalQueued,
+      retryQueueSize: 0, // We don't have a separate retry queue in this implementation
+      isProcessing: processingCount > 0,
+      processingCount
     };
   }
 
@@ -360,6 +419,8 @@ export class WaveReaderMessageRouter {
     status: 'healthy' | 'degraded' | 'unhealthy';
     message: string;
     metrics: any;
+    timestamp: number;
+    error?: string;
   }> {
     const stats = this.getMessageStats();
     const queueSizes = Object.values(stats.queueSizes);
@@ -367,6 +428,7 @@ export class WaveReaderMessageRouter {
     
     let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
     let message = 'Message router is operating normally';
+    let error: string | undefined;
     
     if (stats.errorCount > 10) {
       status = 'degraded';
@@ -381,12 +443,15 @@ export class WaveReaderMessageRouter {
     if (stats.successRate < 80) {
       status = 'unhealthy';
       message = 'Low success rate indicates system issues';
+      error = 'System failure';
     }
     
     return {
       status,
       message,
-      metrics: stats
+      metrics: stats,
+      timestamp: Date.now(),
+      error
     };
   }
 }

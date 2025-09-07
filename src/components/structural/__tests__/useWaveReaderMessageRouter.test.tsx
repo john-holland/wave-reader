@@ -69,7 +69,7 @@ const TestComponent = ({ componentName, options = {} }: { componentName: string;
       
       <button 
         data-testid="route-message" 
-        onClick={() => routeMessage('ROUTE_TYPE', 'target', { data: 'route' }, 'normal')}
+        onClick={() => routeMessage({ type: 'ROUTE_TYPE', source: 'test-component', target: 'target', data: { data: 'route' }, priority: 'normal' })}
       >
         Route Message
       </button>

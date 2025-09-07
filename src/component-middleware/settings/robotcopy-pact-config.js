@@ -460,7 +460,7 @@ class SettingsMessageHandler {
 
     validateImportedSettings(settings) {
         // Basic validation of imported settings
-        const requiredKeys = ['showNotifications', 'waveAnimationControl', 'waveSpeed'];
+        const requiredKeys = ['showNotifications', 'waveSpeed'];
         
         for (const key of requiredKeys) {
             if (!(key in settings)) {

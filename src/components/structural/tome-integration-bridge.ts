@@ -1,16 +1,18 @@
 import React from 'react';
-import { createViewStateMachine } from 'log-view-machine';
+import { createViewStateMachine } from '../../mocks/log-view-machine';
 
 /**
  * Tome Integration Bridge
  * 
- * This bridge provides a unified interface for components to interact with
- * the structural tome system, enabling enhanced message routing and state management.
+ * This bridge connects the existing component middleware tomes with our new
+ * structural system, enabling seamless integration between the robotproxy
+ * ProxyStateMachine system and our enhanced message routing.
  */
 
 export interface TomeBridgeConfig {
   componentName: string;
-  tomeConfig: any;
+  existingTomePath: string;
+  structuralTomeConfig: any;
   messageRouter: any;
 }
 
@@ -26,29 +28,51 @@ export class TomeIntegrationBridge {
    * Create a bridge for a specific component
    */
   async createBridge(config: TomeBridgeConfig) {
-    const { componentName, tomeConfig } = config;
+    const { componentName, existingTomePath, structuralTomeConfig } = config;
 
     try {
-      // Create a bridge that uses only the tome system
+      // Import the existing component tome
+      const existingTomeModule = await this.importExistingTome(existingTomePath);
+      
+      // Create a bridge that connects both systems
       const bridge = {
         componentName,
-        tomeConfig,
+        existingTome: existingTomeModule,
+        structuralTome: structuralTomeConfig,
         messageRouter: this.messageRouter,
         
         // Bridge methods
-        sendEvent: (event: any) => {
+        sendToExisting: (event: any) => {
+          if (existingTomeModule && existingTomeModule.sendEvent) {
+            return existingTomeModule.sendEvent(event);
+          }
+          return null;
+        },
+        
+        sendToStructural: (event: any) => {
           return this.messageRouter.sendMessage(event.type, componentName, event.data);
         },
         
-        // Get current state from the tome system
-        getState: () => {
+        // Get current state from both systems
+        getExistingState: () => {
+          if (existingTomeModule && existingTomeModule.getCurrentState) {
+            return existingTomeModule.getCurrentState();
+          }
+          return null;
+        },
+        
+        getStructuralState: () => {
           // This would come from the structural system
           return null;
         },
         
-        // Get tome configuration
-        getTomeConfig: () => {
-          return tomeConfig;
+        // Sync states between systems
+        syncStates: () => {
+          const existingState = bridge.getExistingState();
+          const structuralState = bridge.getStructuralState();
+          
+          // Implement state synchronization logic
+          console.log(`Syncing states for ${componentName}:`, { existingState, structuralState });
         }
       };
 
@@ -57,6 +81,20 @@ export class TomeIntegrationBridge {
     } catch (error) {
       console.error(`Failed to create bridge for ${componentName}:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Import existing tome from component middleware
+   */
+  private async importExistingTome(tomePath: string) {
+    try {
+      // Dynamic import of the existing tome
+      const module = await (global as any).import(tomePath);
+      return module.default || module;
+    } catch (error) {
+      console.warn(`Could not import existing tome from ${tomePath}:`, error);
+      return null;
     }
   }
 
@@ -76,11 +114,13 @@ export class TomeIntegrationBridge {
       throw new Error(`No bridge found for component: ${componentName}`);
     }
 
-    // Send through the tome system
-    const result = await bridge.sendEvent(event);
+    // Send to both systems for synchronization
+    const existingResult = bridge.sendToExisting(event);
+    const structuralResult = await bridge.sendToStructural(event);
 
     return {
-      result,
+      existing: existingResult,
+      structural: structuralResult,
       bridge
     };
   }
@@ -141,31 +181,31 @@ export function useTomeIntegrationBridge(componentName: string, bridgeConfig: To
       throw new Error('Bridge not initialized');
     }
 
-    return await bridge.sendEvent(event);
+    return await bridge.sendToStructural(event);
   }, [bridge]);
 
-  const getState = React.useCallback(() => {
+  const sendToExisting = React.useCallback((event: any) => {
     if (!bridge) {
       throw new Error('Bridge not initialized');
     }
 
-    return bridge.getState();
+    return bridge.sendToExisting(event);
   }, [bridge]);
 
-  const getTomeConfig = React.useCallback(() => {
+  const syncStates = React.useCallback(() => {
     if (!bridge) {
       throw new Error('Bridge not initialized');
     }
 
-    return bridge.getTomeConfig();
+    bridge.syncStates();
   }, [bridge]);
 
   return {
     bridge,
     isConnected,
     sendEvent,
-    getState,
-    getTomeConfig
+    sendToExisting,
+    syncStates
   };
 }
 
