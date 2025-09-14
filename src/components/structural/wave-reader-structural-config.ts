@@ -1,4 +1,4 @@
-import { createStructuralConfig, AppStructureConfig } from '../../mocks/log-view-machine';
+import { createStructuralConfig, AppStructureConfig } from 'log-view-machine';
 import WaveReaderMainTome from './wave-reader-tome-config';
 
 /**
@@ -13,9 +13,10 @@ export const WaveReaderStructuralConfig: AppStructureConfig = createStructuralCo
   AppStructure: {
     id: 'wave-reader-app',
     name: 'Wave Reader Application',
-    description: 'Chrome extension for wave reading with structural system integration',
-    version: '1.0.0',
-    type: 'chrome-extension'
+    type: 'application',
+    routing: {
+      path: '/'
+    }
   },
 
   // Component to tome mapping
@@ -23,44 +24,32 @@ export const WaveReaderStructuralConfig: AppStructureConfig = createStructuralCo
     'wave-tabs': {
       componentPath: 'src/components/wave-tabs.tsx',
       tomePath: 'src/components/structural/wave-reader-tome-config.ts',
-      templatePath: 'src/components/structural/templates/wave-tabs/',
-      tomeId: 'wave-tabs',
-      description: 'Wave tabs navigation component'
+      templatePath: 'src/components/structural/templates/wave-tabs/'
     },
     'wave-reader': {
       componentPath: 'src/components/wave-reader.tsx',
       tomePath: 'src/components/structural/wave-reader-tome-config.ts',
-      templatePath: 'src/components/structural/templates/wave-reader/',
-      tomeId: 'wave-reader',
-      description: 'Core wave reader functionality'
+      templatePath: 'src/components/structural/templates/wave-reader/'
     },
     'go-button': {
       componentPath: 'src/components/go-button.tsx',
       tomePath: 'src/components/structural/wave-reader-tome-config.ts',
-      templatePath: 'src/components/structural/templates/go-button/',
-      tomeId: 'go-button',
-      description: 'Go button control component'
+      templatePath: 'src/components/structural/templates/go-button/'
     },
     'selector-input': {
       componentPath: 'src/components/selector-input.tsx',
       tomePath: 'src/components/structural/wave-reader-tome-config.ts',
-      templatePath: 'src/components/structural/templates/selector-input/',
-      tomeId: 'selector-input',
-      description: 'CSS selector input component'
+      templatePath: 'src/components/structural/templates/selector-input/'
     },
     'settings': {
       componentPath: 'src/components/settings.tsx',
       tomePath: 'src/components/structural/wave-reader-tome-config.ts',
-      templatePath: 'src/components/structural/templates/settings/',
-      tomeId: 'settings',
-      description: 'Settings management component'
+      templatePath: 'src/components/structural/templates/settings/'
     },
     'about': {
       componentPath: 'src/components/about.tsx',
       tomePath: 'src/components/structural/wave-reader-tome-config.ts',
-      templatePath: 'src/components/structural/templates/about/',
-      tomeId: 'about',
-      description: 'About information component'
+      templatePath: 'src/components/structural/templates/about/'
     }
   },
 
@@ -69,51 +58,65 @@ export const WaveReaderStructuralConfig: AppStructureConfig = createStructuralCo
     routes: [
       {
         path: '/',
-        component: 'wave-tabs',
-        name: 'Home',
-        description: 'Main wave reader interface'
+        component: 'wave-tabs'
       },
       {
         path: '/wave-tabs',
-        component: 'wave-tabs',
-        name: 'Wave Tabs',
-        description: 'Wave tabs navigation'
+        component: 'wave-tabs'
       },
       {
         path: '/wave-reader',
         component: 'wave-reader',
-        name: 'Wave Reader',
-        description: 'Core wave reading functionality',
         children: [
           {
             path: '/wave-reader/go-button',
-            component: 'go-button',
-            name: 'Go Button',
-            description: 'Wave reader activation button'
+            component: 'go-button'
           },
           {
             path: '/wave-reader/selector-input',
-            component: 'selector-input',
-            name: 'Selector Input',
-            description: 'CSS selector input field'
+            component: 'selector-input'
           }
         ]
       },
       {
         path: '/settings',
-        component: 'settings',
-        name: 'Settings',
-        description: 'Application settings and configuration'
+        component: 'settings'
       },
       {
         path: '/about',
-        component: 'about',
-        name: 'About',
-        description: 'About information and version details'
+        component: 'about'
       }
     ],
-    defaultRoute: '/wave-tabs',
-    fallbackRoute: '/wave-tabs'
+    navigation: {
+      primary: [
+        {
+          id: 'wave-tabs',
+          label: 'Wave Tabs',
+          path: '/wave-tabs',
+          icon: '🌊'
+        },
+        {
+          id: 'wave-reader',
+          label: 'Wave Reader',
+          path: '/wave-reader',
+          icon: '📖'
+        }
+      ],
+      secondary: [
+        {
+          id: 'settings',
+          label: 'Settings',
+          path: '/settings',
+          icon: '⚙️'
+        },
+        {
+          id: 'about',
+          label: 'About',
+          path: '/about',
+          icon: 'ℹ️'
+        }
+      ]
+    }
   },
 
   // Tome configuration integration
@@ -183,110 +186,6 @@ export const WaveReaderStructuralConfig: AppStructureConfig = createStructuralCo
         description: 'About information state machine',
         states: ['loading', 'ready', 'showingChangelog', 'showingLicense'],
         events: ['INFO_LOADED', 'REFRESH_INFO', 'SHOW_CHANGELOG', 'SHOW_LICENSE', 'BACK_TO_ABOUT']
-      }
-    }
-  },
-
-  // Message routing configuration
-  MessageRouting: {
-    // Global message routing rules
-    global: {
-      'WAVE_READER_START': { target: 'wave-reader', priority: 'high' },
-      'WAVE_READER_STOP': { target: 'wave-reader', priority: 'high' },
-      'WAVE_READER_UPDATE': { target: 'wave-reader', priority: 'normal' },
-      'TAB_CHANGE': { target: 'wave-tabs', priority: 'normal' },
-      'NAVIGATE': { target: 'main-app', priority: 'normal' },
-      'ERROR': { target: 'main-app', priority: 'critical' }
-    },
-
-    // Component-specific routing
-    components: {
-      'wave-tabs': {
-        'TAB_SELECT': { target: 'main-app', priority: 'normal' },
-        'TAB_NAVIGATE': { target: 'main-app', priority: 'normal' }
-      },
-      'wave-reader': {
-        'START_READING': { target: 'go-button', priority: 'high' },
-        'STOP_READING': { target: 'go-button', priority: 'high' },
-        'SELECTOR_UPDATE': { target: 'selector-input', priority: 'normal' },
-        'SETTINGS_UPDATE': { target: 'settings', priority: 'normal' }
-      },
-      'go-button': {
-        'BUTTON_CLICK': { target: 'wave-reader', priority: 'high' },
-        'SELECTOR_READY': { target: 'wave-reader', priority: 'normal' }
-      },
-      'selector-input': {
-        'SELECTOR_APPLY': { target: 'wave-reader', priority: 'high' },
-        'VALIDATION_SUCCESS': { target: 'go-button', priority: 'normal' }
-      },
-      'settings': {
-        'SETTING_CHANGE': { target: 'wave-reader', priority: 'normal' },
-        'SETTINGS_SAVED': { target: 'main-app', priority: 'normal' }
-      }
-    },
-
-    // Priority levels for message handling
-    priorities: {
-      'critical': { timeout: 1000, retryCount: 3 },
-      'high': { timeout: 2000, retryCount: 2 },
-      'normal': { timeout: 5000, retryCount: 1 },
-      'low': { timeout: 10000, retryCount: 0 }
-    }
-  },
-
-  // Performance and monitoring configuration
-  Performance: {
-    // State machine performance settings
-    stateMachines: {
-      maxInitTime: 2000,
-      maxStateTransitionTime: 500,
-      maxEventProcessingTime: 1000
-    },
-
-    // Message routing performance
-    messageRouting: {
-      maxRoutingTime: 100,
-      maxQueueSize: 1000,
-      enableBatching: true,
-      batchSize: 10,
-      batchTimeout: 50
-    },
-
-    // Monitoring and metrics
-    monitoring: {
-      enableMetrics: true,
-      enableTracing: true,
-      enableHealthChecks: true,
-      healthCheckInterval: 30000
-    }
-  },
-
-  // Error handling and recovery
-  ErrorHandling: {
-    // Global error handling
-    global: {
-      maxErrorCount: 10,
-      errorRecoveryTimeout: 5000,
-      enableAutoRecovery: true,
-      enableErrorReporting: true
-    },
-
-    // Component-specific error handling
-    components: {
-      'wave-reader': {
-        maxErrorCount: 5,
-        recoveryStrategy: 'restart',
-        fallbackState: 'idle'
-      },
-      'selector-input': {
-        maxErrorCount: 3,
-        recoveryStrategy: 'reset',
-        fallbackState: 'empty'
-      },
-      'settings': {
-        maxErrorCount: 2,
-        recoveryStrategy: 'reload',
-        fallbackState: 'loading'
       }
     }
   }

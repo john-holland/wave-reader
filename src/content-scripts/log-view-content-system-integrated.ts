@@ -41,9 +41,13 @@ export class LogViewContentSystemIntegrated {
     this.domService = new ContentSystemDOMService();
     this.messageService = new ContentSystemMessageService(this.sessionId);
     
-    // Initialize Tomes
-    this.contentTome = LogViewContentSystemTomes;
-    this.shadowTome = LogViewShadowSystemTomes;
+    // Initialize Tomes by calling create() to get actual instances
+    this.contentTome = LogViewContentSystemTomes.create({});
+    this.shadowTome = LogViewShadowSystemTomes.create({});
+    
+    // Start the Tomes
+    this.contentTome.start();
+    this.shadowTome.start();
     
     // Initialize the system
     this.init();
@@ -123,6 +127,10 @@ export class LogViewContentSystemIntegrated {
           this.handlePing(message);
           sendResponse({ success: true, state: this.proxyState });
           break;
+        case 'get-status':
+          this.handleGetStatus(message);
+          sendResponse({ success: true, status: this.getCurrentState() });
+          break;
         default:
           console.log("🌊 Integrated System: Unknown runtime message type:", message.name);
           sendResponse({ success: false, error: 'Unknown message type' });
@@ -188,6 +196,9 @@ export class LogViewContentSystemIntegrated {
     // Update proxy state
     this.updateProxyState();
     
+    // Sync state with background script
+    this.syncGoingStateWithBackground();
+    
     this.messageService.logMessage('start', 'Integrated system started');
     this.logMessage('start', 'Integrated system started');
   }
@@ -205,6 +216,9 @@ export class LogViewContentSystemIntegrated {
     
     // Update proxy state
     this.updateProxyState();
+    
+    // Sync state with background script
+    this.syncGoingStateWithBackground();
     
     this.messageService.logMessage('stop', 'Integrated system stopped');
     this.logMessage('stop', 'Integrated system stopped');
@@ -239,6 +253,11 @@ export class LogViewContentSystemIntegrated {
     
     this.messageService.logMessage('ping', 'Ping responded with pong');
     this.logMessage('ping', 'Ping responded with pong');
+  }
+
+  private handleGetStatus(message: any) {
+    console.log("🌊 Integrated System: Handling get-status message");
+    this.logMessage('status-requested', 'Status requested from integrated system');
   }
 
   private routeMessageToTomes(messageName: string, messageData: any) {
@@ -282,8 +301,8 @@ export class LogViewContentSystemIntegrated {
   }
 
   private updateProxyState() {
-    const contentState = this.contentTome.getSnapshot().value;
-    const shadowState = this.shadowTome.getSnapshot().value;
+    const contentState = this.contentTome.getState().value;
+    const shadowState = this.shadowTome.getState().value;
     
     if (contentState === 'active' && shadowState === 'waving') {
       this.proxyState = 'both-active';
@@ -300,6 +319,24 @@ export class LogViewContentSystemIntegrated {
       contentState,
       shadowState
     });
+  }
+
+  private syncGoingStateWithBackground() {
+    console.log("🌊 Integrated System: Syncing going state with background", { going: this.going });
+    
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      chrome.runtime.sendMessage({
+        from: 'integrated-content-system',
+        name: 'update-going-state',
+        going: this.going,
+        timestamp: Date.now(),
+        sessionId: this.sessionId
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.warn("🌊 Integrated System: Failed to sync going state with background:", chrome.runtime.lastError.message);
+        }
+      });
+    }
   }
 
   private applyWaveAnimation() {
@@ -350,8 +387,8 @@ export class LogViewContentSystemIntegrated {
       sessionId: this.sessionId,
       url: window.location.href,
       proxyState: this.proxyState,
-      contentState: this.contentTome.getSnapshot().value,
-      shadowState: this.shadowTome.getSnapshot().value
+      contentState: this.contentTome.getState().value,
+      shadowState: this.shadowTome.getState().value
     };
     
     this.messageHistory.push(logEntry);
@@ -362,8 +399,8 @@ export class LogViewContentSystemIntegrated {
   public getCurrentState() {
     return {
       proxyState: this.proxyState,
-      contentState: this.contentTome.getSnapshot().value,
-      shadowState: this.shadowTome.getSnapshot().value,
+      contentState: this.contentTome.getState().value,
+      shadowState: this.shadowTome.getState().value,
       going: this.going
     };
   }
@@ -382,8 +419,8 @@ export class LogViewContentSystemIntegrated {
 
   public getTomeStates() {
     return {
-      content: this.contentTome.getSnapshot(),
-      shadow: this.shadowTome.getSnapshot()
+      content: this.contentTome.getState(),
+      shadow: this.shadowTome.getState()
     };
   }
 

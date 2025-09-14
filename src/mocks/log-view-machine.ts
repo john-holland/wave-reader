@@ -1,8 +1,13 @@
 // Mock implementation of log-view-machine for development
 // This allows the build to complete while we work on the actual integration
 
+// ⚠️ PRODUCTION WARNING: This is a MOCK implementation!
+// If you see this warning in production, the real log-view-machine integration is missing!
+console.warn('🚨 MOCK WARNING: Using mock log-view-machine implementation! This should only be used during development. If you see this in production, the real integration is missing!');
+
 export class StructuralSystem {
   constructor(config: any) {
+    console.warn('🚨 MOCK StructuralSystem: This is a MOCK implementation! Real log-view-machine integration missing!');
     console.log('Mock StructuralSystem created with config:', config);
   }
 
@@ -15,9 +20,33 @@ export class StructuralSystem {
       }
     };
   }
+
+  getStructuralSystem() {
+    console.log('Mock getStructuralSystem called');
+    return this;
+  }
+
+  getMessageStats() {
+    console.log('Mock getMessageStats called');
+    return {
+      total: 0,
+      success: 0,
+      rate: 0.0
+    };
+  }
+
+  async healthCheck() {
+    console.log('Mock healthCheck called');
+    return {
+      status: 'healthy',
+      timestamp: Date.now(),
+      uptime: 0
+    };
+  }
 }
 
 export function createViewStateMachine(config: any) {
+  console.warn('🚨 MOCK createViewStateMachine: This is a MOCK implementation! Real log-view-machine integration missing!');
   console.log('Mock createViewStateMachine called with:', config);
   return {
     send: async (message: any) => {
@@ -39,11 +68,16 @@ export function createViewStateMachine(config: any) {
         value: 'idle',
         context: { isActive: false }
       };
+    },
+    start: async () => {
+      console.log('Mock state machine start called');
+      return Promise.resolve();
     }
   };
 }
 
 export function createStructuralConfig(config: any) {
+  console.warn('🚨 MOCK createStructuralConfig: This is a MOCK implementation! Real log-view-machine integration missing!');
   console.log('Mock createStructuralConfig called with:', config);
   return config;
 }

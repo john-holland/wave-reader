@@ -20,10 +20,14 @@ import {
   WaveReaderMessageRouter,
   useWaveReaderMessageRouter
 } from './components/structural';
+import { createProxyRobotCopyStateMachine, createTomeConfig } from 'log-view-machine';
+
+
 
 // Check if we're in development mode
 const isDevelopment = configured.mode !== 'production';
 
+        
 // Styled components optimized for Chrome extension popup
 const WaveReader = styled.div`
   width: 400px; // Smaller width for popup
@@ -219,6 +223,39 @@ const AppUnified: FunctionComponent = () => {
 
         const extensionContext = checkExtensionContext();
         setIsExtension(Boolean(extensionContext));
+
+        // Set up message listener for state changes from background script
+        if (extensionContext && chrome.runtime && chrome.runtime.onMessage) {
+            const messageListener = async (message: any) => {
+                console.log('🌊 Popup: Received message from background:', message);
+                if (message.from === 'background-script' && message.name === 'state-changed') {
+                    console.log('🌊 Popup: State change detected, refreshing state from content script');
+                    
+                    // Refresh state from content script
+                    try {
+                        const statusMessage = {
+                            name: 'get-status',
+                            from: 'popup'
+                        };
+                        const statusResponse = await sendExtensionMessage(statusMessage) as any;
+                        if (statusResponse && statusResponse.success && statusResponse.status) {
+                            const isGoing = statusResponse.status.going || false;
+                            setGoing(isGoing);
+                            console.log('🌊 Popup: Updated going state from keyboard toggle:', isGoing);
+                        }
+                    } catch (error) {
+                        console.log('🌊 Popup: Could not refresh state from keyboard toggle:', error);
+                    }
+                }
+            };
+            
+            chrome.runtime.onMessage.addListener(messageListener);
+            
+            // Cleanup listener on unmount
+            return () => {
+                chrome.runtime.onMessage.removeListener(messageListener);
+            };
+        }
 
         // Initialize the app
         const initializeApp = async () => {
@@ -857,4 +894,356 @@ const AppUnified: FunctionComponent = () => {
     );
 };
 
-export default AppUnified;
+
+
+// todo: wire this up to the existing UI above and use TomeManager to register the structural system
+//      already configured in DefaultStructuralConfig
+
+const BackgroundProxyMachine = createProxyRobotCopyStateMachine({
+    id: 'background-proxy-machine',
+    name: 'Background Proxy Machine',
+    description: 'Background Proxy Machine',
+    version: '1.0.0',
+    dependencies: ['log-view-machine'],
+    xstateConfig: {
+        initial: 'initialize',
+        states: {
+            idle: {
+                on: {
+                    INITIALIZE: { target: 'initializing', actions: ['initialize'] },
+                    IDLE: { target: 'idle', actions: ['idle'] },
+                    START: { target: 'starting', actions: ['startApp'] },
+                    STOP: { target: 'stopping', actions: ['stopApp'] },
+                    TOGGLE: { target: 'toggling', actions: ['toggleApp'] },
+                    SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
+                    SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
+                    ERROR: { target: 'error', actions: ['handleError'] },
+                    TEARDOWN: { target: 'tearingDown', actions: ['teardown'] }
+                }
+            }
+        },
+        actions: {
+            initialize: {
+                type: 'function',
+                fn: ({context, event, send, log, transition, machine}) => {   
+                    // Set up message listener for state changes from background script
+                    if (chrome.runtime && chrome.runtime.onMessage) {
+                        const messageListener = async (message: any) => {
+                            console.log('🌊 Popup: Received message from background:', message);
+                            if (message.from === 'background-script' && message.name === 'state-changed') {
+                                console.log('🌊 Popup: State change detected, refreshing state from content script');
+                                
+                                // Refresh state from content script
+                                try {
+                                    machine.parentMachine.send({message});
+                                } catch (error) {
+                                    console.log('🌊 Popup: Received error while sending proxy message: ', error);
+                                }
+                            }
+                        };
+                        
+                        chrome.runtime.onMessage.addListener(messageListener);
+                    } else {
+                        console.log('🌊 Popup: No message listener found');
+                    }
+                }
+            },
+            teardown: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    chrome.runtime.onMessage.removeListener(messageListener);
+                }
+            },
+            startApp: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    sendExtensionMessage(context.message);
+                }
+            },
+            stopApp: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    sendExtensionMessage(context.message);
+                }
+            },
+            toggleApp: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    sendExtensionMessage(context.message);
+                }
+            },
+            updateSelector: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    sendExtensionMessage(context.message);
+                }
+            },
+            updateSettings: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    sendExtensionMessage(context.message);
+                }
+            },
+            handleError: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    sendExtensionMessage(context.message);
+                }
+            },
+            markInitialized: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    sendExtensionMessage(context.message);
+                }
+            }
+        }
+    }
+});
+
+const AppMachine = createViewStateMachine({
+
+    states: {
+        idle: {
+            on: {
+                INITIALIZE: { target: 'initializing', actions: ['initializeApp'] },
+                START: { target: 'starting', actions: ['startApp'] },
+                STOP: { target: 'stopping', actions: ['stopApp'] },
+                TOGGLE: { target: 'toggling', actions: ['toggleApp'] },
+                SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
+                SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
+                ERROR: { target: 'error', actions: ['handleError'] }
+            }
+        },
+        initializing: {
+            on: {
+                INITIALIZATION_COMPLETE: { target: 'ready', actions: ['markInitialized'] },
+                INITIALIZATION_FAILED: { target: 'error', actions: ['handleInitError'] }
+            }
+        },
+        ready: {
+            on: {
+                START: { target: 'starting', actions: ['startApp'] },
+                STOP: { target: 'stopping', actions: ['stopApp'] },
+                TOGGLE: { target: 'toggling', actions: ['toggleApp'] },
+                SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
+                SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
+                ERROR: { target: 'error', actions: ['handleError'] }
+            }
+        },
+        starting: {
+            on: {
+                START_COMPLETE: { target: 'waving', actions: ['startWaveAnimation'] },
+                START_FAILED: { target: 'error', actions: ['handleStartError'] }
+            }
+        },
+        waving: {
+            on: {
+                STOP: { target: 'stopping', actions: ['stopWaveAnimation'] },
+                TOGGLE: { target: 'toggling', actions: ['toggleWaveAnimation'] },
+                SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
+                SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
+                ERROR: { target: 'error', actions: ['handleError'] }
+            }
+        },
+        stopping: {
+            on: {
+                STOP_COMPLETE: { target: 'idle', actions: ['completeStop'] },
+                ERROR: { target: 'error', actions: ['handleError'] }
+            }
+        },
+        selectorUpdating: {
+            on: { SELECTOR_UPDATE_COMPLETE: { target: 'idle', actions: ['completeSelectorUpdate'] } },
+            entry: 'updateSelector'
+        },
+        settingsUpdating: {
+            on: { SETTINGS_UPDATE_COMPLETE: { target: 'idle', actions: ['completeSettingsUpdate'] } },
+            entry: 'updateSettings'
+        }
+    },
+    actions: {
+        initializeApp: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Initialize app');
+            }
+        },
+        completeStop: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Complete stop');
+            }
+        },
+        updateSelector: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Update selector');
+            }
+        },
+        updateSettings: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Update settings');
+            }
+        },
+        handleError: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Handle error');
+            }
+        },
+        markInitialized: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Mark initialized');
+            }
+        },
+        handleInitError: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Handle init error');
+            }
+        },
+        startApp: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Start app');
+            }
+        },
+        stopApp: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Stop app');
+            }
+        },
+        toggleApp: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Toggle app');
+            }
+        },
+        completeToggle: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Complete toggle');
+            }
+        },
+        completeSelectorUpdate: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Complete selector update');
+            }
+        },
+        completeSettingsUpdate: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Complete settings update');
+            }
+        },
+        handleStartError: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Handle start error');
+            }
+        },
+        startWaveAnimation: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Start wave animation');
+            }
+        },
+        stopWaveAnimation: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Stop wave animation');
+            }
+        },
+        toggleWaveAnimation: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Toggle wave animation');
+            }
+        },
+        completeToggle: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Complete toggle');
+            }
+        },
+        completeSettingsUpdate: {
+            type: 'function',
+            fn: (context: any, event: any) => {
+                console.log('🌊 App Tome: Complete settings update');
+            }
+        }
+    }
+}).withState('idle', ({ context, event, view, transition}) => {
+    view(renderIdleView(context));
+}).withState('initializing', ({ context, event, view, transition}) => {
+    view(renderInitializingView(context));
+}).withState('ready', ({ context, event, view, transition}) => {
+    transition('idle');
+}).withState('starting', ({ context, event, view, transition}) => {
+    console.log('🌊 App Tome: Starting');
+}).withState('waving', ({ context, event, view, transition}) => {
+    transition(renderStopButtonView(context));
+}).withState('stopping', ({ context, event, view, transition}) => {
+    console.log('🌊 App Tome: Stopping');
+    view(renderStoppingView(context));
+    transition('idle');
+}).withState('selectorUpdating', ({ context, event, view, transition}) => {
+    view(renderSelectorUpdatingView(context));
+}).withState('settingsUpdating', ({ context, event, view, transition}) => {
+    view(renderSettings(context));
+}).withState('settingsUpdated', ({ context, event, send, log, transition}) => {
+    log(context.model);/*.settings*/
+    send({ type: 'SETTINGS_UPDATE_COMPLETE' });
+    transition('idle');
+}).withState('error', ({ context, event, send, log, transition}) => {
+    log(renderIdleView(context, context.model.error));
+    send({ type: 'ERROR' });
+    transition('idle');
+});
+
+const AppTome = createTomeConfig({
+    id: 'app-tome',
+    name: 'App Tome',
+    description: 'App Tome',
+    version: '1.0.0',
+    machines: {
+        backgroundProxyMachine: BackgroundProxyMachine,
+        appMachine: AppMachine
+    },
+    dependencies: ['log-view-machine'],
+    author: 'Wave Reader Team',
+    createdAt: '2024-01-01',
+    lastModified: new Date().toISOString().split('T')[0],
+    tags: ['app', 'tome'],
+    priority: 'normal',
+    stability: 'stable',
+    routing: {
+        basePath: '/',
+        routes: {
+            'background-proxy-machine': {
+                path: '/background-proxy-machine',
+                method: 'POST',
+                transformers: {
+                    input: (data: any) => {
+                        
+                    },
+                    output: (data: any) => data
+                }
+            }
+            'app-machine': {
+                path: '/app-machine',
+                method: 'POST'
+            }
+        }
+    }
+});
+
+AppTome.start();
+AppTome.machines.get('appMachine').view();
+
+    
+
+export default AppTome;

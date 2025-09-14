@@ -122,19 +122,7 @@ export class WaveReaderMessageRouter {
   private async resolveRoute(message: WaveReaderMessage): Promise<string> {
     const { type, source } = message;
     
-    // Check global routing rules first
-    const globalRouting = WaveReaderStructuralConfig.MessageRouting.global;
-    if (globalRouting[type]) {
-      return globalRouting[type].target;
-    }
-
-    // Check component-specific routing
-    const componentRouting = WaveReaderStructuralConfig.MessageRouting.components[source];
-    if (componentRouting && componentRouting[type]) {
-      return componentRouting[type].target;
-    }
-
-    // Default routing based on message type
+    // Simple routing based on message type
     if (type.includes('WAVE_READER')) {
       return 'wave-reader';
     } else if (type.includes('TAB')) {

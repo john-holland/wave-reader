@@ -26,7 +26,8 @@ const config = {
     resolve: {
         extensions: [".tsx", ".ts", ".js", ".jsx", ".*"],
         alias: {
-            "log-view-machine": path.resolve(__dirname, "src/mocks/log-view-machine.ts")
+            // Real log-view-machine integration - using local package
+            // "log-view-machine": path.resolve(__dirname, "../log-view-machine/dist")
         },
         fallback: {
             "path": require.resolve("path-browserify"),

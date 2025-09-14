@@ -2,17 +2,16 @@ import { MessageUtility } from '../models/messages/simplified-messages';
 import { MessageFactory } from '../models/messages/simplified-messages';
 import { MLSettingsService } from '../services/ml-settings-service';
 
-// Log-View-Machine Background System using ProxyMachine
+// Log-View-Machine Background System
 export class LogViewBackgroundSystem {
     private mlService: MLSettingsService;
     private messageHistory: any[] = [];
     private sessionId: string;
     private activeTabs: Map<number, any> = new Map();
     private extensionState: 'active' | 'inactive' = 'active';
-    private proxyMachine: any;
 
     constructor() {
-        console.log("🌊 Creating Log-View-Machine Background System with ProxyMachine...");
+        console.log("🌊 Creating Log-View-Machine Background System...");
         
         // Initialize services
         this.mlService = new MLSettingsService();
@@ -35,39 +34,8 @@ export class LogViewBackgroundSystem {
         // Set up Chrome extension event listeners
         this.setupChromeListeners();
         
-        // Initialize ProxyMachine for delegation
-        this.initializeProxyMachine();
-        
         // Log system initialization
         this.logMessage('system-init', 'Background system initialized successfully');
-    }
-
-    private initializeProxyMachine() {
-        console.log("🌊 Initializing ProxyMachine for background system...");
-        
-        // Create a ProxyMachine to delegate message handling
-        this.proxyMachine = new Proxy(this, {
-            get(target, prop, receiver) {
-                // Delegate method calls to the target
-                const value = Reflect.get(target, prop, receiver);
-                
-                if (typeof value === 'function') {
-                    return function(...args: any[]) {
-                        console.log(`🌊 ProxyMachine delegating call to ${String(prop)}`);
-                        return value.apply(target, args);
-                    };
-                }
-                
-                return value;
-            },
-            
-            set(target, prop, value, receiver) {
-                console.log(`🌊 ProxyMachine delegating property set: ${String(prop)}`);
-                return Reflect.set(target, prop, value, receiver);
-            }
-        });
-        
-        this.logMessage('proxy-machine-init', 'ProxyMachine initialized for delegation');
     }
 
     private setupChromeListeners() {
@@ -83,276 +51,428 @@ export class LogViewBackgroundSystem {
             chrome.runtime.onInstalled.addListener((details) => {
                 this.handleExtensionInstalled(details);
             });
-        }
 
-        // Handle tab updates
-        if (typeof chrome !== 'undefined' && chrome.tabs) {
-            chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-                this.handleTabUpdated(tabId, changeInfo, tab);
+            // Handle extension startup
+            chrome.runtime.onStartup.addListener(() => {
+                this.handleExtensionStartup();
             });
+
+            // Handle tab updates
+            if (chrome.tabs) {
+                chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+                    this.handleTabUpdated(tabId, changeInfo, tab);
+                });
+
+                chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+                    this.handleTabRemoved(tabId, removeInfo);
+                });
+            }
         }
     }
 
     private setupMessageListeners() {
+        // Listen for messages from content scripts and popup
         if (typeof chrome !== 'undefined' && chrome.runtime) {
             chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 this.handleRuntimeMessage(message, sender, sendResponse);
-                return true; // Keep the message channel open for async response
+                return true; // Keep message channel open
             });
         }
     }
 
     private handleKeyboardCommand(command: string) {
-        console.log("🌊 Log-View-Machine: Keyboard command received:", command);
-        this.logMessage('keyboard-command', `Command received: ${command}`);
+        console.log("🌊 Log-View-Machine: Background received command:", command);
+        this.logMessage('keyboard-command', `Received command: ${command}`);
         
         switch (command) {
-            case '_execute_action':
-                this.toggleWaveReader();
+            case "_execute_action":
+                // This opens the popup - handled automatically by Chrome
+                this.logMessage('popup-open', 'Popup opened via keyboard shortcut');
                 break;
-            case 'toggle-wave-reader':
-                this.toggleWaveReader();
+                
+            case "toggle-wave-reader":
+                this.handleToggleWaveReader();
                 break;
+                
             default:
-                console.log("🌊 Log-View-Machine: Unknown command:", command);
+                this.logMessage('unknown-command', `Unknown command: ${command}`);
         }
     }
 
-    private handleExtensionInstalled(details: chrome.runtime.InstalledDetails) {
-        console.log("🌊 Log-View-Machine: Extension installed/updated:", details);
-        this.logMessage('extension-installed', `Extension ${details.reason} - version ${details.previousVersion || 'new'}`);
+    private handleExtensionInstalled(details: any) {
+        console.log("🌊 Log-View-Machine: Extension installed:", details);
+        this.logMessage('extension-installed', `Extension installed: ${details.reason}`);
         
-        if (details.reason === 'install') {
-            this.logMessage('first-install', 'First time installation completed');
-        } else if (details.reason === 'update') {
-            this.logMessage('extension-updated', `Updated from version ${details.previousVersion}`);
-        }
+        // Initialize ML service with default patterns
+        this.initializeMLService();
+        
+        // Set up default extension state
+        this.extensionState = 'active';
     }
 
-    private handleTabUpdated(tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) {
+    private handleExtensionStartup() {
+        console.log("🌊 Log-View-Machine: Extension started");
+        this.logMessage('extension-startup', 'Extension started');
+        
+        // Initialize ML service
+        this.initializeMLService();
+        
+        // Set up default extension state
+        this.extensionState = 'active';
+    }
+
+    private handleTabUpdated(tabId: number, changeInfo: any, tab: any) {
         if (changeInfo.status === 'complete' && tab.url) {
-            console.log("🌊 Log-View-Machine: Tab updated:", tabId, tab.url);
-            this.logMessage('tab-updated', `Tab ${tabId} updated: ${tab.url}`);
-            
-            // Update active tabs tracking
-            if (this.activeTabs.has(tabId)) {
-                const tabInfo = this.activeTabs.get(tabId);
-                tabInfo.url = tab.url;
-                tabInfo.lastUpdated = Date.now();
-                this.activeTabs.set(tabId, tabInfo);
+            // Check if the tab URL is accessible
+            if (this.isUrlAccessible(tab.url)) {
+                this.activeTabs.set(tabId, {
+                    url: tab.url,
+                    title: tab.title,
+                    timestamp: Date.now()
+                });
+                
+                this.logMessage('tab-updated', `Tab updated: ${tab.url}`, { tabId, url: tab.url });
             }
         }
     }
 
-    private async handleRuntimeMessage(message: any, sender: any, sendResponse: any) {
+    private handleTabRemoved(tabId: number, removeInfo: any) {
+        this.activeTabs.delete(tabId);
+        this.logMessage('tab-removed', `Tab removed`, { tabId });
+    }
+
+    private handleToggleWaveReader() {
+        console.log("🌊 Log-View-Machine: Toggle wave reader command received");
+        this.logMessage('toggle-requested', 'Toggle wave reader requested');
+        
+        // Get the active tab and send toggle message to content script
+        this.getActiveTab().then((tab) => {
+            if (!tab) {
+                this.logMessage('toggle-error', 'No active tab found for toggle command');
+                return;
+            }
+            
+            // Check if the tab URL is accessible
+            if (!this.isUrlAccessible(tab.url)) {
+                this.logMessage('toggle-skipped', `Skipping toggle for restricted URL: ${tab.url}`);
+                return;
+            }
+            
+            this.logMessage('toggle-sending', `Sending toggle command to tab: ${tab.url}`);
+            
+            // Send toggle message to content script via chrome.tabs.sendMessage
+            this.injectToggleCommand(tab.id);
+        }).catch((error) => {
+            this.logMessage('toggle-error', `Error getting active tab: ${error.message}`);
+        });
+    }
+
+    private async getActiveTab(): Promise<any> {
+        if (typeof chrome === 'undefined' || !chrome.tabs) {
+            throw new Error('Chrome tabs API not available');
+        }
+        
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tabs || tabs.length === 0) {
+            throw new Error('No active tabs found');
+        }
+        
+        return tabs[0];
+    }
+
+    private isUrlAccessible(url: string): boolean {
+        if (!url) return false;
+        
+        // Check if the URL is restricted
+        return !(
+            url.startsWith('chrome://') || 
+            url.startsWith('chrome-extension://') || 
+            url.startsWith('moz-extension://') ||
+            url.startsWith('edge://') ||
+            url.startsWith('about:')
+        );
+    }
+
+    private injectToggleCommand(tabId: number) {
+        if (typeof chrome === 'undefined' || !chrome.scripting) {
+            this.logMessage('toggle-error', 'Chrome scripting API not available');
+            return;
+        }
+        
+        chrome.scripting.executeScript({
+            target: { tabId },
+            func: (messageData) => {
+                console.log("🌊 Log-View-Machine: Background script injecting toggle command to content script:", messageData);
+                // Note: In service worker context, we use chrome.tabs.sendMessage instead of window.postMessage
+                // This is handled by injectMessageToContentScript method
+                chrome.tabs.sendMessage({
+                    source: 'wave-reader-extension',
+                    message: messageData
+                }, '*');
+            },
+            args: [{
+                from: 'background-script',
+                name: 'toggle-wave-reader',
+                timestamp: Date.now()
+            }]
+        }).then(() => {
+            this.logMessage('toggle-injected', 'Toggle command injected successfully');
+            
+            // Notify popup of state change if it's open
+            try {
+                chrome.runtime.sendMessage({
+                    from: 'background-script',
+                    name: 'state-changed',
+                    timestamp: Date.now(),
+                    action: 'keyboard-toggle'
+                }).catch(() => {
+                    // Popup might not be open, which is fine
+                });
+            } catch (error) {
+                // Ignore errors
+            }
+        }).catch((error) => {
+            this.logMessage('toggle-error', `Failed to inject toggle command: ${error.message}`);
+        });
+    }
+
+    private handleRuntimeMessage(message: any, sender: any, sendResponse: any) {
         console.log("🌊 Log-View-Machine: Background received runtime message:", message);
         this.logMessage('runtime-message', `Received ${message.name} from ${message.from}`);
         
+        // Create a proper message using our factory
+        const properMessage = MessageFactory.createMessage(message.name, message.from, message);
+        
+        // Route the message through our message system
+        const route = MessageUtility.routeMessage(
+            message.from, 
+            'background-script', 
+            properMessage, 
+            this.sessionId
+        );
+        
+        // Handle the message based on its type
+        this.processRuntimeMessage(properMessage, route, sender, sendResponse);
+    }
+
+    private processRuntimeMessage(message: any, route: any, sender: any, sendResponse: any) {
+        const messageName = message.name;
+        
         try {
-            // Delegate message handling to ProxyMachine
-            const result = await this.proxyMachine.handleMessage(message, sender);
-            sendResponse({ success: true, result });
+            switch (messageName) {
+                case 'selection-made':
+                    this.handleSelectionMade(message, sender, sendResponse);
+                    break;
+                    
+                case 'ping':
+                    this.handlePing(message, sender, sendResponse);
+                    break;
+                    
+                case 'health-check':
+                    this.handleHealthCheck(message, sender, sendResponse);
+                    break;
+                    
+                case 'ml-recommendation-request':
+                    this.handleMLRecommendationRequest(message, sender, sendResponse);
+                    break;
+                    
+                case 'settings-reset-request':
+                    this.handleSettingsResetRequest(message, sender, sendResponse);
+                    break;
+                    
+                case 'analytics-event':
+                    this.handleAnalyticsEvent(message, sender, sendResponse);
+                    break;
+                    
+                case 'extension-status-request':
+                    this.handleExtensionStatusRequest(message, sender, sendResponse);
+                    break;
+                    
+                case 'start':
+                    this.handleStart(message, sender, sendResponse);
+                    break;
+                    
+                case 'stop':
+                    this.handleStop(message, sender, sendResponse);
+                    break;
+                    
+                case 'toggle':
+                    this.handleToggle(message, sender, sendResponse);
+                    break;
+                    
+                default:
+                    console.log(`🌊 Log-View-Machine: Unknown runtime message type: ${messageName}`);
+                    this.logMessage('unknown-runtime-message', `Unknown message type: ${messageName}`);
+                    sendResponse({ success: false, error: 'Unknown message type' });
+            }
         } catch (error: any) {
-            console.error("🌊 Log-View-Machine: Error handling message:", error);
-            this.logMessage('message-error', `Error handling message: ${error.message}`);
+            console.error(`🌊 Log-View-Machine: Error processing runtime message ${messageName}:`, error);
+            this.logMessage('runtime-message-error', `Error processing ${messageName}: ${error?.message || 'Unknown error'}`);
+            sendResponse({ success: false, error: error?.message || 'Unknown error' });
+        }
+    }
+
+    private handleSelectionMade(message: any, sender: any, sendResponse: any) {
+        console.log("🌊 Log-View-Machine: Handling selection-made message:", message.selector);
+        this.logMessage('selection-made', `Selector selected: ${message.selector}`);
+        
+        // Forward the message to the popup
+        this.forwardToPopup({
+            from: 'background-script',
+            name: 'selection-made',
+            selector: message.selector,
+            sessionId: this.sessionId
+        });
+        
+        sendResponse({ success: true });
+    }
+
+    private handlePing(message: any, sender: any, sendResponse: any) {
+        console.log("🌊 Log-View-Machine: Handling ping message from popup");
+        this.logMessage('ping-received', 'Ping received from popup');
+        
+        // Get the active tab and send ping message to content script
+        this.getActiveTab().then((tab) => {
+            if (!tab || !this.isUrlAccessible(tab.url)) {
+                this.logMessage('ping-skipped', 'Ping skipped for restricted URL');
+                sendResponse({ success: false, error: 'URL not accessible' });
+                return;
+            }
+            
+            // Send ping message to content script
+            this.injectPingCommand(tab.id);
+            sendResponse({ success: true });
+        }).catch((error) => {
+            this.logMessage('ping-error', `Error handling ping: ${error.message}`);
             sendResponse({ success: false, error: error.message });
-        }
+        });
     }
 
-    private async handleMessage(message: any, sender: any) {
-        console.log("🌊 Log-View-Machine: Handling message via ProxyMachine:", message);
-        
-        switch (message.name) {
-            case 'start':
-                return await this.handleStart(message, sender);
-            case 'stop':
-                return await this.handleStop(message, sender);
-            case 'toggle':
-                return await this.handleToggle(message, sender);
-            case 'update-going-state':
-                return await this.handleUpdateGoingState(message, sender);
-            case 'get-status':
-                return await this.handleGetStatus(message, sender);
-            case 'get-health':
-                return await this.handleGetHealth(message, sender);
-            default:
-                throw new Error(`Unknown message type: ${message.name}`);
+    private injectPingCommand(tabId: number) {
+        if (typeof chrome === 'undefined' || !chrome.scripting) {
+            this.logMessage('ping-error', 'Chrome scripting API not available');
+            return;
         }
-    }
-
-    private async handleStart(message: any, sender: any) {
-        console.log("🌊 Log-View-Machine: Handling start message:", message);
-        this.logMessage('start-requested', 'Start wave reader requested');
         
-        try {
-            // Get active tab
-            const tab = await this.getActiveTab();
-            if (!tab) {
-                throw new Error('No active tab found');
-            }
-            
-            // Check if the tab URL is accessible
-            if (!tab.url || !this.isUrlAccessible(tab.url)) {
-                throw new Error(`Cannot access restricted URL: ${tab.url || 'unknown'}`);
-            }
-            
-            // Send start message to content script
-            if (!tab.id) {
-                throw new Error('Tab ID is undefined');
-            }
-            await this.injectMessageToContentScript(tab.id, {
+        chrome.scripting.executeScript({
+            target: { tabId },
+            func: (messageData) => {
+                console.log("🌊 Log-View-Machine: Background script injecting ping command to content script:", messageData);
+                // Note: In service worker context, we use chrome.tabs.sendMessage instead of window.postMessage
+                // This is handled by injectMessageToContentScript method
+                    source: 'wave-reader-extension',
+                    message: messageData
+                }, '*');
+            },
+            args: [{
                 from: 'background-script',
-                name: 'start',
-                options: message.options,
+                name: 'ping',
                 timestamp: Date.now()
+            }]
+        }).then(() => {
+            this.logMessage('ping-injected', 'Ping command injected successfully');
+        }).catch((error) => {
+            this.logMessage('ping-error', `Failed to inject ping command: ${error.message}`);
+        });
+    }
+
+    private handleHealthCheck(message: any, sender: any, sendResponse: any) {
+        console.log("🌊 Log-View-Machine: Handling health check message");
+        this.logMessage('health-check-requested', 'Health check requested');
+        
+        const healthStatus = this.performHealthCheck();
+        sendResponse({ success: true, status: healthStatus });
+    }
+
+    private handleMLRecommendationRequest(message: any, sender: any, sendResponse: any) {
+        console.log("🌊 Log-View-Machine: Handling ML recommendation request");
+        this.logMessage('ml-request', 'ML recommendation requested');
+        
+        const { domain, path, selector } = message;
+        
+        this.mlService.getSettingsRecommendations(domain, path, selector)
+            .then((recommendations) => {
+                this.logMessage('ml-recommendations', `Generated ${recommendations.length} ML recommendations`);
+                sendResponse({ success: true, recommendations });
+            })
+            .catch((error) => {
+                this.logMessage('ml-error', `Error generating recommendations: ${error.message}`);
+                sendResponse({ success: false, error: error.message });
             });
-            
-            // Update active tabs tracking
-            this.activeTabs.set(tab.id, {
-                ...this.activeTabs.get(tab.id),
-                state: 'waving',
-                startTime: Date.now(),
-                options: message.options
-            });
-            
-            this.logMessage('start-success', 'Wave reader started successfully');
-            return { success: true, message: 'Wave reader started' };
-            
+    }
+
+    private handleSettingsResetRequest(message: any, sender: any, sendResponse: any) {
+        console.log("🌊 Log-View-Machine: Handling settings reset request");
+        this.logMessage('settings-reset-requested', 'Settings reset requested');
+        
+        try {
+            const newDefaults = this.mlService.resetToNewDefaults();
+            this.logMessage('settings-reset-completed', 'Settings reset to ML defaults completed');
+            sendResponse({ success: true, newDefaults });
         } catch (error: any) {
-            console.error('🌊 Log-View-Machine: Failed to start wave reader:', error);
-            this.logMessage('start-error', `Failed to start: ${error.message}`);
-            throw error;
+            this.logMessage('settings-reset-error', `Error resetting settings: ${error?.message || 'Unknown error'}`);
+            sendResponse({ success: false, error: error?.message || 'Unknown error' });
         }
     }
 
-    private async handleStop(message: any, sender: any) {
-        console.log("🌊 Log-View-Machine: Handling stop message:", message);
-        this.logMessage('stop-requested', 'Stop wave reader requested');
+    private handleAnalyticsEvent(message: any, sender: any, sendResponse: any) {
+        console.log("🌊 Log-View-Machine: Handling analytics event");
+        this.logMessage('analytics-event', `Analytics event: ${message.eventType}`);
         
-        try {
-            // Get active tab
-            const tab = await this.getActiveTab();
-            if (!tab) {
-                throw new Error('No active tab found');
-            }
-            
-            // Send stop message to content script
-            if (!tab.id) {
-                throw new Error('Tab ID is undefined');
-            }
-            await this.injectMessageToContentScript(tab.id, {
-                from: 'background-script',
-                name: 'stop',
-                timestamp: Date.now()
-            });
-            
-            // Update active tabs tracking
-            if (this.activeTabs.has(tab.id)) {
-                const tabInfo = this.activeTabs.get(tab.id);
-                tabInfo.state = 'stopped';
-                tabInfo.stopTime = Date.now();
-                this.activeTabs.set(tab.id, tabInfo);
-            }
-            
-            this.logMessage('stop-success', 'Wave reader stopped successfully');
-            return { success: true, message: 'Wave reader stopped' };
-            
-        } catch (error: any) {
-            console.error('🌊 Log-View-Machine: Failed to stop wave reader:', error);
-            this.logMessage('stop-error', `Failed to stop: ${error.message}`);
-            throw error;
-        }
+        // Process analytics event
+        this.processAnalyticsEvent(message);
+        
+        sendResponse({ success: true });
     }
 
-    private async handleToggle(message: any, sender: any) {
-        console.log("🌊 Log-View-Machine: Handling toggle message:", message);
-        this.logMessage('toggle-requested', 'Toggle wave reader requested');
-        
-        try {
-            // Get active tab
-            const tab = await this.getActiveTab();
-            if (!tab) {
-                throw new Error('No active tab found');
-            }
-            
-            // Check if the tab URL is accessible
-            if (!tab.url || !this.isUrlAccessible(tab.url)) {
-                throw new Error(`Cannot access restricted URL: ${tab.url || 'unknown'}`);
-            }
-            
-            // Send toggle message to content script
-            if (!tab.id) {
-                throw new Error('Tab ID is undefined');
-            }
-            await this.injectMessageToContentScript(tab.id, {
-                from: 'background-script',
-                name: 'toggle',
-                options: message.options,
-                timestamp: Date.now()
-            });
-            
-            this.logMessage('toggle-success', 'Wave reader toggle sent successfully');
-            return { success: true, message: 'Wave reader toggled' };
-            
-        } catch (error: any) {
-            console.error('🌊 Log-View-Machine: Failed to toggle wave reader:', error);
-            this.logMessage('toggle-error', `Failed to toggle: ${error.message}`);
-            throw error;
-        }
-    }
-
-    private async handleGetStatus(message: any, sender: any) {
-        console.log("🌊 Log-View-Machine: Handling get-status message:", message);
-        
-        // Get current going state from storage
-        let goingState = false;
-        try {
-            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                const result = await chrome.storage.local.get(['going']);
-                goingState = result.going?.going || false;
-            }
-        } catch (error) {
-            console.log('🌊 Log-View-Machine: Could not get going state from storage:', error);
-        }
+    private handleExtensionStatusRequest(message: any, sender: any, sendResponse: any) {
+        console.log("🌊 Log-View-Machine: Handling extension status request");
+        this.logMessage('status-requested', 'Extension status requested');
         
         const status = {
+            extensionState: this.extensionState,
+            activeTabsCount: this.activeTabs.size,
             sessionId: this.sessionId,
             timestamp: Date.now(),
             mlServiceStatus: 'active',
-            messageHistoryLength: this.messageHistory.length,
-            activeTabsCount: this.activeTabs.size,
-            extensionState: this.extensionState,
-            going: goingState
+            messageHistoryLength: this.messageHistory.length
         };
         
-        return { success: true, status };
+        sendResponse({ success: true, status });
     }
 
-    private async handleUpdateGoingState(message: any, sender: any) {
-        console.log("🌊 Log-View-Machine: Handling update-going-state message:", message);
-        this.logMessage('going-state-update', `Going state updated to: ${message.going}`);
+    private forwardToPopup(message: any) {
+        if (typeof chrome === 'undefined' || !chrome.runtime) {
+            this.logMessage('popup-forward-error', 'Chrome runtime not available');
+            return;
+        }
         
         try {
-            // Update Chrome storage with the new going state
-            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                await chrome.storage.local.set({
-                    going: { going: message.going }
-                });
-                
-                this.logMessage('going-state-saved', `Going state saved to storage: ${message.going}`);
-            }
-            
-            return { success: true, going: message.going };
+            chrome.runtime.sendMessage(message);
+            this.logMessage('popup-forwarded', 'Message forwarded to popup successfully');
         } catch (error: any) {
-            console.error('🌊 Log-View-Machine: Failed to update going state:', error);
-            this.logMessage('going-state-error', `Failed to update going state: ${error.message}`);
-            throw error;
+            this.logMessage('popup-forward-error', `Popup not available: ${error?.message || 'Unknown error'}`);
         }
+
+    private initializeMLService() {
+        console.log("🌊 Log-View-Machine: Initializing ML service");
+        this.logMessage('ml-service-init', 'ML service initialization started');
+        
+        // The ML service is already initialized in the constructor
+        // This method can be used for additional setup if needed
+        
+        this.logMessage('ml-service-init', 'ML service initialization completed');
     }
 
-    private async handleGetHealth(message: any, sender: any) {
-        console.log("🌊 Log-View-Machine: Handling get-health message:", message);
+    private processAnalyticsEvent(event: any) {
+        console.log("🌊 Log-View-Machine: Processing analytics event:", event);
+        this.logMessage('analytics-processed', `Analytics event processed: ${event.eventType}`);
         
+        // Process analytics data here
+        // This could include sending to external analytics services, storing locally, etc.
+    }
+
+    private performHealthCheck() {
         const healthStatus = {
             timestamp: Date.now(),
             sessionId: this.sessionId,
@@ -363,92 +483,13 @@ export class LogViewBackgroundSystem {
             chromeApis: {
                 runtime: typeof chrome !== 'undefined' && !!chrome.runtime,
                 tabs: typeof chrome !== 'undefined' && !!chrome.tabs,
-                scripting: typeof chrome !== 'undefined' && !!chrome.scripting
+                scripting: typeof chrome !== 'undefined' && !!chrome.scripting,
+                commands: typeof chrome !== 'undefined' && !!chrome.commands
             }
         };
         
-        return { success: true, health: healthStatus };
-    }
-
-    private async getActiveTab(): Promise<chrome.tabs.Tab | null> {
-        if (typeof chrome === 'undefined' || !chrome.tabs) {
-            throw new Error('Chrome tabs API not available');
-        }
-        
-        try {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            return tab || null;
-        } catch (error: any) {
-            console.error('🌊 Log-View-Machine: Failed to get active tab:', error);
-            throw error;
-        }
-    }
-
-    private isUrlAccessible(url: string): boolean {
-        if (!url) return false;
-        
-        // Check for restricted URLs
-        const restrictedPatterns = [
-            /^chrome:\/\//,
-            /^chrome-extension:\/\//,
-            /^moz-extension:\/\//,
-            /^about:/,
-            /^data:/
-        ];
-        
-        return !restrictedPatterns.some(pattern => pattern.test(url));
-    }
-
-    private async injectMessageToContentScript(tabId: number, messageData: any) {
-        if (typeof chrome === 'undefined' || !chrome.scripting) {
-            throw new Error('Chrome scripting API not available');
-        }
-        
-        try {
-            await chrome.scripting.executeScript({
-                target: { tabId },
-                func: (messageData) => {
-                    console.log("🌊 Log-View-Machine: Background script injecting message to content script:", messageData);
-                    window.postMessage({
-                        source: 'wave-reader-extension',
-                        message: messageData
-                    }, '*');
-                },
-                args: [messageData]
-            });
-            
-            this.logMessage('message-injected', 'Message injected to content script successfully');
-        } catch (error: any) {
-            console.error('🌊 Log-View-Machine: Failed to inject message:', error);
-            this.logMessage('injection-error', `Failed to inject message: ${error.message}`);
-            throw error;
-        }
-    }
-
-    private async toggleWaveReader() {
-        console.log("🌊 Log-View-Machine: Toggling wave reader via keyboard shortcut");
-        this.logMessage('keyboard-toggle', 'Toggle wave reader via keyboard shortcut');
-        
-        try {
-            const tab = await this.getActiveTab();
-            if (!tab) {
-                throw new Error('No active tab found');
-            }
-            
-            if (!tab.id) {
-                throw new Error('Tab ID is undefined');
-            }
-            await this.injectMessageToContentScript(tab.id, {
-                from: 'background-script',
-                name: 'toggle-wave-reader',
-                timestamp: Date.now()
-            });
-            
-            this.logMessage('keyboard-toggle-success', 'Toggle command sent successfully');
-        } catch (error: any) {
-            console.error('🌊 Log-View-Machine: Failed to toggle via keyboard:', error);
-            this.logMessage('keyboard-toggle-error', `Failed to toggle: ${error.message}`);
-        }
+        console.log("🌊 Log-View-Machine: Health check completed:", healthStatus);
+        return healthStatus;
     }
 
     private logMessage(type: string, message: string, data?: any) {
@@ -472,6 +513,137 @@ export class LogViewBackgroundSystem {
         console.log(`🌊 Log-View-Machine [${type}]:`, message, data || '');
     }
 
+    private async handleStart(message: any, sender: any, sendResponse: any) {
+        console.log("🌊 Log-View-Machine: Handling start message:", message);
+        this.logMessage('start-requested', 'Start wave reader requested');
+        
+        try {
+            // Get active tab
+            const tab = await this.getActiveTab();
+            if (!tab) {
+                throw new Error('No active tab found');
+            }
+            
+            // Check if the tab URL is accessible
+            if (!this.isUrlAccessible(tab.url)) {
+                throw new Error(`Cannot access restricted URL: ${tab.url}`);
+            }
+            
+            // Send start message to content script via chrome.tabs.sendMessage
+            await this.injectMessageToContentScript(tab.id, {
+                from: 'background-script',
+                name: 'start',
+                options: message.options,
+                timestamp: Date.now()
+            });
+            
+            // Update active tabs tracking
+            this.activeTabs.set(tab.id, {
+                ...this.activeTabs.get(tab.id),
+                state: 'waving',
+                startTime: Date.now(),
+                options: message.options
+            });
+            
+            this.logMessage('start-success', 'Wave reader started successfully');
+            sendResponse({ success: true, message: 'Wave reader started' });
+            
+        } catch (error: any) {
+            console.error('🌊 Log-View-Machine: Failed to start wave reader:', error);
+            this.logMessage('start-error', `Failed to start: ${error.message}`);
+            sendResponse({ success: false, error: error.message });
+        }
+    }
+
+    private async handleStop(message: any, sender: any, sendResponse: any) {
+        console.log("🌊 Log-View-Machine: Handling stop message:", message);
+        this.logMessage('stop-requested', 'Stop wave reader requested');
+        
+        try {
+            // Get active tab
+            const tab = await this.getActiveTab();
+            if (!tab) {
+                throw new Error('No active tab found');
+            }
+            
+            // Send stop message to content script via chrome.tabs.sendMessage
+            await this.injectMessageToContentScript(tab.id, {
+                from: 'background-script',
+                name: 'stop',
+                timestamp: Date.now()
+            });
+            
+            // Update active tabs tracking
+            if (this.activeTabs.has(tab.id)) {
+                const tabInfo = this.activeTabs.get(tab.id);
+                tabInfo.state = 'stopped';
+                tabInfo.stopTime = Date.now();
+                this.activeTabs.set(tab.id, tabInfo);
+            }
+            
+            this.logMessage('stop-success', 'Wave reader stopped successfully');
+            sendResponse({ success: true, message: 'Wave reader stopped' });
+            
+        } catch (error: any) {
+            console.error('🌊 Log-View-Machine: Failed to stop wave reader:', error);
+            this.logMessage('stop-error', `Failed to stop: ${error.message}`);
+            sendResponse({ success: false, error: error.message });
+        }
+    }
+
+    private async handleToggle(message: any, sender: any, sendResponse: any) {
+        console.log("🌊 Log-View-Machine: Handling toggle message:", message);
+        this.logMessage('toggle-requested', 'Toggle wave reader requested');
+        
+        try {
+            // Get active tab
+            const tab = await this.getActiveTab();
+            if (!tab) {
+                throw new Error('No active tab found');
+            }
+            
+            // Check if the tab URL is accessible
+            if (!this.isUrlAccessible(tab.url)) {
+                throw new Error(`Cannot access restricted URL: ${tab.url}`);
+            }
+            
+            // Send toggle message to content script via chrome.tabs.sendMessage
+            await this.injectMessageToContentScript(tab.id, {
+                from: 'background-script',
+                name: 'toggle',
+                options: message.options,
+                timestamp: Date.now()
+            });
+            
+            this.logMessage('toggle-success', 'Wave reader toggle sent successfully');
+            sendResponse({ success: true, message: 'Wave reader toggled' });
+            
+        } catch (error: any) {
+            console.error('🌊 Log-View-Machine: Failed to toggle wave reader:', error);
+            this.logMessage('toggle-error', `Failed to toggle: ${error.message}`);
+            sendResponse({ success: false, error: error.message });
+        }
+    }
+
+    private async injectMessageToContentScript(tabId: number, messageData: any) {
+        if (typeof chrome === 'undefined' || !chrome.scripting) {
+            throw new Error('Chrome scripting API not available');
+        }
+        
+        return chrome.scripting.executeScript({
+            target: { tabId },
+            func: (messageData) => {
+                console.log("🌊 Log-View-Machine: Background script injecting message to content script:", messageData);
+                // Note: In service worker context, we use chrome.tabs.sendMessage instead of window.postMessage
+                // This is handled by injectMessageToContentScript method
+                    source: 'wave-reader-extension',
+                    message: messageData
+                }, '*');
+            },
+            args: [messageData]
+        });
+    }
+
     // Public methods for external access
     public getMessageHistory() {
         return [...this.messageHistory];
@@ -493,24 +665,6 @@ export class LogViewBackgroundSystem {
         return this.performHealthCheck();
     }
 
-    private performHealthCheck() {
-        const healthStatus = {
-            timestamp: Date.now(),
-            sessionId: this.sessionId,
-            extensionState: this.extensionState,
-            activeTabsCount: this.activeTabs.size,
-            mlService: !!this.mlService,
-            messageHistoryLength: this.messageHistory.length,
-            chromeApis: {
-                runtime: typeof chrome !== 'undefined' && !!chrome.runtime,
-                tabs: typeof chrome !== 'undefined' && !!chrome.tabs,
-                scripting: typeof chrome !== 'undefined' && !!chrome.scripting
-            }
-        };
-        
-        return healthStatus;
-    }
-
     public destroy() {
         console.log("🌊 Log-View-Machine: Destroying background system");
         
@@ -522,4 +676,11 @@ export class LogViewBackgroundSystem {
     }
 }
 
+// Initialize the system when the script loads
+console.log("🌊 Log-View-Machine: Initializing background system...");
+
+// Create the background system instance
+const backgroundSystem = new LogViewBackgroundSystem();
+
+// Export for testing
 export default LogViewBackgroundSystem;
