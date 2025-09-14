@@ -20,7 +20,7 @@ import {
   WaveReaderMessageRouter,
   useWaveReaderMessageRouter
 } from './components/structural';
-import { createProxyRobotCopyStateMachine, createTomeConfig } from 'log-view-machine';
+import { createProxyRobotCopyStateMachine, createTomeConfig, createViewStateMachine, TomeManager } from 'log-view-machine';
 
 
 
@@ -900,7 +900,7 @@ const AppUnified: FunctionComponent = () => {
 //      already configured in DefaultStructuralConfig
 
 const BackgroundProxyMachine = createProxyRobotCopyStateMachine({
-    id: 'background-proxy-machine',
+    machineId: 'background-proxy-machine',
     name: 'Background Proxy Machine',
     description: 'Background Proxy Machine',
     version: '1.0.0',
@@ -1001,178 +1001,240 @@ const BackgroundProxyMachine = createProxyRobotCopyStateMachine({
 });
 
 const AppMachine = createViewStateMachine({
-
-    states: {
-        idle: {
-            on: {
-                INITIALIZE: { target: 'initializing', actions: ['initializeApp'] },
-                START: { target: 'starting', actions: ['startApp'] },
-                STOP: { target: 'stopping', actions: ['stopApp'] },
-                TOGGLE: { target: 'toggling', actions: ['toggleApp'] },
-                SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
-                SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
-                ERROR: { target: 'error', actions: ['handleError'] }
-            }
-        },
-        initializing: {
-            on: {
-                INITIALIZATION_COMPLETE: { target: 'ready', actions: ['markInitialized'] },
-                INITIALIZATION_FAILED: { target: 'error', actions: ['handleInitError'] }
-            }
-        },
-        ready: {
-            on: {
-                START: { target: 'starting', actions: ['startApp'] },
-                STOP: { target: 'stopping', actions: ['stopApp'] },
-                TOGGLE: { target: 'toggling', actions: ['toggleApp'] },
-                SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
-                SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
-                ERROR: { target: 'error', actions: ['handleError'] }
-            }
-        },
-        starting: {
-            on: {
-                START_COMPLETE: { target: 'waving', actions: ['startWaveAnimation'] },
-                START_FAILED: { target: 'error', actions: ['handleStartError'] }
-            }
-        },
-        waving: {
-            on: {
-                STOP: { target: 'stopping', actions: ['stopWaveAnimation'] },
-                TOGGLE: { target: 'toggling', actions: ['toggleWaveAnimation'] },
-                SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
-                SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
-                ERROR: { target: 'error', actions: ['handleError'] }
-            }
-        },
-        stopping: {
-            on: {
-                STOP_COMPLETE: { target: 'idle', actions: ['completeStop'] },
-                ERROR: { target: 'error', actions: ['handleError'] }
-            }
-        },
-        selectorUpdating: {
-            on: { SELECTOR_UPDATE_COMPLETE: { target: 'idle', actions: ['completeSelectorUpdate'] } },
-            entry: 'updateSelector'
-        },
-        settingsUpdating: {
-            on: { SETTINGS_UPDATE_COMPLETE: { target: 'idle', actions: ['completeSettingsUpdate'] } },
-            entry: 'updateSettings'
-        }
+    machineId: 'app-machine',
+    name: 'App Machine',
+    description: 'App Machine',
+    version: '1.0.0',
+    dependencies: ['log-view-machine'],
+    context: {
+        message: null
     },
-    actions: {
-        initializeApp: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Initialize app');
+    xstateConfig: {
+        id: 'app-machine',
+        initial: 'idle',
+        states: {
+            idle: {
+                on: {
+                    INITIALIZE: { target: 'initializing', actions: ['initializeApp'] },
+                    START: { target: 'starting', actions: ['startApp'] },
+                    STOP: { target: 'stopping', actions: ['stopApp'] },
+                    TOGGLE: { target: 'toggling', actions: ['toggleApp'] },
+                    SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
+                    SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
+                    ERROR: { target: 'error', actions: ['handleError'] }
+                }
+            },
+            initializing: {
+                on: {
+                    INITIALIZATION_COMPLETE: { target: 'ready', actions: ['markInitialized'] },
+                    INITIALIZATION_FAILED: { target: 'error', actions: ['handleInitError'] }
+                }
+            },
+            ready: {
+                on: {
+                    START: { target: 'starting', actions: ['startApp'] },
+                    STOP: { target: 'stopping', actions: ['stopApp'] },
+                    TOGGLE: { target: 'toggling', actions: ['toggleApp'] },
+                    SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
+                    SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
+                    ERROR: { target: 'error', actions: ['handleError'] }
+                }
+            },
+            starting: {
+                on: {
+                    START_COMPLETE: { target: 'waving', actions: ['startWaveAnimation'] },
+                    START_FAILED: { target: 'error', actions: ['handleStartError'] }
+                }
+            },
+            waving: {
+                on: {
+                    STOP: { target: 'stopping', actions: ['stopWaveAnimation'] },
+                    TOGGLE: { target: 'toggling', actions: ['toggleWaveAnimation'] },
+                    SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
+                    SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
+                    ERROR: { target: 'error', actions: ['handleError'] }
+                }
+            },
+            stopping: {
+                on: {
+                    STOP_COMPLETE: { target: 'idle', actions: ['completeStop'] },
+                    ERROR: { target: 'error', actions: ['handleError'] }
+                }
+            },
+            selectorUpdating: {
+                on: { SELECTOR_UPDATE_COMPLETE: { target: 'idle', actions: ['completeSelectorUpdate'] } },
+                entry: 'updateSelector'
+            },
+            settingsUpdating: {
+                on: { SETTINGS_UPDATE_COMPLETE: { target: 'idle', actions: ['completeSettingsUpdate'] } },
+                entry: 'updateSettings'
             }
         },
-        completeStop: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Complete stop');
-            }
-        },
-        updateSelector: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Update selector');
-            }
-        },
-        updateSettings: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Update settings');
-            }
-        },
-        handleError: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Handle error');
-            }
-        },
-        markInitialized: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Mark initialized');
-            }
-        },
-        handleInitError: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Handle init error');
-            }
-        },
-        startApp: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Start app');
-            }
-        },
-        stopApp: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Stop app');
-            }
-        },
-        toggleApp: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Toggle app');
-            }
-        },
-        completeToggle: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Complete toggle');
-            }
-        },
-        completeSelectorUpdate: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Complete selector update');
-            }
-        },
-        completeSettingsUpdate: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Complete settings update');
-            }
-        },
-        handleStartError: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Handle start error');
-            }
-        },
-        startWaveAnimation: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Start wave animation');
-            }
-        },
-        stopWaveAnimation: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Stop wave animation');
-            }
-        },
-        toggleWaveAnimation: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Toggle wave animation');
-            }
-        },
-        completeToggle: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Complete toggle');
-            }
-        },
-        completeSettingsUpdate: {
-            type: 'function',
-            fn: (context: any, event: any) => {
-                console.log('🌊 App Tome: Complete settings update');
+        actions: {
+            initializeApp: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    console.log('🌊 App Tome: Initialize app');
+                }
+            },
+            completeStop: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    console.log('🌊 App Tome: Complete stop');
+                }
+            },
+            updateSelector: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    console.log('🌊 App Tome: Update selector');
+                }
+            },
+            updateSettings: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    console.log('🌊 App Tome: Update settings');
+                }
+            },
+            handleError: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    console.log('🌊 App Tome: Handle error');
+                }
+            },
+            markInitialized: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    console.log('🌊 App Tome: Mark initialized');
+                }
+            },
+            handleInitError: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    console.log('🌊 App Tome: Handle init error');
+                }
+            },
+            startApp: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    console.log('🌊 App Tome: Start app');
+                }
+            },
+            stopApp: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    console.log('🌊 App Tome: Stop app');
+                }
+            },
+            toggleApp: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    console.log('🌊 App Tome: Toggle app');
+                }
+            },
+            completeToggle: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    console.log('🌊 App Tome: Complete toggle');
+                }
+            },
+            completeSelectorUpdate: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    console.log('🌊 App Tome: Complete selector update');
+                }
+            },
+            completeSettingsUpdate: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    console.log('🌊 App Tome: Complete settings update');
+                }
+            },
+            handleStartError: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    console.log('🌊 App Tome: Handle start error');
+                }
+            },
+            startWaveAnimation: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    // Get current settings and create wave
+                    const currentOptions = await settingsService.getCurrentSettings();
+                    const options = new Options(currentOptions);
+                    
+                    // Create wave with current selector and settings
+                    const wave = new Wave({ 
+                        selector: selector,
+                        ...currentOptions.wave // Include all wave settings including waveSpeed
+                    });
+                    options.wave = wave.update();
+
+                    // Show notification if enabled
+                    if (options.showNotifications) {
+                        try {
+                            const notifOptions = {
+                                type: "basic",
+                                iconUrl: "icons/waver48.png",
+                                title: "wave reader",
+                                message: "reading",
+                            };
+
+                            // @ts-ignore
+                            chrome.notifications.create("", notifOptions, guardLastError);
+                        } catch (error) {
+                            console.warn("Could not create notification:", error);
+                        }
+                    }
+
+                    // Send start message
+                    const startMessage = new StartMessage({ options });
+                    await sendExtensionMessage(startMessage);
+                    
+                    // Update sync state
+                    setSyncObject("going", { going: true });
+                    setGoing(true);
+                    setSaved(true);
+                    
+                    console.log('🌊 Unified App: Wave reader started via extension');
+                }
+            },
+            stopWaveAnimation: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    const stopMessage = new StopMessage();
+                    await sendExtensionMessage(stopMessage);
+                    
+                    // Update sync state
+                    setSyncObject("going", { going: false });
+                    setGoing(false);
+                    setSaved(true);
+                    
+                    console.log('🌊 Unified App: Wave reader stopped via extension');
+                }
+            },
+            toggleWaveAnimation: {
+                type: 'function',
+                fn: ({ context, event, send, log, transition, machine, viewModel}: any) => {
+                    if (viewModel.going) {
+                        transition('stopWaveAnimation');
+                    } else {
+                        transition('startWaveAnimation');
+                    }
+                    viewModel.going = !viewModel.going;
+                    send({ type: 'TOGGLE_COMPLETE' });
+                }
+            },
+            completeToggle: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    log("toggle complete", viewModel.going)
+                }
+            },
+            completeSettingsUpdate: {
+                type: 'function',
+                fn: (context: any, event: any) => {
+                    console.log('🌊 App Tome: Complete settings update');
+                }
             }
         }
     }
@@ -1210,8 +1272,8 @@ const AppTome = createTomeConfig({
     description: 'App Tome',
     version: '1.0.0',
     machines: {
-        backgroundProxyMachine: BackgroundProxyMachine,
-        appMachine: AppMachine
+        'backgroundProxyMachine': BackgroundProxyMachine,
+        'appMachine': AppMachine
     },
     dependencies: ['log-view-machine'],
     author: 'Wave Reader Team',
@@ -1227,15 +1289,17 @@ const AppTome = createTomeConfig({
                 path: '/background-proxy-machine',
                 method: 'POST',
                 transformers: {
-                    input: (data: any) => {
-                        
+                    input: ({context, event, send, log, transition, machine}: any) => {
+                        machine.parentMachine.send({event});
                     },
-                    output: (data: any) => data
+                    output: ({context, event, send, log, transition, machine}: any) => {
+                        sendExtensionMessage(context.message);
+                    }
                 }
             }
             'app-machine': {
                 path: '/app-machine',
-                method: 'POST'
+                method: 'XSTATE'
             }
         }
     }
@@ -1244,6 +1308,32 @@ const AppTome = createTomeConfig({
 AppTome.start();
 AppTome.machines.get('appMachine').view();
 
-    
+const AppComponent: FunctionComponent = () => {
+    const [selector, setSelector] = useState('p');
+    const [saved, setSaved] = useState(true);
+    const [going, setGoing] = useState(false);
+    const [selectors, setSelectors] = useState<string[]>([]);
+    const [currentView, setCurrentView] = useState('main');
+    const [isExtension, setIsExtension] = useState(false);
+    const [settings, setSettings] = useState<Options | null>(null);
+    const [showNotifications, setShowNotifications] = useState(true);
+
+    const syncState = async () => {
+        const state = await AppTome.machines.get('appMachine').getState();
+        setSelector(state.selector);
+        setSaved(state.saved);
+        setGoing(state.going);
+    }
+    useEffect(() => {
+        TomeManager.getInstance().registerTome(AppTome);
+        AppTome.machines.get('appMachine').initialize({selector, saved, going, selectors, currentView, isExtension, settings, showNotifications});
+        syncState();
+        TomeManager.getInstance().startTome('app-tome');
+    }, []);
+
+    return (
+        <AppTome.machines.get('appMachine').render({selector, saved, going, selectors, currentView, isExtension, settings, showNotifications})
+    );
+}
 
 export default AppTome;
