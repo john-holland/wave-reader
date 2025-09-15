@@ -1,0 +1,43 @@
+{
+  "rules": {
+    "tome-patterns": {
+      "enabled": true,
+      "severity": "error"
+    },
+    "routing-patterns": {
+      "enabled": true,
+      "severity": "warning"
+    },
+    "happy-space-patterns": {
+      "enabled": true,
+      "severity": "info"
+    },
+    "business-logic-patterns": {
+      "enabled": true,
+      "severity": "warning"
+    }
+  },
+  "happySpacePatterns": [
+    "createTomeConfig",
+    "createViewStateMachine",
+    "tome-based-routing",
+    "action-based-business-logic"
+  ],
+  "routingPatterns": [
+    "tome-routes",
+    "nested-routes",
+    "route-guards"
+  ],
+  "businessLogicPatterns": [
+    "tome-actions",
+    "service-layer",
+    "pure-functions"
+  ],
+  "excludePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/*.test.*",
+    "**/*.spec.*"
+  ]
+}

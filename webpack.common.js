@@ -51,7 +51,8 @@ const config = {
     },
     plugins: [
         new webpack.ProvidePlugin({
-            'config': 'config'
+            'config': 'config',
+            'process': 'process/browser'
         }),
         new webpack.DefinePlugin({
             'regeneratorRuntime': 'regeneratorRuntime'

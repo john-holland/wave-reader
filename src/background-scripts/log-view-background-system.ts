@@ -205,10 +205,10 @@ export class LogViewBackgroundSystem {
                 console.log("🌊 Log-View-Machine: Background script injecting toggle command to content script:", messageData);
                 // Note: In service worker context, we use chrome.tabs.sendMessage instead of window.postMessage
                 // This is handled by injectMessageToContentScript method
-                chrome.tabs.sendMessage({
+                chrome.tabs.sendMessage(tabId, {
                     source: 'wave-reader-extension',
                     message: messageData
-                }, '*');
+                });
             },
             args: [{
                 from: 'background-script',
@@ -218,13 +218,14 @@ export class LogViewBackgroundSystem {
         }).then(() => {
             this.logMessage('toggle-injected', 'Toggle command injected successfully');
             
-            // Notify popup of state change if it's open
+            // Send keyboard toggle message to popup state machine instead of direct toggle
             try {
                 chrome.runtime.sendMessage({
                     from: 'background-script',
-                    name: 'state-changed',
+                    name: 'KEYBOARD_TOGGLE',
                     timestamp: Date.now(),
-                    action: 'keyboard-toggle'
+                    action: 'keyboard-toggle',
+                    target: 'popup-state-machine'
                 }).catch(() => {
                     // Popup might not be open, which is fine
                 });
