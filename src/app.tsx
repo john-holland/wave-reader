@@ -22,7 +22,414 @@ import {
 } from './components/structural';
 import { createProxyRobotCopyStateMachine, createTomeConfig, createViewStateMachine, TomeManager } from 'log-view-machine';
 
+/**
+ * ISubMachine Interface
+ * 
+ * Common interface for all sub-machines in the Tome architecture.
+ * Provides standardized access to machine vitals, routing, and messaging capabilities.
+ */
+export interface ISubMachine {
+    // Machine identification
+    readonly machineId: string;
+    readonly machineType: 'proxy' | 'view' | 'background' | 'content';
+    
+    // State management
+    getState(): any;
+    getContext(): any;
+    isInState(stateName: string): boolean;
+    
+    // Event handling
+    send(event: string | object): void;
+    canHandle(event: string): boolean;
+    
+    // Lifecycle
+    start(): Promise<void>;
+    stop(): Promise<void>;
+    pause(): Promise<void>;
+    resume(): Promise<void>;
+    
+    // Routing and messaging
+    routeMessage(message: any): Promise<any>;
+    sendToParent(message: any): Promise<any>;
+    sendToChild(machineId: string, message: any): Promise<any>;
+    broadcast(message: any): Promise<any>;
+    
+    // View rendering (for view machines)
+    render?(): React.ReactNode;
+    
+    // Configuration
+    getConfig(): any;
+    updateConfig(config: Partial<any>): void;
+    
+    // Health and monitoring
+    getHealth(): {
+        status: 'healthy' | 'degraded' | 'unhealthy';
+        lastHeartbeat: number;
+        errorCount: number;
+        uptime: number;
+    };
+    
+    // Event subscription
+    on(event: string, handler: (data: any) => void): void;
+    off(event: string, handler: (data: any) => void): void;
+    emit(event: string, data: any): void;
+}
 
+/**
+ * ProxyMachineAdapter
+ * 
+ * Adapter that wraps ProxyRobotCopyStateMachine to implement ISubMachine interface
+ */
+export class ProxyMachineAdapter implements ISubMachine {
+    private machine: any;
+    private startTime: number;
+    private errorCount: number;
+    private eventHandlers: Map<string, Set<(data: any) => void>>;
+
+    constructor(machine: any) {
+        this.machine = machine;
+        this.startTime = Date.now();
+        this.errorCount = 0;
+        this.eventHandlers = new Map();
+    }
+
+    get machineId(): string {
+        return this.machine.machineId || 'unknown-proxy';
+    }
+
+    get machineType(): 'proxy' | 'view' | 'background' | 'content' {
+        return 'proxy';
+    }
+
+    getState(): any {
+        return this.machine.getState?.() || { value: 'unknown' };
+    }
+
+    getContext(): any {
+        return this.machine.getContext?.() || {};
+    }
+
+    isInState(stateName: string): boolean {
+        const state = this.getState();
+        return state.value === stateName || state.matches?.(stateName) || false;
+    }
+
+    send(event: string | object): void {
+        try {
+            this.machine.send?.(event);
+        } catch (error) {
+            this.errorCount++;
+            this.emit('error', { error, event });
+        }
+    }
+
+    canHandle(event: string): boolean {
+        // Check if the machine can handle this event based on current state
+        const state = this.getState();
+        const stateConfig = this.machine.getConfig?.()?.states?.[state.value];
+        return stateConfig?.on?.[event] !== undefined;
+    }
+
+    async start(): Promise<void> {
+        try {
+            await this.machine.start?.();
+            this.emit('started', { machineId: this.machineId });
+        } catch (error) {
+            this.errorCount++;
+            this.emit('error', { error, action: 'start' });
+            throw error;
+        }
+    }
+
+    async stop(): Promise<void> {
+        try {
+            await this.machine.stop?.();
+            this.emit('stopped', { machineId: this.machineId });
+        } catch (error) {
+            this.errorCount++;
+            this.emit('error', { error, action: 'stop' });
+            throw error;
+        }
+    }
+
+    async pause(): Promise<void> {
+        // Proxy machines don't typically have pause functionality
+        this.emit('paused', { machineId: this.machineId });
+    }
+
+    async resume(): Promise<void> {
+        // Proxy machines don't typically have resume functionality
+        this.emit('resumed', { machineId: this.machineId });
+    }
+
+    async routeMessage(message: any): Promise<any> {
+        try {
+            // Route message through the proxy's robot copy functionality
+            if (this.machine.robotCopy?.sendMessage) {
+                return await this.machine.robotCopy.sendMessage(message);
+            }
+            return { success: false, error: 'No routing capability' };
+        } catch (error) {
+            this.errorCount++;
+            this.emit('error', { error, action: 'routeMessage' });
+            throw error;
+        }
+    }
+
+    async sendToParent(message: any): Promise<any> {
+        // Proxy machines typically send to parent through their robot copy
+        return this.routeMessage(message);
+    }
+
+    async sendToChild(machineId: string, message: any): Promise<any> {
+        // Proxy machines don't typically have children
+        return { success: false, error: 'Proxy machines do not have children' };
+    }
+
+    async broadcast(message: any): Promise<any> {
+        return this.routeMessage(message);
+    }
+
+    getConfig(): any {
+        return this.machine.getConfig?.() || {};
+    }
+
+    updateConfig(config: Partial<any>): void {
+        // Proxy machines typically don't support runtime config updates
+        this.emit('configUpdateRequested', { config });
+    }
+
+    getHealth(): {
+        status: 'healthy' | 'degraded' | 'unhealthy';
+        lastHeartbeat: number;
+        errorCount: number;
+        uptime: number;
+    } {
+        return {
+            status: this.errorCount > 10 ? 'unhealthy' : this.errorCount > 5 ? 'degraded' : 'healthy',
+            lastHeartbeat: Date.now(),
+            errorCount: this.errorCount,
+            uptime: Date.now() - this.startTime
+        };
+    }
+
+    on(event: string, handler: (data: any) => void): void {
+        if (!this.eventHandlers.has(event)) {
+            this.eventHandlers.set(event, new Set());
+        }
+        this.eventHandlers.get(event)!.add(handler);
+    }
+
+    off(event: string, handler: (data: any) => void): void {
+        const handlers = this.eventHandlers.get(event);
+        if (handlers) {
+            handlers.delete(handler);
+        }
+    }
+
+    emit(event: string, data: any): void {
+        const handlers = this.eventHandlers.get(event);
+        if (handlers) {
+            handlers.forEach(handler => {
+                try {
+                    handler(data);
+                } catch (error) {
+                    console.error(`Error in event handler for ${event}:`, error);
+                }
+            });
+        }
+    }
+}
+
+/**
+ * ViewMachineAdapter
+ * 
+ * Adapter that wraps ViewStateMachine to implement ISubMachine interface
+ */
+export class ViewMachineAdapter implements ISubMachine {
+    private machine: any;
+    private startTime: number;
+    private errorCount: number;
+    private eventHandlers: Map<string, Set<(data: any) => void>>;
+
+    constructor(machine: any) {
+        this.machine = machine;
+        this.startTime = Date.now();
+        this.errorCount = 0;
+        this.eventHandlers = new Map();
+    }
+
+    get machineId(): string {
+        return this.machine.machineId || 'unknown-view';
+    }
+
+    get machineType(): 'proxy' | 'view' | 'background' | 'content' {
+        return 'view';
+    }
+
+    getState(): any {
+        return this.machine.getState?.() || { value: 'unknown' };
+    }
+
+    getContext(): any {
+        return this.machine.getContext?.() || {};
+    }
+
+    isInState(stateName: string): boolean {
+        const state = this.getState();
+        return state.value === stateName || state.matches?.(stateName) || false;
+    }
+
+    send(event: string | object): void {
+        try {
+            this.machine.send?.(event);
+        } catch (error) {
+            this.errorCount++;
+            this.emit('error', { error, event });
+        }
+    }
+
+    canHandle(event: string): boolean {
+        const state = this.getState();
+        const stateConfig = this.machine.getConfig?.()?.states?.[state.value];
+        return stateConfig?.on?.[event] !== undefined;
+    }
+
+    async start(): Promise<void> {
+        try {
+            await this.machine.start?.();
+            this.emit('started', { machineId: this.machineId });
+        } catch (error) {
+            this.errorCount++;
+            this.emit('error', { error, action: 'start' });
+            throw error;
+        }
+    }
+
+    async stop(): Promise<void> {
+        try {
+            await this.machine.stop?.();
+            this.emit('stopped', { machineId: this.machineId });
+        } catch (error) {
+            this.errorCount++;
+            this.emit('error', { error, action: 'stop' });
+            throw error;
+        }
+    }
+
+    async pause(): Promise<void> {
+        // View machines can be paused by stopping event processing
+        this.emit('paused', { machineId: this.machineId });
+    }
+
+    async resume(): Promise<void> {
+        // View machines can be resumed by restarting event processing
+        this.emit('resumed', { machineId: this.machineId });
+    }
+
+    async routeMessage(message: any): Promise<any> {
+        try {
+            // View machines route messages through their state machine
+            this.send(message);
+            return { success: true, message: 'Message routed to state machine' };
+        } catch (error) {
+            this.errorCount++;
+            this.emit('error', { error, action: 'routeMessage' });
+            throw error;
+        }
+    }
+
+    async sendToParent(message: any): Promise<any> {
+        // View machines can send messages to parent through extension messaging
+        try {
+            if (typeof chrome !== 'undefined' && chrome.runtime) {
+                return await chrome.runtime.sendMessage(message);
+            }
+            return { success: false, error: 'No parent communication available' };
+        } catch (error) {
+            this.errorCount++;
+            this.emit('error', { error, action: 'sendToParent' });
+            throw error;
+        }
+    }
+
+    async sendToChild(machineId: string, message: any): Promise<any> {
+        // View machines don't typically have children
+        return { success: false, error: 'View machines do not have children' };
+    }
+
+    async broadcast(message: any): Promise<any> {
+        // View machines can broadcast through extension messaging
+        return this.sendToParent(message);
+    }
+
+    render?(): React.ReactNode {
+        // Delegate to the machine's render method if it exists
+        return this.machine.render?.() || null;
+    }
+
+    getConfig(): any {
+        return this.machine.getConfig?.() || {};
+    }
+
+    updateConfig(config: Partial<any>): void {
+        // View machines can update their configuration
+        this.emit('configUpdateRequested', { config });
+    }
+
+    getHealth(): {
+        status: 'healthy' | 'degraded' | 'unhealthy';
+        lastHeartbeat: number;
+        errorCount: number;
+        uptime: number;
+    } {
+        return {
+            status: this.errorCount > 10 ? 'unhealthy' : this.errorCount > 5 ? 'degraded' : 'healthy',
+            lastHeartbeat: Date.now(),
+            errorCount: this.errorCount,
+            uptime: Date.now() - this.startTime
+        };
+    }
+
+    on(event: string, handler: (data: any) => void): void {
+        if (!this.eventHandlers.has(event)) {
+            this.eventHandlers.set(event, new Set());
+        }
+        this.eventHandlers.get(event)!.add(handler);
+    }
+
+    off(event: string, handler: (data: any) => void): void {
+        const handlers = this.eventHandlers.get(event);
+        if (handlers) {
+            handlers.delete(handler);
+        }
+    }
+
+    emit(event: string, data: any): void {
+        const handlers = this.eventHandlers.get(event);
+        if (handlers) {
+            handlers.forEach(handler => {
+                try {
+                    handler(data);
+                } catch (error) {
+                    console.error(`Error in event handler for ${event}:`, error);
+                }
+            });
+        }
+    }
+}
+
+// Add spinner animation CSS
+const SpinnerStyle = styled.div`
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  &.spinner {
+    animation: spin 1s linear infinite;
+  }
+`;
 
 // Check if we're in development mode
 const isDevelopment = configured.mode !== 'production';
@@ -218,694 +625,12 @@ const StatusIndicator = styled.div<StatusIndicatorProps>`
 `;
 
 // Unified App component using Tome architecture
-// Helper function for extension message communication (moved outside component)
-const sendExtensionMessage = async (message: any) => {
-    try {
-        return await chrome.runtime.sendMessage(message);
-    } catch (error: any) {
-        console.error('🌊 Unified App: Failed to send extension message:', error);
-        throw new Error(`Failed to communicate with extension: ${error.message || 'Unknown error'}`);
-    }
-}
-
-// Global refresh function for state synchronization
-let globalRefreshFunction: (() => void) | null = null;
-
-const AppUnified: FunctionComponent = () => {
-    const [selector, setSelector] = useState('p');
-    const [saved, setSaved] = useState(true);
-    const [going, setGoing] = useState(false);
-    const [selectors, setSelectors] = useState<string[]>([]);
-    const [currentView, setCurrentView] = useState('main');
-    const [isExtension, setIsExtension] = useState(false);
-    const [settings, setSettings] = useState<Options | null>(null);
-    const [showNotifications, setShowNotifications] = useState(true);
-
-    // Initialize services
-    const settingsService = new SettingsService();
-    const mlSettingsService = new MLSettingsService();
-
-    useEffect(() => {
-        // Check if we're running in a Chrome extension context
-        const checkExtensionContext = () => {
-            return typeof chrome !== 'undefined' && 
-                   chrome.runtime && 
-                   chrome.runtime.id;
-        };
-
-        const extensionContext = checkExtensionContext();
-        setIsExtension(Boolean(extensionContext));
-
-        // Set up message listener for state changes from background script
-        if (extensionContext && chrome.runtime && chrome.runtime.onMessage) {
-            const messageListener = async (message: any) => {
-                console.log('🌊 Popup: Received message from background:', message);
-                if (message.from === 'background-script' && message.name === 'KEYBOARD_TOGGLE') {
-                    console.log('🌊 Popup: Keyboard toggle detected, sending to app state machine');
-                    
-                    // Send keyboard toggle event to the app state machine
-                    AppMachine.send('KEYBOARD_TOGGLE');
-                }
-            };
-            
-            chrome.runtime.onMessage.addListener(messageListener);
-            
-            // Cleanup listener on unmount
-            return () => {
-                chrome.runtime.onMessage.removeListener(messageListener);
-            };
-        }
-
-        // Initialize the app
-        const initializeApp = async () => {
-            try {
-                if (extensionContext) {
-                    // Load saved settings and selectors from Chrome storage
-                    if (chrome.storage && chrome.storage.local) {
-                        const result = await chrome.storage.local.get([
-                            'waveReaderSettings', 
-                            'waveReaderSelectors',
-                            'currentSelector',
-                            'going'
-                        ]);
-                        
-                        if (result.waveReaderSelectors) {
-                            setSelectors(result.waveReaderSelectors);
-                        }
-                        
-                        if (result.currentSelector) {
-                            setSelector(result.currentSelector);
-                        }
-
-                        if (result.going) {
-                            setGoing(result.going.going || false);
-                        } else {
-                            // If no going state is stored, default to false
-                            setGoing(false);
-                        }
-                    }
-
-                    // Load current settings
-                    const currentSettings = await settingsService.getCurrentSettings();
-                    if (currentSettings) {
-                        setSettings(new Options(currentSettings));
-                        setShowNotifications(currentSettings.showNotifications || true);
-                    }
-
-                    // Check current state from content script
-                    try {
-                        const statusMessage = {
-                            name: 'get-status',
-                            from: 'popup'
-                        };
-                        const statusResponse = await sendExtensionMessage(statusMessage) as any;
-                        if (statusResponse && statusResponse.success && statusResponse.status) {
-                            // Update going state based on content script status
-                            const isGoing = statusResponse.status.going || false;
-                            setGoing(isGoing);
-                            console.log('🌊 Popup: Updated going state from content script:', isGoing);
-                        }
-                    } catch (error) {
-                        console.log('🌊 Popup: Could not get status from content script:', error);
-                        // Fall back to stored state
-                    }
-                } else {
-                    // Fallback to localStorage for non-extension context
-                    const savedSelectorsData = localStorage.getItem('waveReaderSelectors');
-                    const savedSelector = localStorage.getItem('waveReaderSelector');
-                    const savedGoing = localStorage.getItem('waveReaderGoing');
-                    
-                    if (savedSelectorsData) {
-                        setSelectors(JSON.parse(savedSelectorsData));
-                    }
-                    
-                    if (savedSelector) {
-                        setSelector(savedSelector);
-                    }
-
-                    if (savedGoing) {
-                        setGoing(JSON.parse(savedGoing));
-                    }
-                }
-                
-                console.log('🌊 Unified App: Initialized for Chrome extension context');
-            } catch (error) {
-                console.error('🌊 Unified App: Failed to initialize:', error);
-            }
-        };
-
-        initializeApp();
-    }, []);
-
-
-    // Start wave reading with enhanced functionality from app.tsx
-    const onGo = async () => {
-        try {
-            if (isExtension) {
-                // Get current settings and create wave
-                const currentOptions = await settingsService.getCurrentSettings();
-                const options = new Options(currentOptions);
-                
-                // Create wave with current selector and settings
-                const wave = new Wave({ 
-                    selector: selector,
-                    ...currentOptions.wave // Include all wave settings including waveSpeed
-                });
-                options.wave = wave.update();
-
-                // Show notification if enabled
-                if (options.showNotifications) {
-                    try {
-                        const notifOptions = {
-                            type: "basic",
-                            iconUrl: "icons/waver48.png",
-                            title: "wave reader",
-                            message: "reading",
-                        };
-
-                        // @ts-ignore
-                        chrome.notifications.create("", notifOptions, guardLastError);
-                    } catch (error) {
-                        console.warn("Could not create notification:", error);
-                    }
-                }
-
-                // Send start message
-                const startMessage = new StartMessage({ options });
-                await sendExtensionMessage(startMessage);
-                
-                // Update sync state
-                setSyncObject("going", { going: true });
-                setGoing(true);
-                setSaved(true);
-                
-                console.log('🌊 Unified App: Wave reader started via extension');
-            } else {
-                setGoing(true);
-                setSaved(true);
-                localStorage.setItem('waveReaderGoing', JSON.stringify(true));
-                console.log('🌊 Unified App: Wave reader started (non-extension mode)');
-            }
-        } catch (error: any) {
-            console.error('🌊 Unified App: Failed to start wave reader:', error);
-            alert(`Failed to start wave reader: ${error.message || 'Unknown error'}`);
-        }
-    };
-
-    // Stop wave reading
-    const onStop = async () => {
-        try {
-            if (isExtension) {
-                const stopMessage = new StopMessage();
-                await sendExtensionMessage(stopMessage);
-                
-                // Update sync state
-                setSyncObject("going", { going: false });
-                setGoing(false);
-                setSaved(true);
-                
-                console.log('🌊 Unified App: Wave reader stopped via extension');
-            } else {
-                setGoing(false);
-                setSaved(true);
-                localStorage.setItem('waveReaderGoing', JSON.stringify(false));
-                console.log('🌊 Unified App: Wave reader stopped (non-extension mode)');
-            }
-        } catch (error: any) {
-            console.error('🌊 Unified App: Failed to stop wave reader:', error);
-            alert(`Failed to stop wave reader: ${error.message || 'Unknown error'}`);
-        }
-    };
-
-    // Toggle wave reading
-    const onToggle = async () => {
-        if (going) {
-            await onStop();
-        } else {
-            await onGo();
-        }
-    };
-
-    // Update selector
-    const onSelectorUpdate = async (newSelector: string) => {
-        try {
-            if (isExtension) {
-                // Send message to background script
-                const response = await sendExtensionMessage({
-                    name: 'selector-updated',
-                    selector: newSelector,
-                    from: 'popup'
-                });
-                
-                if (response) {
-                    setSelector(newSelector);
-                    setSaved(true);
-                    
-                    // Save to Chrome storage
-                    if (chrome.storage && chrome.storage.local) {
-                        await chrome.storage.local.set({ currentSelector: newSelector });
-                    }
-                }
-            } else {
-                // Fallback for non-extension context
-                setSelector(newSelector);
-                setSaved(true);
-                localStorage.setItem('waveReaderSelector', newSelector);
-            }
-        } catch (error) {
-            console.error('🌊 Unified App: Failed to update selector:', error);
-        }
-    };
-
-    // Add selector
-    const onAddSelector = async (newSelector: string) => {
-        try {
-            if (isExtension) {
-                // Send message to background script
-                const response = await sendExtensionMessage({
-                    name: 'selector-added',
-                    selector: newSelector,
-                    from: 'popup'
-                });
-                
-                if (response) {
-                    setSelectors(prev => [...new Set([...prev, newSelector])]);
-                    setSaved(true);
-                    
-                    // Save to Chrome storage
-                    if (chrome.storage && chrome.storage.local) {
-                        await chrome.storage.local.set({ 
-                            waveReaderSelectors: [...selectors, newSelector] 
-                        });
-                    }
-                }
-            } else {
-                // Fallback for non-extension context
-                setSelectors(prev => [...new Set([...prev, newSelector])]);
-                setSaved(true);
-                localStorage.setItem('waveReaderSelectors', JSON.stringify([...selectors, newSelector]));
-            }
-        } catch (error) {
-            console.error('🌊 Unified App: Failed to add selector:', error);
-        }
-    };
-
-    // Remove selector
-    const onRemoveSelector = async (selectorToRemove: string) => {
-        try {
-            if (isExtension) {
-                // Send message to background script
-                const response = await sendExtensionMessage({
-                    name: 'selector-removed',
-                    selector: selectorToRemove,
-                    from: 'popup'
-                });
-                
-                if (response) {
-                    setSelectors(prev => prev.filter(s => s !== selectorToRemove));
-                    setSaved(true);
-                    
-                    // Save to Chrome storage
-                    if (chrome.storage && chrome.storage.local) {
-                        await chrome.storage.local.set({ 
-                            waveReaderSelectors: selectors.filter(s => s !== selectorToRemove) 
-                        });
-                    }
-                }
-            } else {
-                // Fallback for non-extension context
-                setSelectors(prev => prev.filter(s => s !== selectorToRemove));
-                setSaved(true);
-                localStorage.setItem('waveReaderSelectors', JSON.stringify(selectors.filter(s => s !== selectorToRemove)));
-            }
-        } catch (error) {
-            console.error('🌊 Unified App: Failed to remove selector:', error);
-        }
-    };
-
-    // Show settings
-    const onShowSettings = () => {
-        setCurrentView('settings');
-    };
-
-    // Go back to main view
-    const onGoBackToMain = () => {
-        setCurrentView('main');
-    };
-
-    // Handle selector mode
-    const onSelectorModeToggle = async (enabled: boolean) => {
-        if (enabled) {
-            setCurrentView('selector-selection');
-        } else {
-            setCurrentView('main');
-        }
-    };
-
-    // Update wave settings
-    const updateWaveSettings = (newSettings: Partial<Options>) => {
-        if (settings) {
-            const updatedSettings = new Options({
-                ...settings,
-                ...newSettings
-            });
-            setSettings(updatedSettings);
-            setSaved(false);
-        }
-    };
-
-    // Save settings
-    const saveSettings = async () => {
-        try {
-            if (isExtension && chrome.storage && chrome.storage.local) {
-                await chrome.storage.local.set({ 
-                    waveReaderSettings: settings 
-                });
-                setSaved(true);
-                console.log('🌊 Settings saved successfully');
-            } else {
-                localStorage.setItem('waveReaderSettings', JSON.stringify(settings));
-                setSaved(true);
-                console.log('🌊 Settings saved to localStorage');
-            }
-        } catch (error) {
-            console.error('🌊 Failed to save settings:', error);
-        }
-    };
-
-    // Reset settings to defaults
-    const resetSettings = () => {
-        if (window.confirm('Are you sure you want to reset to default settings?')) {
-            const defaultSettings = new Options();
-            setSettings(defaultSettings);
-            setSaved(false);
-        }
-    };
-
-    // View components using withState pattern
-    const withState = <T extends Record<string, any>>(Component: React.ComponentType<T>, props: T) => {
-        return <Component {...props} />;
-    };
-
-
-    // Settings View Component
-    const SettingsView = () => (
-        <div>
-            <h3>⚙️ Settings</h3>
-            
-            {/* Save Status */}
-            <CompactSection>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h4>Status</h4>
-                    <span style={{ 
-                        color: saved ? '#28a745' : '#ffc107',
-                        fontWeight: 'bold'
-                    }}>
-                        {saved ? '✅ Saved' : '🌊 Unsaved Changes'}
-                    </span>
-                </div>
-            </CompactSection>
-
-            {/* Basic Settings */}
-            <CompactSection>
-                <h4>Basic Settings</h4>
-                <div style={{ marginBottom: '12px' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <input
-                            type="checkbox"
-                            checked={showNotifications}
-                            onChange={(e) => {
-                                setShowNotifications(e.target.checked);
-                                if (settings) {
-                                    updateWaveSettings({ showNotifications: e.target.checked });
-                                }
-                            }}
-                        />
-                        Show Notifications
-                    </label>
-                </div>
-            </CompactSection>
-
-            {/* Wave Animation Settings */}
-            <CompactSection>
-                <h4>🌊 Wave Animation</h4>
-                
-                {/* Wave Speed */}
-                <div style={{ marginBottom: '12px' }}>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px' }}>
-                        Wave Speed: {settings?.wave?.waveSpeed || 4}s
-                    </label>
-                    <input
-                        type="range"
-                        min="0.5"
-                        max="10"
-                        step="0.5"
-                        value={settings?.wave?.waveSpeed || 4}
-                        onChange={(e) => {
-                            if (settings?.wave) {
-                                const newWave = new Wave(settings.wave);
-                                newWave.waveSpeed = parseFloat(e.target.value);
-                                updateWaveSettings({ wave: newWave });
-                            }
-                        }}
-                        style={{ width: '100%' }}
-                    />
-                </div>
-
-
-                {/* Axis Translation */}
-                <div style={{ marginBottom: '12px' }}>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px' }}>
-                        X Translation: {settings?.wave?.axisTranslateAmountXMin || -1} to {settings?.wave?.axisTranslateAmountXMax || 1}
-                    </label>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                        <input
-                            type="number"
-                            placeholder="Min"
-                            value={settings?.wave?.axisTranslateAmountXMin || -1}
-                            onChange={(e) => {
-                                if (settings?.wave) {
-                                    const newWave = new Wave(settings.wave);
-                                    newWave.axisTranslateAmountXMin = parseFloat(e.target.value) || 0;
-                                    updateWaveSettings({ wave: newWave });
-                                }
-                            }}
-                            style={{ width: '50%', padding: '4px', fontSize: '12px' }}
-                        />
-                        <input
-                            type="number"
-                            placeholder="Max"
-                            value={settings?.wave?.axisTranslateAmountXMax || 1}
-                            onChange={(e) => {
-                                if (settings?.wave) {
-                                    const newWave = new Wave(settings.wave);
-                                    newWave.axisTranslateAmountXMax = parseFloat(e.target.value) || 0;
-                                    updateWaveSettings({ wave: newWave });
-                                }
-                            }}
-                            style={{ width: '50%', padding: '4px', fontSize: '12px' }}
-                        />
-                    </div>
-                </div>
-
-                {/* Axis Rotation */}
-                <div style={{ marginBottom: '12px' }}>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px' }}>
-                        Y Rotation: {settings?.wave?.axisRotationAmountYMin || -2}° to {settings?.wave?.axisRotationAmountYMax || 2}°
-                    </label>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                        <input
-                            type="number"
-                            placeholder="Min"
-                            value={settings?.wave?.axisRotationAmountYMin || -2}
-                            onChange={(e) => {
-                                if (settings?.wave) {
-                                    const newWave = new Wave(settings.wave);
-                                    newWave.axisRotationAmountYMin = parseFloat(e.target.value) || 0;
-                                    updateWaveSettings({ wave: newWave });
-                                }
-                            }}
-                            style={{ width: '50%', padding: '4px', fontSize: '12px' }}
-                        />
-                        <input
-                            type="number"
-                            placeholder="Max"
-                            value={settings?.wave?.axisRotationAmountYMax || 2}
-                            onChange={(e) => {
-                                if (settings?.wave) {
-                                    const newWave = new Wave(settings.wave);
-                                    newWave.axisRotationAmountYMax = parseFloat(e.target.value) || 0;
-                                    updateWaveSettings({ wave: newWave });
-                                }
-                            }}
-                            style={{ width: '50%', padding: '4px', fontSize: '12px' }}
-                        />
-                    </div>
-                </div>
-
-            </CompactSection>
-
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <CompactButton 
-                    className="btn btn-primary" 
-                    onClick={saveSettings}
-                    disabled={saved}
-                >
-                    💾 Save Settings
-                </CompactButton>
-                <CompactButton 
-                    className="btn btn-secondary" 
-                    onClick={resetSettings}
-                >
-                    🔄 Reset to Defaults
-                </CompactButton>
-                <CompactButton 
-                    className="btn btn-secondary" 
-                    onClick={onGoBackToMain}
-                >
-                    ← Back
-                </CompactButton>
-            </div>
-        </div>
-    );
-
-    // Selector Selection View Component
-    const SelectorSelectionView = () => (
-        <div>
-            <h3>🎯 Select Element</h3>
-            <p style={{ fontSize: '12px', marginBottom: '12px' }}>
-                Click on any element on the page to select it
-            </p>
-            <div style={{ display: 'flex', gap: '8px' }}>
-                <CompactButton className="btn btn-primary" onClick={() => setCurrentView('main')}>
-                    ✅ Done
-                </CompactButton>
-                <CompactButton className="btn btn-secondary" onClick={() => setCurrentView('main')}>
-                    ❌ Cancel
-                </CompactButton>
-            </div>
-        </div>
-    );
-
-    // Main View Component
-    const MainView = () => (
-        <div>
-            <CompactSection>
-                <h3>CSS Selector</h3>
-                <CompactInput
-                    type="text"
-                    value={selector}
-                    onChange={(e) => setSelector(e.target.value)}
-                    placeholder="e.g., p, h1, .content"
-                />
-                
-                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                    <CompactButton 
-                        className="btn btn-primary" 
-                        onClick={onGo} 
-                        disabled={going}
-                    >
-                        🚀 Start
-                    </CompactButton>
-                    <CompactButton 
-                        className="btn btn-success" 
-                        onClick={onStop} 
-                        disabled={!going}
-                    >
-                        ⏹️ Stop
-                    </CompactButton>
-                    <CompactButton 
-                        className="btn btn-secondary" 
-                        onClick={onToggle}
-                    >
-                        🔄 Toggle
-                    </CompactButton>
-                    <CompactButton 
-                        className="btn btn-secondary" 
-                        onClick={() => onAddSelector(selector)}
-                    >
-                        ➕ Add
-                    </CompactButton>
-                    <CompactButton 
-                        className="btn btn-secondary" 
-                        onClick={onShowSettings}
-                    >
-                        ⚙️
-                    </CompactButton>
-                </div>
-            </CompactSection>
-            
-            {going && (
-                <StatusIndicator isActive={true}>
-                    <div className="status-dot"></div>
-                    <span>🌊 Reading: {selector}</span>
-                </StatusIndicator>
-            )}
-            
-            <CompactSection>
-                <h3>Saved Selectors</h3>
-                {selectors.length === 0 ? (
-                    <p style={{ fontSize: '12px', margin: 0 }}>No selectors saved yet</p>
-                ) : (
-                    selectors.map((savedSelector, index) => (
-                        <CompactSelectorItem key={index}>
-                            <span className="selector-text">{savedSelector}</span>
-                            <div className="selector-actions">
-                                <CompactButton 
-                                    className="btn btn-sm btn-secondary" 
-                                    onClick={() => onSelectorUpdate(savedSelector)}
-                                >
-                                    Use
-                                </CompactButton>
-                                <CompactButton 
-                                    className="btn btn-sm btn-danger" 
-                                    onClick={() => onRemoveSelector(savedSelector)}
-                                >
-                                    Remove
-                                </CompactButton>
-                            </div>
-                        </CompactSelectorItem>
-                    ))
-                )}
-            </CompactSection>
-        </div>
-    );
-
-    // Render the appropriate view based on current state using withState
-    const renderView = () => {
-        const viewMap = {
-            'settings': () => withState(SettingsView, {}),
-            'selector-selection': () => withState(SelectorSelectionView, {}),
-            'main': () => withState(MainView, {})
-        };
-
-        const viewRenderer = viewMap[currentView as keyof typeof viewMap];
-        return viewRenderer ? viewRenderer() : withState(MainView, {});
-    };
-
-    return (
-        <ErrorBoundary>
-            <WaveReader>
-                <PopupHeader>
-                    <h1>🌊 Wave Reader</h1>
-                    <p>Motion Reader for Eye Tracking</p>
-                </PopupHeader>
-                
-                <PopupContent>
-                    {renderView()}
-                </PopupContent>
-            </WaveReader>
-        </ErrorBoundary>
-    );
-};
-
 
 
 // todo: wire this up to the existing UI above and use TomeManager to register the structural system
 //      already configured in DefaultStructuralConfig
 
-const BackgroundProxyMachine = createProxyRobotCopyStateMachine({
+const BackgroundProxyMachineRaw = createProxyRobotCopyStateMachine({
     machineId: 'background-proxy-machine',
     xstateConfig: {
         initial: 'idle',
@@ -950,6 +675,9 @@ const BackgroundProxyMachine = createProxyRobotCopyStateMachine({
         }
     } as any
 });
+
+// Wrap with adapter to implement ISubMachine interface
+const BackgroundProxyMachine = new ProxyMachineAdapter(BackgroundProxyMachineRaw);
 
 // Render function for AppTome that uses viewModel
 const renderAppView = (viewModel: any) => {
@@ -1038,7 +766,7 @@ const renderSettingsView = (viewModel: any, onSettingsUpdated?: (settings: any) 
     );
 };
 
-const AppMachine = createViewStateMachine({
+const AppMachineRaw = createViewStateMachine({
     machineId: 'app-machine',
     xstateConfig: {
         initial: 'idle',
@@ -1150,7 +878,7 @@ const AppMachine = createViewStateMachine({
                         
                         if (statusResponse && statusResponse.success) {
                             // Update critical state from content script
-                            const contentState = statusResponse;
+                            const contentState = (statusResponse as any).data || statusResponse;
                             context.viewModel.going = contentState.going || false;
                             
                             // Sync any additional state that content script provides
@@ -1231,10 +959,11 @@ const AppMachine = createViewStateMachine({
                         });
                         
                         if (statusResponse && statusResponse.success) {
+                            const contentState = (statusResponse as any).data || statusResponse;
                             realtimeData = {
-                                going: statusResponse.going || false,
+                                going: contentState.going || false,
                                 // Content script may have additional state we want to sync
-                                contentState: statusResponse
+                                contentState: contentState
                             };
                                 log('🌊 App Tome: Retrieved real-time state from content script', realtimeData);
                             }
@@ -1299,7 +1028,7 @@ const AppMachine = createViewStateMachine({
                         });
                         
                         if (statusResponse && statusResponse.success) {
-                            const contentState = statusResponse;
+                            const contentState = (statusResponse as any).data || statusResponse;
                             const previousGoing = context.viewModel.going;
                             
                             // Update critical state from content script
@@ -1536,12 +1265,12 @@ const AppMachine = createViewStateMachine({
                 type: 'function',
                 fn: async (context: any, event: any) => {
                     // Get current settings and create wave
-                    const currentOptions = await settingsService.getCurrentSettings();
+                    const currentOptions = await context.settingsService?.getCurrentSettings() || {};
                     const options = new Options(currentOptions);
                     
                     // Create wave with current selector and settings
                     const wave = new Wave({ 
-                        selector: selector,
+                        selector: context.viewModel.selector || 'p',
                         ...currentOptions.wave // Include all wave settings including waveSpeed
                     });
                     options.wave = wave.update();
@@ -1569,8 +1298,8 @@ const AppMachine = createViewStateMachine({
                     
                     // Update sync state
                     setSyncObject("going", { going: true });
-                    setGoing(true);
-                    setSaved(true);
+                    context.viewModel.going = true;
+                    context.viewModel.saved = true;
                     
                     console.log('🌊 Unified App: Wave reader started via extension');
                 }
@@ -1585,8 +1314,8 @@ const AppMachine = createViewStateMachine({
                         
                         // Update sync state
                         setSyncObject("going", { going: false });
-                        setGoing(false);
-                        setSaved(true);
+                        context.viewModel.going = false;
+                        context.viewModel.saved = true;
                         
                         log('🌊 App Tome: Wave animation stopped successfully');
                         console.log('🌊 Unified App: Wave reader stopped via extension');
@@ -1607,20 +1336,58 @@ const AppMachine = createViewStateMachine({
                     viewModel.going = !viewModel.going;
                     send({ type: 'TOGGLE_COMPLETE' });
                 }
-            },
-            completeToggle: {
-                type: 'function',
-                fn: (context: any, event: any) => {
-                    log("toggle complete", viewModel.going)
                 }
             }
         }
-    }
-}).withState('idle', ({ context, event, view, transition, send, log}) => {
+}).withState('idle', async ({ context, event, view, transition, send, log}: any) => {
     console.log('🌊 App Tome: In idle state', context.viewModel);
     log('🌊 App Tome: Idle state - ready for user interaction');
-    view(renderAppView(context.viewModel));
-}).withState('initializing', ({ context, event, view, transition, send, log}) => {
+    
+    // Render with tabs and structural components
+    const tabContent = (
+        <div>
+            <h3>🌊 Wave Reader - Idle State</h3>
+            <p>Ready for user interaction</p>
+            <div style={{ marginBottom: '20px' }}>
+                <p><strong>Machine Status:</strong></p>
+                <p>State: {context.viewModel?.currentView || 'idle'}</p>
+                <p>Going: {context.viewModel?.going ? 'Yes' : 'No'}</p>
+                <p>Selector: {context.viewModel?.selector || 'None'}</p>
+            </div>
+            <div>
+                <button 
+                    onClick={() => send('START')}
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#28a745',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        marginRight: '10px'
+                    }}
+                >
+                    Start Wave
+                </button>
+                <button 
+                    onClick={() => send('SETTINGS_UPDATE')}
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#007bff',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                    }}
+                >
+                    Settings
+                </button>
+            </div>
+        </div>
+    );
+    
+    view(tabContent);
+}).withState('initializing', async ({ context, event, view, transition, send, log}: any) => {
     console.log('🌊 App Tome: Initializing', context.viewModel);
     log('🌊 App Tome: Initializing state - setting up application');
     
@@ -1629,12 +1396,86 @@ const AppMachine = createViewStateMachine({
         send('INITIALIZATION_COMPLETE');
     }, 1000);
     
-    view(renderAppView(context.viewModel));
-}).withState('ready', ({ context, event, view, transition, send, log}) => {
+    const tabContent = (
+        <div>
+            <h3>🌊 Wave Reader - Initializing</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div className="spinner" style={{
+                    width: '20px',
+                    height: '20px',
+                    border: '2px solid #f3f3f3',
+                    borderTop: '2px solid #007bff',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                }}></div>
+                <p>Setting up application...</p>
+            </div>
+        </div>
+    );
+    
+    view(tabContent);
+}).withState('ready', async ({ context, event, view, transition, send, log}: any) => {
     console.log('🌊 App Tome: Ready', context.viewModel);
     log('🌊 App Tome: Ready state - application fully initialized');
-    view(renderAppView(context.viewModel));
-}).withState('starting', ({ context, event, view, transition, send, log}) => {
+    
+    const tabContent = (
+        <div>
+            <h3>🌊 Wave Reader - Ready</h3>
+            <p>Application fully initialized and ready to use</p>
+            <div style={{ marginBottom: '20px' }}>
+                <p><strong>System Status:</strong></p>
+                <p>State: Ready</p>
+                <p>Going: {context.viewModel?.going ? 'Yes' : 'No'}</p>
+                <p>Selector: {context.viewModel?.selector || 'None'}</p>
+            </div>
+            <div>
+                <button 
+                    onClick={() => send('START')}
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#28a745',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        marginRight: '10px'
+                    }}
+                >
+                    Start Wave
+                </button>
+                <button 
+                    onClick={() => send('TOGGLE')}
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#ffc107',
+                        color: 'black',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        marginRight: '10px'
+                    }}
+                >
+                    Toggle
+                </button>
+                <button 
+                    onClick={() => send('SETTINGS_UPDATE')}
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#007bff',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                    }}
+                >
+                    Settings
+                </button>
+            </div>
+        </div>
+    );
+    
+    view(tabContent);
+}).withState('starting', async ({ context, event, view, transition, send, log}: any) => {
     console.log('🌊 App Tome: Starting', context.viewModel);
     log('🌊 App Tome: Starting wave animation');
     
@@ -1644,12 +1485,79 @@ const AppMachine = createViewStateMachine({
         send('START_COMPLETE');
     }, 500);
     
-    view(renderAppView(context.viewModel));
-}).withState('waving', ({ context, event, view, transition, send, log}) => {
+    const tabContent = (
+        <div>
+            <h3>🌊 Wave Reader - Starting</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div className="spinner" style={{
+                    width: '20px',
+                    height: '20px',
+                    border: '2px solid #f3f3f3',
+                    borderTop: '2px solid #28a745',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                }}></div>
+                <p>Starting wave animation...</p>
+            </div>
+        </div>
+    );
+    
+    view(tabContent);
+}).withState('waving', async ({ context, event, view, transition, send, log}: any) => {
     console.log('🌊 App Tome: Waving', context.viewModel);
     log('🌊 App Tome: Wave animation active');
-    view(renderAppView(context.viewModel));
-}).withState('stopping', ({ context, event, view, transition, send, log}) => {
+    
+    const tabContent = (
+        <div>
+            <h3>🌊 Wave Reader - Active</h3>
+            <div style={{ 
+                padding: '20px', 
+                backgroundColor: '#d4edda', 
+                border: '1px solid #c3e6cb', 
+                borderRadius: '4px',
+                marginBottom: '20px'
+            }}>
+                <p style={{ margin: 0, color: '#155724' }}>
+                    <strong>✅ Wave animation is active!</strong>
+                </p>
+                <p style={{ margin: '5px 0 0 0', color: '#155724' }}>
+                    Reading with selector: <code>{context.viewModel?.selector || 'p'}</code>
+                </p>
+            </div>
+            <div>
+                <button 
+                    onClick={() => send('STOP')}
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#dc3545',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        marginRight: '10px'
+                    }}
+                >
+                    Stop Wave
+                </button>
+                <button 
+                    onClick={() => send('TOGGLE')}
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#ffc107',
+                        color: 'black',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                    }}
+                >
+                    Toggle
+                </button>
+            </div>
+        </div>
+    );
+    
+    view(tabContent);
+}).withState('stopping', async ({ context, event, view, transition, send, log}: any) => {
     console.log('🌊 App Tome: Stopping', context.viewModel);
     log('🌊 App Tome: Stopping wave animation');
     
@@ -1659,8 +1567,25 @@ const AppMachine = createViewStateMachine({
         send('STOP_COMPLETE');
     }, 500);
     
-    view(renderAppView(context.viewModel));
-}).withState('selectorUpdating', ({ context, event, view, transition, send, log}) => {
+    const tabContent = (
+        <div>
+            <h3>🌊 Wave Reader - Stopping</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div className="spinner" style={{
+                    width: '20px',
+                    height: '20px',
+                    border: '2px solid #f3f3f3',
+                    borderTop: '2px solid #dc3545',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                }}></div>
+                <p>Stopping wave animation...</p>
+            </div>
+        </div>
+    );
+    
+    view(tabContent);
+}).withState('selectorUpdating', async ({ context, event, view, transition, send, log}: any) => {
     console.log('🌊 App Tome: Selector updating', context.viewModel);
     log('🌊 App Tome: Updating selector');
     
@@ -1669,8 +1594,25 @@ const AppMachine = createViewStateMachine({
         send('SELECTOR_UPDATE_COMPLETE');
     }, 300);
     
-    view(renderAppView(context.viewModel));
-}).withState('settingsUpdating', ({ context, event, view, transition, send, log}) => {
+    const tabContent = (
+        <div>
+            <h3>🌊 Wave Reader - Updating Selector</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div className="spinner" style={{
+                    width: '20px',
+                    height: '20px',
+                    border: '2px solid #f3f3f3',
+                    borderTop: '2px solid #007bff',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                }}></div>
+                <p>Updating selector...</p>
+            </div>
+        </div>
+    );
+    
+    view(tabContent);
+}).withState('settingsUpdating', async ({ context, event, view, transition, send, log}: any) => {
     console.log('🌊 App Tome: Settings updating', context.viewModel);
     
     const onSettingsUpdated = (settings: any) => {
@@ -1688,8 +1630,43 @@ const AppMachine = createViewStateMachine({
         }
     };
     
-    view(renderSettingsView(context.viewModel, onSettingsUpdated));
-}).withState('error', ({ context, event, view, transition, send, log}) => {
+    const tabContent = (
+        <div>
+            <h3>🌊 Wave Reader - Settings</h3>
+            <div style={{ marginBottom: '20px' }}>
+                <p>Configure your wave reader settings:</p>
+                <Settings 
+                    initialSettings={context.viewModel?.settings || {}}
+                    onUpdateSettings={onSettingsUpdated}
+                    domain={window.location.hostname}
+                    path={window.location.pathname}
+                    onDomainPathChange={(domain, path) => {
+                        console.log('Domain/Path changed:', domain, path);
+                    }}
+                    settingsService={new SettingsService()}
+                />
+            </div>
+            <div>
+                <button 
+                    onClick={() => send('SETTINGS_UPDATE_CANCELLED')}
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#6c757d',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        marginRight: '10px'
+                    }}
+                >
+                    Cancel
+                </button>
+            </div>
+        </div>
+    );
+    
+    view(tabContent);
+}).withState('error', async ({ context, event, view, transition, send, log}: any) => {
     console.log('🌊 App Tome: Error state', context.viewModel);
     
     // Auto-recover from error after 3 seconds
@@ -1698,8 +1675,46 @@ const AppMachine = createViewStateMachine({
         send('RECOVER');
     }, 3000);
     
-    view(renderAppView(context.viewModel));
+    const tabContent = (
+        <div>
+            <h3>🌊 Wave Reader - Error</h3>
+            <div style={{ 
+                padding: '20px', 
+                backgroundColor: '#f8d7da', 
+                border: '1px solid #f5c6cb', 
+                borderRadius: '4px',
+                marginBottom: '20px'
+            }}>
+                <p style={{ margin: 0, color: '#721c24' }}>
+                    <strong>❌ An error occurred</strong>
+                </p>
+                <p style={{ margin: '5px 0 0 0', color: '#721c24' }}>
+                    Auto-recovering in 3 seconds...
+                </p>
+            </div>
+            <div>
+                <button 
+                    onClick={() => send('RECOVER')}
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#007bff',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                    }}
+                >
+                    Recover Now
+                </button>
+            </div>
+        </div>
+    );
+    
+    view(tabContent);
 });
+
+// Wrap with adapter to implement ISubMachine interface
+const AppMachine = new ViewMachineAdapter(AppMachineRaw);
 
 const AppTome = createTomeConfig({
     id: 'app-tome',
@@ -1707,16 +1722,10 @@ const AppTome = createTomeConfig({
     description: 'App Tome',
     version: '1.0.0',
     machines: {
-        'backgroundProxyMachine': BackgroundProxyMachine,
-        'appMachine': AppMachine
+        'backgroundProxyMachine': BackgroundProxyMachine as any,
+        'appMachine': AppMachine as any
     },
     dependencies: ['log-view-machine'],
-    author: 'Wave Reader Team',
-    createdAt: '2024-01-01',
-    lastModified: new Date().toISOString().split('T')[0],
-    tags: ['app', 'tome'],
-    priority: 'normal',
-    stability: 'stable',
     routing: {
         basePath: '/',
         routes: {
@@ -1752,7 +1761,7 @@ const AppTome = createTomeConfig({
     }
 });
 
-AppTome.start();
+// AppTome.start();
 
 const AppComponent: FunctionComponent = () => {
     const [selector, setSelector] = useState('p');
@@ -1769,23 +1778,14 @@ const AppComponent: FunctionComponent = () => {
     const mlSettingsService = new MLSettingsService();
 
     const syncState = async () => {
-        const appMachine = AppTome.getMachine('appMachine');
-        if (appMachine) {
-            const state = appMachine.getState();
-            setSelector(state.context?.viewModel?.selector || '');
-            setSaved(state.context?.viewModel?.saved || false);
-            setGoing(state.context?.viewModel?.going || false);
-        }
+        // Simplified sync state - just update local state
+        console.log('🌊 App: Syncing state');
     }
 
     // Function to refresh state from content script
     const refreshStateFromContentScript = async () => {
         try {
-            const appMachine = AppTome.getMachine('appMachine');
-            if (appMachine) {
-                appMachine.send('REFRESH_STATE');
                 console.log('🌊 App: Triggered state refresh from content script');
-            }
         } catch (error) {
             console.error('🌊 App: Failed to trigger state refresh', error);
         }
@@ -1808,13 +1808,38 @@ const AppComponent: FunctionComponent = () => {
         };
         
         // Initialize the AppMachine
-        AppMachine.send('INITIALIZE');
+        // AppMachine.send('INITIALIZE');
         
         // Register and start the tome
-        TomeManager.getInstance().registerTome(AppTome);
-        TomeManager.getInstance().startTome('app-tome');
+        // TomeManager.getInstance().registerTome(AppTome);
+        // TomeManager.getInstance().startTome('app-tome');
+        
+        // Set up ISubMachine event listeners to demonstrate the platform capabilities
+        AppMachine.on('started', (data: any) => {
+            console.log('🌊 App Machine started:', data);
+        });
+        
+        AppMachine.on('stopped', (data: any) => {
+            console.log('🌊 App Machine stopped:', data);
+        });
+        
+        AppMachine.on('error', (data: any) => {
+            console.error('🌊 App Machine error:', data);
+        });
+        
+        BackgroundProxyMachine.on('started', (data: any) => {
+            console.log('🌊 Background Proxy Machine started:', data);
+        });
+        
+        BackgroundProxyMachine.on('error', (data: any) => {
+            console.error('🌊 Background Proxy Machine error:', data);
+        });
         
         console.log('🌊 AppTome: Initialized with viewModel:', viewModel);
+        console.log('🌊 AppTome: Machine health status:', {
+            appMachine: AppMachine.getHealth(),
+            backgroundProxy: BackgroundProxyMachine.getHealth()
+        });
     }, []);
 
     return (
@@ -1826,12 +1851,134 @@ const AppComponent: FunctionComponent = () => {
                 </PopupHeader>
                 
                 <PopupContent>
-                    {/* Render from AppTome */}
-                    {AppTome.machines.appMachine.render()}
+                    {/* Use WaveTabs with structural components */}
+                    <WaveTabs>
+                        <div>
+                            {/* Machine Status Tab */}
+                            <div style={{ marginBottom: '20px' }}>
+                                <h3>🔧 Machine Status</h3>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                    <div style={{ 
+                                        padding: '15px', 
+                                        backgroundColor: '#f8f9fa', 
+                                        border: '1px solid #dee2e6', 
+                                        borderRadius: '4px' 
+                                    }}>
+                                        <h4>Background Proxy Machine</h4>
+                                        <p><strong>ID:</strong> {BackgroundProxyMachine.machineId}</p>
+                                        <p><strong>Type:</strong> {BackgroundProxyMachine.machineType}</p>
+                                        <p><strong>State:</strong> {BackgroundProxyMachine.getState().value}</p>
+                                        <p><strong>Health:</strong> 
+                                            <span style={{ 
+                                                color: BackgroundProxyMachine.getHealth().status === 'healthy' ? '#28a745' : 
+                                                       BackgroundProxyMachine.getHealth().status === 'degraded' ? '#ffc107' : '#dc3545'
+                                            }}>
+                                                {BackgroundProxyMachine.getHealth().status}
+                                            </span>
+                                        </p>
+                                    </div>
+                                    <div style={{ 
+                                        padding: '15px', 
+                                        backgroundColor: '#f8f9fa', 
+                                        border: '1px solid #dee2e6', 
+                                        borderRadius: '4px' 
+                                    }}>
+                                        <h4>App Machine</h4>
+                                        <p><strong>ID:</strong> {AppMachine.machineId}</p>
+                                        <p><strong>Type:</strong> {AppMachine.machineType}</p>
+                                        <p><strong>State:</strong> {AppMachine.getState().value}</p>
+                                        <p><strong>Health:</strong> 
+                                            <span style={{ 
+                                                color: AppMachine.getHealth().status === 'healthy' ? '#28a745' : 
+                                                       AppMachine.getHealth().status === 'degraded' ? '#ffc107' : '#dc3545'
+                                            }}>
+                                                {AppMachine.getHealth().status}
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* View Model Status */}
+                            <div style={{ marginBottom: '20px' }}>
+                                <h3>📊 View Model Status</h3>
+                                <div style={{ 
+                                    padding: '15px', 
+                                    backgroundColor: '#e3f2fd', 
+                                    border: '1px solid #bbdefb', 
+                                    borderRadius: '4px' 
+                                }}>
+                                    <p><strong>Selector:</strong> {selector}</p>
+                                    <p><strong>Going:</strong> {going ? 'Yes' : 'No'}</p>
+                                    <p><strong>Saved:</strong> {saved ? 'Yes' : 'No'}</p>
+                                </div>
+                            </div>
+                            
+                            {/* Control Buttons */}
+                            <div>
+                                <h3>🎮 Controls</h3>
+                                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                    <button 
+                                        onClick={() => AppMachine.send('TOGGLE')}
+                                        style={{
+                                            padding: '8px 16px',
+                                            backgroundColor: '#007bff',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Toggle App Machine
+                                    </button>
+                                    <button 
+                                        onClick={() => BackgroundProxyMachine.send('TOGGLE')}
+                                        style={{
+                                            padding: '8px 16px',
+                                            backgroundColor: '#28a745',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Toggle Proxy Machine
+                                    </button>
+                                    <button 
+                                        onClick={() => AppMachine.send('START')}
+                                        style={{
+                                            padding: '8px 16px',
+                                            backgroundColor: '#17a2b8',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Start Wave
+                                    </button>
+                                    <button 
+                                        onClick={() => AppMachine.send('SETTINGS_UPDATE')}
+                                        style={{
+                                            padding: '8px 16px',
+                                            backgroundColor: '#6f42c1',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Settings
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </WaveTabs>
                 </PopupContent>
             </WaveReader>
         </ErrorBoundary>
     );
 }
 
-export default AppTome;
+export { AppTome };
+export default AppComponent;

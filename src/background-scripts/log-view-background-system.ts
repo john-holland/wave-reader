@@ -226,8 +226,6 @@ export class LogViewBackgroundSystem {
                     timestamp: Date.now(),
                     action: 'keyboard-toggle',
                     target: 'popup-state-machine'
-                }).catch(() => {
-                    // Popup might not be open, which is fine
                 });
             } catch (error) {
                 // Ignore errors
@@ -361,9 +359,10 @@ export class LogViewBackgroundSystem {
                 console.log("🌊 Log-View-Machine: Background script injecting ping command to content script:", messageData);
                 // Note: In service worker context, we use chrome.tabs.sendMessage instead of window.postMessage
                 // This is handled by injectMessageToContentScript method
+                chrome.tabs.sendMessage(tabId, {
                     source: 'wave-reader-extension',
                     message: messageData
-                }, '*');
+                });
             },
             args: [{
                 from: 'background-script',
@@ -454,6 +453,7 @@ export class LogViewBackgroundSystem {
         } catch (error: any) {
             this.logMessage('popup-forward-error', `Popup not available: ${error?.message || 'Unknown error'}`);
         }
+    }
 
     private initializeMLService() {
         console.log("🌊 Log-View-Machine: Initializing ML service");
@@ -637,9 +637,10 @@ export class LogViewBackgroundSystem {
                 console.log("🌊 Log-View-Machine: Background script injecting message to content script:", messageData);
                 // Note: In service worker context, we use chrome.tabs.sendMessage instead of window.postMessage
                 // This is handled by injectMessageToContentScript method
+                chrome.tabs.sendMessage(tabId, {
                     source: 'wave-reader-extension',
                     message: messageData
-                }, '*');
+                });
             },
             args: [messageData]
         });

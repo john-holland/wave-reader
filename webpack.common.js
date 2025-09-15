@@ -12,7 +12,7 @@ const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 //config: path.join(__dirname, "./src/config/config.common.js")
 const config = {
     mode: "development",
-    devtool: "source-map",
+    devtool: "cheap-module-source-map",
     entry: {
         app: path.join(__dirname, "./static/index.js"),
         background: path.join(__dirname, "./static/background.js"),
@@ -28,6 +28,7 @@ const config = {
         alias: {
             // Real log-view-machine integration - using local package
             // "log-view-machine": path.resolve(__dirname, "../log-view-machine/dist")
+            "process/browser": require.resolve("process/browser")
         },
         fallback: {
             "path": require.resolve("path-browserify"),
@@ -46,16 +47,39 @@ const config = {
             "events": require.resolve("events/"),
             "buffer": require.resolve("buffer/"),
             "string_decoder": require.resolve("string_decoder/"),
-            "async_hooks": false
+            "async_hooks": false,
+            "process": require.resolve("process/browser")
         }
     },
     plugins: [
         new webpack.ProvidePlugin({
             'config': 'config',
-            'process': 'process/browser'
+            'process': 'process/browser',
+            'Buffer': ['buffer', 'Buffer']
         }),
         new webpack.DefinePlugin({
             'regeneratorRuntime': 'regeneratorRuntime'
+        }),
+        new webpack.IgnorePlugin({
+            resourceRegExp: /^\.\/locale$/,
+            contextRegExp: /moment$/
+        }),
+        new webpack.NormalModuleReplacementPlugin(
+            /log-view-machine/,
+            path.resolve(__dirname, 'src/mocks/log-view-machine-mock.js')
+        ),
+        new webpack.DefinePlugin({
+            'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+            'global': 'globalThis'
+        }),
+        new webpack.ProvidePlugin({
+            'global': 'globalThis'
+        }),
+        new webpack.IgnorePlugin({
+            resourceRegExp: /deprecate/
+        }),
+        new webpack.IgnorePlugin({
+            resourceRegExp: /node_modules\/deprecate/
         }),
         new HtmlWebpackPlugin({
             title: "boilerplate", // change this to your app title
