@@ -1753,14 +1753,108 @@ const AppMachineRaw = createViewStateMachine({
 // Wrap with adapter to implement ISubMachine interface
 const AppMachine = new ViewMachineAdapter(AppMachineRaw);
 
+// Create UI Component Tome Configurations
+const WaveTabsTome = createTomeConfig({
+    id: 'wave-tabs-tome',
+    name: 'Wave Tabs Tome',
+    description: 'UI Component Tome for Wave Tabs functionality',
+    version: '1.0.0',
+    machines: {
+        'waveTabsMachine': {
+            machineId: 'wave-tabs-machine',
+            machineType: 'view',
+            getState: () => ({ value: 'idle' }),
+            getContext: () => ({ activeTab: 0, tabs: [] }),
+            send: (event: any) => {
+                console.log('🌊 WaveTabs Tome: Processing event', event);
+                // Handle tab-related events
+                if (event.type === 'TAB_CHANGE') {
+                    console.log('🌊 WaveTabs Tome: Tab changed to', event.tabIndex);
+                }
+                return { success: true };
+            },
+            subscribe: (callback: any) => ({
+                unsubscribe: () => console.log('🌊 WaveTabs Tome: Unsubscribed')
+            })
+        } as any
+    },
+    dependencies: ['log-view-machine'],
+    routing: {
+        basePath: '/ui/wave-tabs',
+        routes: {
+            'tab-management': {
+                path: '/tab-management',
+                method: 'POST',
+                transformers: {
+                    input: ({context, event, send, log, transition, machine}: any) => {
+                        console.log('🌊 WaveTabs Tome: Processing tab event', event);
+                        return machine.send(event);
+                    },
+                    output: ({context, event, send, log, transition, machine}: any) => {
+                        console.log('🌊 WaveTabs Tome: Tab output', event);
+                        return context;
+                    }
+                }
+            }
+        }
+    }
+});
+
+const SettingsTome = createTomeConfig({
+    id: 'settings-tome',
+    name: 'Settings Tome',
+    description: 'UI Component Tome for Settings functionality',
+    version: '1.0.0',
+    machines: {
+        'settingsMachine': {
+            machineId: 'settings-machine',
+            machineType: 'view',
+            getState: () => ({ value: 'idle' }),
+            getContext: () => ({ settings: {}, isOpen: false }),
+            send: (event: any) => {
+                console.log('🌊 Settings Tome: Processing event', event);
+                if (event.type === 'SETTINGS_UPDATE') {
+                    console.log('🌊 Settings Tome: Settings updated', event.settings);
+                }
+                return { success: true };
+            },
+            subscribe: (callback: any) => ({
+                unsubscribe: () => console.log('🌊 Settings Tome: Unsubscribed')
+            })
+        } as any
+    },
+    dependencies: ['log-view-machine'],
+    routing: {
+        basePath: '/ui/settings',
+        routes: {
+            'settings-management': {
+                path: '/settings-management',
+                method: 'POST',
+                transformers: {
+                    input: ({context, event, send, log, transition, machine}: any) => {
+                        console.log('🌊 Settings Tome: Processing settings event', event);
+                        return machine.send(event);
+                    },
+                    output: ({context, event, send, log, transition, machine}: any) => {
+                        console.log('🌊 Settings Tome: Settings output', event);
+                        return context;
+                    }
+                }
+            }
+        }
+    }
+});
+
 const AppTome = createTomeConfig({
     id: 'app-tome',
     name: 'App Tome',
-    description: 'App Tome',
+    description: 'Main Application Tome with integrated UI components',
     version: '1.0.0',
     machines: {
         'backgroundProxyMachine': BackgroundProxyMachine as any,
-        'appMachine': AppMachine as any
+        'appMachine': AppMachine as any,
+        'waveTabsTome': WaveTabsTome as any,
+        'settingsTome': SettingsTome as any
     },
     dependencies: ['log-view-machine'],
     routing: {
@@ -1793,6 +1887,38 @@ const AppTome = createTomeConfig({
                         return context;
                     }
                 }
+            },
+            'wave-tabs-tome': {
+                path: '/ui/wave-tabs',
+                method: 'POST',
+                transformers: {
+                    input: ({context, event, send, log, transition, machine}: any) => {
+                        console.log('🌊 App Tome: Routing to WaveTabs Tome', event);
+                        // Route to WaveTabs Tome
+                        return machine.parentMachine.getSubMachine('waveTabsTome')?.send(event);
+                    },
+                    output: ({context, event, send, log, transition, machine}: any) => {
+                        console.log('🌊 App Tome: WaveTabs Tome output', event);
+                        // Handle output from WaveTabs Tome
+                        return context;
+                    }
+                }
+            },
+            'settings-tome': {
+                path: '/ui/settings',
+                method: 'POST',
+                transformers: {
+                    input: ({context, event, send, log, transition, machine}: any) => {
+                        console.log('🌊 App Tome: Routing to Settings Tome', event);
+                        // Route to Settings Tome
+                        return machine.parentMachine.getSubMachine('settingsTome')?.send(event);
+                    },
+                    output: ({context, event, send, log, transition, machine}: any) => {
+                        console.log('🌊 App Tome: Settings Tome output', event);
+                        // Handle output from Settings Tome
+                        return context;
+                    }
+                }
             }
         }
     }
@@ -1815,6 +1941,25 @@ const AppComponent: FunctionComponent = () => {
     const [proxyMachineState, setProxyMachineState] = useState(BackgroundProxyMachine.getState());
     const [appMachineContext, setAppMachineContext] = useState(AppMachine.getContext());
     const [proxyMachineContext, setProxyMachineContext] = useState(BackgroundProxyMachine.getContext());
+    
+    // Set up UI component communication
+    const handleUIComponentEvent = (event: any) => {
+        console.log('🌊 App Component: UI component event received', event);
+        
+        // Route UI events to appropriate tomes
+        switch (event.source) {
+            case 'wave-tabs':
+                console.log('🌊 App Component: Routing to WaveTabs Tome');
+                // You can access the tome through the AppTome
+                break;
+            case 'settings':
+                console.log('🌊 App Component: Routing to Settings Tome');
+                // You can access the tome through the AppTome
+                break;
+            default:
+                console.log('🌊 App Component: Unknown UI component', event.source);
+        }
+    };
 
     // Initialize services
     const settingsService = new SettingsService();
@@ -1919,6 +2064,34 @@ const AppComponent: FunctionComponent = () => {
                     {/* Use WaveTabs with structural components */}
                     <WaveTabs>
                         <div>
+                            {/* Integrated Tome System Status */}
+                            <div style={{ marginBottom: '20px' }}>
+                                <h3>🏗️ Integrated Tome System</h3>
+                                <div style={{ 
+                                    padding: '15px', 
+                                    backgroundColor: '#e8f5e8', 
+                                    border: '1px solid #4caf50', 
+                                    borderRadius: '4px',
+                                    marginBottom: '15px'
+                                }}>
+                                    <h4>📚 Available Tomes</h4>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px' }}>
+                                        <div>
+                                            <strong>App Tome:</strong> Main application with UI integration
+                                        </div>
+                                        <div>
+                                            <strong>WaveTabs Tome:</strong> Tab management UI component
+                                        </div>
+                                        <div>
+                                            <strong>Settings Tome:</strong> Settings UI component
+                                        </div>
+                                        <div>
+                                            <strong>Background Proxy:</strong> Extension communication
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             {/* Machine Status Tab */}
                             <div style={{ marginBottom: '20px' }}>
                                 <h3>🔧 Machine Status</h3>
@@ -2018,6 +2191,13 @@ const AppComponent: FunctionComponent = () => {
                                         onClick={() => {
                                             console.log('🌊 App Component: Toggling App Machine');
                                             AppMachine.send('TOGGLE');
+                                            
+                                            // Also notify UI components
+                                            handleUIComponentEvent({
+                                                source: 'app',
+                                                type: 'TOGGLE',
+                                                data: { going: !appMachineState.value }
+                                            });
                                         }}
                                         style={{
                                             padding: '8px 16px',
