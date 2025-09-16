@@ -73,6 +73,9 @@ export interface ISubMachine {
     on(event: string, handler: (data: any) => void): void;
     off(event: string, handler: (data: any) => void): void;
     emit(event: string, data: any): void;
+    
+    // State change subscription
+    subscribe(callback: (data: any) => void): { unsubscribe: () => void };
 }
 
 /**
@@ -238,6 +241,14 @@ export class ProxyMachineAdapter implements ISubMachine {
                 }
             });
         }
+    }
+
+    subscribe(callback: (data: any) => void): { unsubscribe: () => void } {
+        return this.machine.subscribe?.(callback) || {
+            unsubscribe: () => {
+                console.log('🌊 ProxyMachineAdapter: No subscription to unsubscribe from');
+            }
+        };
     }
 }
 
@@ -416,6 +427,14 @@ export class ViewMachineAdapter implements ISubMachine {
                 }
             });
         }
+    }
+
+    subscribe(callback: (data: any) => void): { unsubscribe: () => void } {
+        return this.machine.subscribe?.(callback) || {
+            unsubscribe: () => {
+                console.log('🌊 ViewMachineAdapter: No subscription to unsubscribe from');
+            }
+        };
     }
 }
 
@@ -818,16 +837,23 @@ const AppMachineRaw = createViewStateMachine({
             },
             starting: {
                 on: {
-                    START_COMPLETE: { target: 'waving', actions: ['startWaveAnimation'] },
+                    START_COMPLETE: { target: 'waving', actions: ['startApp'] },
                     START_FAILED: { target: 'error', actions: ['handleStartError'] }
                 }
             },
             waving: {
                 on: {
-                    STOP: { target: 'stopping', actions: ['stopWaveAnimation'] },
+                    STOP: { target: 'stopping', actions: ['stopApp'] },
                     TOGGLE: { target: 'toggling', actions: ['toggleWaveAnimation'] },
                     SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
                     SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
+                    ERROR: { target: 'error', actions: ['handleError'] }
+                }
+            },
+            toggling: {
+                on: {
+                    TOGGLE_COMPLETE: { target: 'ready', actions: ['completeToggle'] },
+                    TOGGLE_COMPLETE_WAVING: { target: 'waving', actions: ['completeToggleWaving'] },
                     ERROR: { target: 'error', actions: ['handleError'] }
                 }
             },
@@ -850,7 +876,7 @@ const AppMachineRaw = createViewStateMachine({
             },
             keyboardToggling: {
                 on: { 
-                    KEYBOARD_TOGGLE_COMPLETE: { target: 'idle', actions: ['completeKeyboardToggle'] },
+                    KEYBOARD_TOGGLE_COMPLETE: { target: 'idle', actions: ['toggleApp'] },
                     ERROR: { target: 'error', actions: ['handleError'] }
                 },
                 entry: 'handleKeyboardToggle'
@@ -863,14 +889,26 @@ const AppMachineRaw = createViewStateMachine({
             }
         },
         actions: {
+            toggleComplete: {
+                type: 'function',
+                fn: ({context, event, send, log, transition, machine}: any) => {
+                    console.log('🌊 App Tome: Toggle complete');
+                }
+            },
+            toggleCompleteWaving: {
+                type: 'function',
+                fn: ({context, event, send, log, transition, machine}: any) => {
+                    console.log('🌊 App Tome: Toggle complete waving');
+                }
+            },
             // Helper function for data synchronization
             syncDataWithContentScript: {
                 type: 'function',
-                fn: async ({context, log}: any) => {
+                fn: async ({context, log, machine}: any) => {
                     log('🌊 App Tome: Syncing data with content script...');
                     
                     try {
-                        const statusResponse = await sendExtensionMessage({
+                        const statusResponse = await machine.parentMachine.getSubMachine('background-proxy')?.send({
                             from: 'popup',
                             name: 'get-status',
                             timestamp: Date.now()
@@ -899,7 +937,7 @@ const AppMachineRaw = createViewStateMachine({
             initializeApp: {
                 type: 'function',
                 fn: async ({context, event, send, log, transition, machine}: any) => {
-                    console.log('🌊 App Tome: Initialize app');
+                    log('🌊 App Tome: Initialize app');
                     
                     try {
                         // Data synchronization strategy: Use a combination approach
@@ -952,7 +990,7 @@ const AppMachineRaw = createViewStateMachine({
                         // Step 2: Query content script for real-time state
                         let realtimeData: any = null;
                         try {
-                        const statusResponse = await sendExtensionMessage({
+                        const statusResponse = await machine.parentMachine.getSubMachine('background-proxy')?.send({
                             from: 'popup',
                             name: 'get-status',
                             timestamp: Date.now()
@@ -1016,12 +1054,12 @@ const AppMachineRaw = createViewStateMachine({
             // Periodic sync action that can be called to refresh state
             refreshStateFromContentScript: {
                 type: 'function',
-                fn: async ({context, send, log}: any) => {
+                fn: async ({context, send, log, machine}: any) => {
                     log('🌊 App Tome: Refreshing state from content script...');
                     
                     try {
                         // Call the sync function directly
-                        const statusResponse = await sendExtensionMessage({
+                        const statusResponse = await machine.parentMachine.getSubMachine('background-proxy')?.send({
                             from: 'popup',
                             name: 'get-status',
                             timestamp: Date.now()
@@ -1140,27 +1178,21 @@ const AppMachineRaw = createViewStateMachine({
             },
             startApp: {
                 type: 'function',
-                fn: (context: any, event: any) => {
-                    console.log('🌊 App Tome: Start app');
+                fn: ({context, event, send, log, transition, machine}: any) => {
+                    machine.parentMachine.getSubMachine('background-proxy')?.send('START');
                 }
             },
             stopApp: {
                 type: 'function',
-                fn: (context: any, event: any) => {
-                    console.log('🌊 App Tome: Stop app');
+                fn: ({context, event, send, log, transition, machine}: any) => {
+                    machine.parentMachine.getSubMachine('background-proxy')?.send('STOP');
                 }
             },
             toggleApp: {
                 type: 'function',
-                fn: (context: any, event: any) => {
+                fn: ({context, event, send, log, transition, machine}: any) => {
                     console.log('🌊 App Tome: Toggle app');
-                }
-            },
-            handleKeyboardToggle: {
-                type: 'function',
-                fn: async ({context, event, send, log, transition, machine}: any) => {
-                    console.log('🌊 App Tome: Handle keyboard toggle', event);
-                    
+
                     try {
                         // Send toggle message to content script via background script
                         const toggleMessage = {
@@ -1168,17 +1200,15 @@ const AppMachineRaw = createViewStateMachine({
                             from: 'popup-state-machine'
                         };
                         
-                        const response = await sendExtensionMessage(toggleMessage);
+                        const response = machine.parentMachine.getSubMachine('background-proxy')?.send('TOGGLE');
                         console.log('🌊 App Tome: Keyboard toggle response', response);
                         
                         // Update the viewModel going state
-                        if (response && typeof response.success !== 'undefined') {
-                            // Toggle the current going state in viewModel
-                            context.viewModel.going = !context.viewModel.going;
-                            context.viewModel.saved = false; // Mark as unsaved since state changed
-                            
-                            log(`🌊 App Tome: Updated viewModel.going to ${context.viewModel.going}`);
-                        }
+                        // Toggle the current going state in viewModel
+                        context.viewModel.going = !context.viewModel.going;
+                        context.viewModel.saved = false; // Mark as unsaved since state changed
+                        
+                        log(`🌊 App Tome: Updated viewModel.going to ${context.viewModel.going}`);
                         
                         // Send completion event
                         send('KEYBOARD_TOGGLE_COMPLETE');
@@ -1187,6 +1217,13 @@ const AppMachineRaw = createViewStateMachine({
                         console.error('🌊 App Tome: Keyboard toggle error', error);
                         send('ERROR');
                     }
+                }
+            },
+            handleKeyboardToggle: {
+                type: 'function',
+                fn: async ({context, event, send, log, transition, machine}: any) => {
+                    console.log('🌊 App Tome: Handle keyboard toggle', event);
+                    send('')
                 }
             },
             completeKeyboardToggle: {
@@ -1263,7 +1300,7 @@ const AppMachineRaw = createViewStateMachine({
             },
             startWaveAnimation: {
                 type: 'function',
-                fn: async (context: any, event: any) => {
+                fn: async (context: any, event: any, machine: any) => {
                     // Get current settings and create wave
                     const currentOptions = await context.settingsService?.getCurrentSettings() || {};
                     const options = new Options(currentOptions);
@@ -1294,7 +1331,7 @@ const AppMachineRaw = createViewStateMachine({
 
                     // Send start message
                     const startMessage = new StartMessage({ options });
-                    await sendExtensionMessage(startMessage);
+                    await machine.parentMachine.getSubMachine('background-proxy')?.send(startMessage);
                     
                     // Update sync state
                     setSyncObject("going", { going: true });
@@ -1310,7 +1347,7 @@ const AppMachineRaw = createViewStateMachine({
                     console.log('🌊 App Tome: Stopping wave animation');
                     try {
                         const stopMessage = new StopMessage();
-                        await sendExtensionMessage(stopMessage);
+                        await machine.parentMachine.getSubMachine('background-proxy')?.send(stopMessage);
                         
                         // Update sync state
                         setSyncObject("going", { going: false });
@@ -1737,7 +1774,7 @@ const AppTome = createTomeConfig({
                         machine.parentMachine.send({event});
                     },
                     output: ({context, event, send, log, transition, machine}: any) => {
-                        sendExtensionMessage(context.message);
+                        machine.parentMachine.getSubMachine('background-proxy')?.send(context.message);
                     }
                 }
             },
@@ -1772,6 +1809,12 @@ const AppComponent: FunctionComponent = () => {
     const [isExtension, setIsExtension] = useState(false);
     const [settings, setSettings] = useState<Options | null>(null);
     const [showNotifications, setShowNotifications] = useState(true);
+    
+    // Add state for reactive UI updates
+    const [appMachineState, setAppMachineState] = useState(AppMachine.getState());
+    const [proxyMachineState, setProxyMachineState] = useState(BackgroundProxyMachine.getState());
+    const [appMachineContext, setAppMachineContext] = useState(AppMachine.getContext());
+    const [proxyMachineContext, setProxyMachineContext] = useState(BackgroundProxyMachine.getContext());
 
     // Initialize services
     const settingsService = new SettingsService();
@@ -1840,6 +1883,28 @@ const AppComponent: FunctionComponent = () => {
             appMachine: AppMachine.getHealth(),
             backgroundProxy: BackgroundProxyMachine.getHealth()
         });
+        
+        // Set up state change listeners for reactive UI
+        const handleAppMachineStateChange = (data: any) => {
+            console.log('🌊 App Component: App machine state changed', data);
+            setAppMachineState(AppMachine.getState());
+            setAppMachineContext(AppMachine.getContext());
+        };
+        
+        const handleProxyMachineStateChange = (data: any) => {
+            console.log('🌊 App Component: Proxy machine state changed', data);
+            setProxyMachineState(BackgroundProxyMachine.getState());
+            setProxyMachineContext(BackgroundProxyMachine.getContext());
+        };
+        
+        // Subscribe to state changes
+        const appSubscription = AppMachine.subscribe?.(handleAppMachineStateChange);
+        const proxySubscription = BackgroundProxyMachine.subscribe?.(handleProxyMachineStateChange);
+        
+        return () => {
+            appSubscription?.unsubscribe?.();
+            proxySubscription?.unsubscribe?.();
+        };
     }, []);
 
     return (
@@ -1867,7 +1932,16 @@ const AppComponent: FunctionComponent = () => {
                                         <h4>Background Proxy Machine</h4>
                                         <p><strong>ID:</strong> {BackgroundProxyMachine.machineId}</p>
                                         <p><strong>Type:</strong> {BackgroundProxyMachine.machineType}</p>
-                                        <p><strong>State:</strong> {BackgroundProxyMachine.getState().value}</p>
+                                        <p><strong>State:</strong> 
+                                            <span style={{ 
+                                                color: proxyMachineState.value === 'active' ? '#28a745' : 
+                                                       proxyMachineState.value === 'connected' ? '#17a2b8' : '#6c757d',
+                                                fontWeight: 'bold'
+                                            }}>
+                                                {proxyMachineState.value}
+                                            </span>
+                                        </p>
+                                        <p><strong>Connected:</strong> {proxyMachineContext.proxyData?.connected ? 'Yes' : 'No'}</p>
                                         <p><strong>Health:</strong> 
                                             <span style={{ 
                                                 color: BackgroundProxyMachine.getHealth().status === 'healthy' ? '#28a745' : 
@@ -1886,7 +1960,15 @@ const AppComponent: FunctionComponent = () => {
                                         <h4>App Machine</h4>
                                         <p><strong>ID:</strong> {AppMachine.machineId}</p>
                                         <p><strong>Type:</strong> {AppMachine.machineType}</p>
-                                        <p><strong>State:</strong> {AppMachine.getState().value}</p>
+                                        <p><strong>State:</strong> 
+                                            <span style={{ 
+                                                color: appMachineState.value === 'waving' ? '#28a745' : 
+                                                       appMachineState.value === 'settingsUpdating' ? '#6f42c1' : '#6c757d',
+                                                fontWeight: 'bold'
+                                            }}>
+                                                {appMachineState.value}
+                                            </span>
+                                        </p>
                                         <p><strong>Health:</strong> 
                                             <span style={{ 
                                                 color: AppMachine.getHealth().status === 'healthy' ? '#28a745' : 
@@ -1908,9 +1990,23 @@ const AppComponent: FunctionComponent = () => {
                                     border: '1px solid #bbdefb', 
                                     borderRadius: '4px' 
                                 }}>
-                                    <p><strong>Selector:</strong> {selector}</p>
-                                    <p><strong>Going:</strong> {going ? 'Yes' : 'No'}</p>
-                                    <p><strong>Saved:</strong> {saved ? 'Yes' : 'No'}</p>
+                                    <p><strong>Selector:</strong> {appMachineContext.viewModel?.selector || selector || 'None'}</p>
+                                    <p><strong>Going:</strong> 
+                                        <span style={{ 
+                                            color: (appMachineContext.viewModel?.going || going) ? '#28a745' : '#dc3545',
+                                            fontWeight: 'bold'
+                                        }}>
+                                            {(appMachineContext.viewModel?.going || going) ? 'Yes' : 'No'}
+                                        </span>
+                                    </p>
+                                    <p><strong>Saved:</strong> 
+                                        <span style={{ 
+                                            color: (appMachineContext.viewModel?.saved || saved) ? '#28a745' : '#dc3545',
+                                            fontWeight: 'bold'
+                                        }}>
+                                            {(appMachineContext.viewModel?.saved || saved) ? 'Yes' : 'No'}
+                                        </span>
+                                    </p>
                                 </div>
                             </div>
                             
@@ -1919,56 +2015,39 @@ const AppComponent: FunctionComponent = () => {
                                 <h3>🎮 Controls</h3>
                                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                                     <button 
-                                        onClick={() => AppMachine.send('TOGGLE')}
+                                        onClick={() => {
+                                            console.log('🌊 App Component: Toggling App Machine');
+                                            AppMachine.send('TOGGLE');
+                                        }}
                                         style={{
                                             padding: '8px 16px',
-                                            backgroundColor: '#007bff',
+                                            backgroundColor: appMachineState.value === 'waving' ? '#dc3545' : '#007bff',
                                             color: 'white',
                                             border: 'none',
                                             borderRadius: '4px',
-                                            cursor: 'pointer'
+                                            cursor: 'pointer',
+                                            fontWeight: 'bold'
                                         }}
                                     >
-                                        Toggle App Machine
+                                        {appMachineState.value === 'waving' ? 'Stop Wave' : 'Start Wave'}
                                     </button>
                                     <button 
-                                        onClick={() => BackgroundProxyMachine.send('TOGGLE')}
+                                        onClick={() => {
+                                            console.log('🌊 App Component: Opening Settings');
+                                            AppMachine.send('SETTINGS_UPDATE');
+                                        }}
+                                        disabled={appMachineState.value === 'settingsUpdating'}
                                         style={{
                                             padding: '8px 16px',
-                                            backgroundColor: '#28a745',
+                                            backgroundColor: appMachineState.value === 'settingsUpdating' ? '#6c757d' : '#6f42c1',
                                             color: 'white',
                                             border: 'none',
                                             borderRadius: '4px',
-                                            cursor: 'pointer'
+                                            cursor: appMachineState.value === 'settingsUpdating' ? 'not-allowed' : 'pointer',
+                                            fontWeight: 'bold'
                                         }}
                                     >
-                                        Toggle Proxy Machine
-                                    </button>
-                                    <button 
-                                        onClick={() => AppMachine.send('START')}
-                                        style={{
-                                            padding: '8px 16px',
-                                            backgroundColor: '#17a2b8',
-                                            color: 'white',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        Start Wave
-                                    </button>
-                                    <button 
-                                        onClick={() => AppMachine.send('SETTINGS_UPDATE')}
-                                        style={{
-                                            padding: '8px 16px',
-                                            backgroundColor: '#6f42c1',
-                                            color: 'white',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        Settings
+                                        {appMachineState.value === 'settingsUpdating' ? 'Opening...' : 'Settings'}
                                     </button>
                                 </div>
                             </div>

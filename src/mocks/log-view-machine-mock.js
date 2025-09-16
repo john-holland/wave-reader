@@ -79,21 +79,94 @@ const TomeManager = {
 // Mock createViewStateMachine
 const createViewStateMachine = (config) => {
     console.log('🌊 Mock createViewStateMachine: Creating view state machine');
-    return {
+    
+    let currentState = 'idle';
+    let context = { viewModel: { going: false, saved: false, selector: null } };
+    const stateHandlers = new Map();
+    const eventListeners = [];
+    
+    const mockMachine = {
         ...config,
         withState: (stateName, handler) => {
             console.log('🌊 Mock createViewStateMachine: Adding state handler', stateName);
-            return {
-                ...config,
-                withState: createViewStateMachine(config).withState
-            };
+            stateHandlers.set(stateName, handler);
+            return mockMachine;
         },
         send: (event) => {
             console.log('🌊 Mock createViewStateMachine: Sending event', event);
+            
+            // Handle different events
+            const eventType = typeof event === 'string' ? event : event.type || event;
+            
+            switch (eventType) {
+                case 'TOGGLE':
+                    context.viewModel.going = !context.viewModel.going;
+                    context.viewModel.saved = false;
+                    currentState = context.viewModel.going ? 'waving' : 'idle';
+                    console.log('🌊 Mock createViewStateMachine: Toggled to', currentState);
+                    break;
+                case 'START':
+                    context.viewModel.going = true;
+                    context.viewModel.saved = false;
+                    currentState = 'waving';
+                    console.log('🌊 Mock createViewStateMachine: Started wave');
+                    break;
+                case 'STOP':
+                    context.viewModel.going = false;
+                    context.viewModel.saved = true;
+                    currentState = 'idle';
+                    console.log('🌊 Mock createViewStateMachine: Stopped wave');
+                    break;
+                case 'SETTINGS_UPDATE':
+                    currentState = 'settingsUpdating';
+                    console.log('🌊 Mock createViewStateMachine: Opening settings');
+                    break;
+                case 'INITIALIZE':
+                    currentState = 'initializing';
+                    console.log('🌊 Mock createViewStateMachine: Initializing');
+                    break;
+            }
+            
+            // Trigger state handler if it exists
+            const handler = stateHandlers.get(currentState);
+            if (handler && typeof handler === 'function') {
+                try {
+                    // Simulate the handler call with proper parameters
+                    const mockSend = (event) => mockMachine.send(event);
+                    const mockTransition = (state) => {
+                        console.log('🌊 Mock createViewStateMachine: Transitioning to', state);
+                        currentState = state;
+                    };
+                    const mockLog = (message, data) => {
+                        console.log('🌊 Mock createViewStateMachine:', message, data);
+                    };
+                    
+                    handler({
+                        context,
+                        event,
+                        view: currentState,
+                        transition: mockTransition,
+                        send: mockSend,
+                        log: mockLog
+                    });
+                } catch (error) {
+                    console.error('🌊 Mock createViewStateMachine: Handler error', error);
+                }
+            }
+            
+            // Notify listeners
+            eventListeners.forEach(listener => {
+                try {
+                    listener({ type: 'stateChanged', data: { value: currentState, context } });
+                } catch (error) {
+                    console.error('🌊 Mock createViewStateMachine: Listener error', error);
+                }
+            });
+            
             return { success: true };
         },
-        getState: () => ({ value: 'idle' }),
-        getContext: () => ({}),
+        getState: () => ({ value: currentState }),
+        getContext: () => context,
         start: async function* () {
             console.log('🌊 Mock createViewStateMachine: Starting');
             yield { success: true };
@@ -106,35 +179,111 @@ const createViewStateMachine = (config) => {
         subscribe: (callback) => {
             console.log('🌊 Mock createViewStateMachine: Subscribing');
             if (typeof callback === 'function') {
-                callback({ type: 'stateChanged', data: { value: 'idle' } });
+                eventListeners.push(callback);
+                callback({ type: 'stateChanged', data: { value: currentState, context } });
             }
             return {
                 unsubscribe: () => {
                     console.log('🌊 Mock createViewStateMachine: Unsubscribing');
+                    const index = eventListeners.indexOf(callback);
+                    if (index > -1) {
+                        eventListeners.splice(index, 1);
+                    }
                 }
             };
         }
     };
+    
+    return mockMachine;
 };
 
 // Mock createProxyRobotCopyStateMachine
 const createProxyRobotCopyStateMachine = (config) => {
     console.log('🌊 Mock createProxyRobotCopyStateMachine: Creating proxy state machine');
-    return {
+    
+    let currentState = 'idle';
+    let context = { proxyData: { connected: true, messages: [] } };
+    const stateHandlers = new Map();
+    const eventListeners = [];
+    
+    const mockMachine = {
         ...config,
         withState: (stateName, handler) => {
             console.log('🌊 Mock createProxyRobotCopyStateMachine: Adding state handler', stateName);
-            return {
-                ...config,
-                withState: createProxyRobotCopyStateMachine(config).withState
-            };
+            stateHandlers.set(stateName, handler);
+            return mockMachine;
         },
         send: (event) => {
             console.log('🌊 Mock createProxyRobotCopyStateMachine: Sending event', event);
+            
+            // Handle different events
+            const eventType = typeof event === 'string' ? event : event.type || event;
+            
+            switch (eventType) {
+                case 'TOGGLE':
+                    currentState = currentState === 'idle' ? 'active' : 'idle';
+                    console.log('🌊 Mock createProxyRobotCopyStateMachine: Toggled to', currentState);
+                    break;
+                case 'START':
+                    currentState = 'active';
+                    console.log('🌊 Mock createProxyRobotCopyStateMachine: Started proxy');
+                    break;
+                case 'STOP':
+                    currentState = 'idle';
+                    console.log('🌊 Mock createProxyRobotCopyStateMachine: Stopped proxy');
+                    break;
+                case 'CONNECT':
+                    currentState = 'connected';
+                    context.proxyData.connected = true;
+                    console.log('🌊 Mock createProxyRobotCopyStateMachine: Connected');
+                    break;
+                case 'DISCONNECT':
+                    currentState = 'disconnected';
+                    context.proxyData.connected = false;
+                    console.log('🌊 Mock createProxyRobotCopyStateMachine: Disconnected');
+                    break;
+            }
+            
+            // Trigger state handler if it exists
+            const handler = stateHandlers.get(currentState);
+            if (handler && typeof handler === 'function') {
+                try {
+                    // Simulate the handler call with proper parameters
+                    const mockSend = (event) => mockMachine.send(event);
+                    const mockTransition = (state) => {
+                        console.log('🌊 Mock createProxyRobotCopyStateMachine: Transitioning to', state);
+                        currentState = state;
+                    };
+                    const mockLog = (message, data) => {
+                        console.log('🌊 Mock createProxyRobotCopyStateMachine:', message, data);
+                    };
+                    
+                    handler({
+                        context,
+                        event,
+                        view: currentState,
+                        transition: mockTransition,
+                        send: mockSend,
+                        log: mockLog
+                    });
+                } catch (error) {
+                    console.error('🌊 Mock createProxyRobotCopyStateMachine: Handler error', error);
+                }
+            }
+            
+            // Notify listeners
+            eventListeners.forEach(listener => {
+                try {
+                    listener({ type: 'stateChanged', data: { value: currentState, context } });
+                } catch (error) {
+                    console.error('🌊 Mock createProxyRobotCopyStateMachine: Listener error', error);
+                }
+            });
+            
             return { success: true };
         },
-        getState: () => ({ value: 'idle' }),
-        getContext: () => ({}),
+        getState: () => ({ value: currentState }),
+        getContext: () => context,
         start: async function* () {
             console.log('🌊 Mock createProxyRobotCopyStateMachine: Starting');
             yield { success: true };
@@ -147,15 +296,22 @@ const createProxyRobotCopyStateMachine = (config) => {
         subscribe: (callback) => {
             console.log('🌊 Mock createProxyRobotCopyStateMachine: Subscribing');
             if (typeof callback === 'function') {
-                callback({ type: 'stateChanged', data: { value: 'idle' } });
+                eventListeners.push(callback);
+                callback({ type: 'stateChanged', data: { value: currentState, context } });
             }
             return {
                 unsubscribe: () => {
                     console.log('🌊 Mock createProxyRobotCopyStateMachine: Unsubscribing');
+                    const index = eventListeners.indexOf(callback);
+                    if (index > -1) {
+                        eventListeners.splice(index, 1);
+                    }
                 }
             };
         }
     };
+    
+    return mockMachine;
 };
 
 // Mock withState function
