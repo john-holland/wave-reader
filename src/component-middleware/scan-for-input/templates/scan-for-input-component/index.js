@@ -5,7 +5,7 @@
  * with routing support for keyboard input management and state management.
  */
 
-import { createViewStateMachine } from '../../../../../../log-view-machine/src/core/ViewStateMachine.tsx';
+import { createViewStateMachine } from 'log-view-machine';
 
 const ScanForInputComponentTemplate = {
   id: 'scan-for-input-component',

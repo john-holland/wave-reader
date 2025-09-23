@@ -49,11 +49,136 @@ export class ExtensionTestUtils {
      * Navigate to the test page and wait for extension to load
      */
     async loadTestPage(page: Page): Promise<void> {
+        // Inject mock Chrome API into the page context BEFORE navigation
+        await this.injectMockChromeAPI(page);
+        
         await page.goto(`file://${this.config.testPagePath}`);
         await page.waitForLoadState('networkidle');
         
         // Wait for extension content script to load
         await page.waitForTimeout(2000);
+    }
+
+    /**
+     * Inject mock Chrome API into the page context
+     */
+    async injectMockChromeAPI(page: Page): Promise<void> {
+        // Inject the mock Chrome API directly into the page context
+        await page.addInitScript(() => {
+            console.log('🔧 Creating mock Chrome API in page context...');
+            
+            // Create mock Chrome API directly in the page context
+            const mockChrome = {
+                runtime: {
+                    sendMessage: async (message) => {
+                        console.log('📤 Mock Chrome API: Sending message', message);
+                        
+                        // Simulate async behavior
+                        return new Promise((resolve) => {
+                            setTimeout(() => {
+                                const response = {
+                                    success: true,
+                                    message: 'Mock response received',
+                                    data: {
+                                        selector: message.selector || '.test-content',
+                                        options: message.options || {},
+                                        traceId: message.traceId || 'mock-trace-' + Date.now()
+                                    }
+                                };
+                                console.log('📥 Mock Chrome API: Response', response);
+                                resolve(response);
+                            }, 10);
+                        });
+                    },
+                    onMessage: {
+                        addListener: (callback) => {
+                            console.log('👂 Mock Chrome API: Message listener added');
+                        },
+                        removeListener: (callback) => {
+                            console.log('🔇 Mock Chrome API: Message listener removed');
+                        }
+                    }
+                },
+                storage: {
+                    local: {
+                        get: (keys, callback) => {
+                            console.log('📦 Mock Chrome API: Storage get', keys);
+                            const result = {};
+                            if (callback) {
+                                setTimeout(() => callback(result), 10);
+                            }
+                            return Promise.resolve(result);
+                        },
+                        set: (items, callback) => {
+                            console.log('💾 Mock Chrome API: Storage set', items);
+                            if (callback) {
+                                setTimeout(callback, 10);
+                            }
+                            return Promise.resolve();
+                        },
+                        remove: (keys, callback) => {
+                            console.log('🗑️ Mock Chrome API: Storage remove', keys);
+                            if (callback) {
+                                setTimeout(callback, 10);
+                            }
+                            return Promise.resolve();
+                        },
+                        clear: (callback) => {
+                            console.log('🧹 Mock Chrome API: Storage clear');
+                            if (callback) {
+                                setTimeout(callback, 10);
+                            }
+                            return Promise.resolve();
+                        }
+                    }
+                },
+                tabs: {
+                    query: (queryInfo, callback) => {
+                        console.log('🔍 Mock Chrome API: Tabs query', queryInfo);
+                        const mockTabs = [{
+                            id: 1,
+                            url: 'file:///Users/johnholland/Developers/wave-reader/test/playwright/test.html',
+                            title: 'Test Page',
+                            active: true
+                        }];
+                        if (callback) {
+                            setTimeout(() => callback(mockTabs), 10);
+                        }
+                        return Promise.resolve(mockTabs);
+                    },
+                    sendMessage: (tabId, message, callback) => {
+                        console.log('📤 Mock Chrome API: Tab send message', { tabId, message });
+                        return mockChrome.runtime.sendMessage(message).then(response => {
+                            if (callback) {
+                                callback(response);
+                            }
+                            return response;
+                        });
+                    }
+                },
+                action: {
+                    setBadgeText: (details) => {
+                        console.log('🏷️ Mock Chrome API: Set badge text', details);
+                    },
+                    setBadgeBackgroundColor: (details) => {
+                        console.log('🎨 Mock Chrome API: Set badge color', details);
+                    }
+                }
+            };
+            
+            // @ts-ignore - We're intentionally adding to global scope
+            window.chrome = mockChrome;
+            
+            // Also add to global scope for compatibility
+            // @ts-ignore
+            globalThis.chrome = mockChrome;
+            
+            console.log('🔧 Chrome API injected successfully');
+            console.log('🔧 window.chrome:', window.chrome);
+            console.log('🔧 globalThis.chrome:', globalThis.chrome);
+        });
+        
+        console.log('🔧 Mock Chrome API injection script added');
     }
 
     /**
@@ -186,7 +311,9 @@ export class ExtensionTestUtils {
      */
     async cleanup(page: Page): Promise<void> {
         // Close the page to clean up resources
-        await page.close();
+        if (page) {
+            await page.close();
+        }
     }
 }
 

@@ -5,7 +5,7 @@
  * nested state machines, and comprehensive element selection capabilities.
  */
 
-import { createViewStateMachine } from '../../../../../../log-view-machine/src/core/ViewStateMachine.tsx';
+import { createViewStateMachine } from 'log-view-machine';
 
 const SelectorHierarchyComponentTemplate = {
   id: 'selector-hierarchy-component',

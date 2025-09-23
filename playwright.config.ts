@@ -24,8 +24,21 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
 
+  /* Global test timeout */
+  timeout: 30000,
+  
+  /* Global setup/teardown timeout */
+  globalSetup: undefined,
+  globalTeardown: undefined,
+
   /* Configure projects for major browsers */
   projects: [
+    // Default Chromium project for simple tests
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    // Extension testing project
     {
       name: 'chromium-extension',
       use: { 

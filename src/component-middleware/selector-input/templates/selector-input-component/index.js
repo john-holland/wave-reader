@@ -5,7 +5,7 @@
  * Includes routing support for selector management and state management.
  */
 
-import { createViewStateMachine } from '../../../../../../log-view-machine/src/core/ViewStateMachine.tsx';
+import { createViewStateMachine } from 'log-view-machine';
 
 const SelectorInputComponentTemplate = {
   id: 'selector-input-component',

@@ -93,7 +93,7 @@ class ContentInterchange {
     handleIncomingMessage(message, sender, sendResponse) {
         const { type, data, source, target, traceId } = message;
         
-        console.log('🌊 Content Script: Received message:', { type, source, target, traceId });
+        console.log('CONTENT-INTERCHANGE: Received message:', { type, source, target, traceId });
         
         try {
             switch (type) {
@@ -528,7 +528,7 @@ class ContentInterchange {
             await chrome.runtime.sendMessage(message);
         } catch (error) {
             // Background might not be available, which is normal
-            console.log('🌊 Content Script: Could not send message to background:', error.message);
+            console.log('CONTENT->BACKGROUND: Could not send message to background:', error.message);
         }
     }
 

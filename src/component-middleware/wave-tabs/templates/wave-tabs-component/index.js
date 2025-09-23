@@ -5,7 +5,7 @@
  * with separate views for each tab state and routing support.
  */
 
-import { createViewStateMachine } from '../../../../../../log-view-machine/src/core/ViewStateMachine.tsx';
+import { createViewStateMachine } from 'log-view-machine';
 
 const WaveTabsComponentTemplate = {
   id: 'wave-tabs-component',

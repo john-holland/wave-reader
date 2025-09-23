@@ -9,6 +9,16 @@ export class LogViewBackgroundSystem {
     private sessionId: string;
     private activeTabs: Map<number, any> = new Map();
     private extensionState: 'active' | 'inactive' = 'active';
+    
+    // Health monitoring for background router
+    private healthStatus = {
+        status: 'healthy' as 'healthy' | 'degraded' | 'unhealthy',
+        lastHeartbeat: Date.now(),
+        errorCount: 0,
+        uptime: Date.now(),
+        messageCount: 0,
+        activeConnections: 0
+    };
 
     constructor() {
         console.log("🌊 Creating Log-View-Machine Background System...");
@@ -22,6 +32,9 @@ export class LogViewBackgroundSystem {
         
         // Set up message listeners
         this.setupMessageListeners();
+        
+        // Start health monitoring
+        this.startHealthMonitoring();
         
         console.log("🌊 Log-View-Machine Background System initialized successfully");
     }
@@ -236,7 +249,7 @@ export class LogViewBackgroundSystem {
     }
 
     private handleRuntimeMessage(message: any, sender: any, sendResponse: any) {
-        console.log("🌊 Log-View-Machine: Background received runtime message:", message);
+        console.log("BACKGROUND->RUNTIME: Received runtime message:", message);
         this.logMessage('runtime-message', `Received ${message.name} from ${message.from}`);
         
         // Create a proper message using our factory
@@ -264,6 +277,7 @@ export class LogViewBackgroundSystem {
                     break;
                     
                 case 'ping':
+                    console.log("BACKGROUND->CONTENT: Processing ping message");
                     this.handlePing(message, sender, sendResponse);
                     break;
                     
@@ -288,14 +302,17 @@ export class LogViewBackgroundSystem {
                     break;
                     
                 case 'start':
+                    console.log("BACKGROUND->CONTENT: Processing start message");
                     this.handleStart(message, sender, sendResponse);
                     break;
                     
                 case 'stop':
+                    console.log("BACKGROUND->CONTENT: Processing stop message");
                     this.handleStop(message, sender, sendResponse);
                     break;
                     
                 case 'toggle':
+                    console.log("BACKGROUND->CONTENT: Processing toggle message");
                     this.handleToggle(message, sender, sendResponse);
                     break;
                     
@@ -327,23 +344,96 @@ export class LogViewBackgroundSystem {
     }
 
     private handlePing(message: any, sender: any, sendResponse: any) {
-        console.log("🌊 Log-View-Machine: Handling ping message from popup");
-        this.logMessage('ping-received', 'Ping received from popup');
+        console.log("BACKGROUND->CONTENT: Handling heartbeat ping message from popup");
+        this.logMessage('ping-received', 'Heartbeat ping received from popup');
+        
+        // Extract current state from the message for comparison
+        const currentState = message.currentState || {};
         
         // Get the active tab and send ping message to content script
-        this.getActiveTab().then((tab) => {
+        this.getActiveTab().then(async (tab) => {
             if (!tab || !this.isUrlAccessible(tab.url)) {
                 this.logMessage('ping-skipped', 'Ping skipped for restricted URL');
                 sendResponse({ success: false, error: 'URL not accessible' });
                 return;
             }
             
-            // Send ping message to content script
-            this.injectPingCommand(tab.id);
-            sendResponse({ success: true });
+            try {
+                // Get current state from content script
+                const contentState = await this.getContentScriptState(tab.id);
+                
+                // Compare states and prepare response with any updates
+                const updates: any = {};
+                let hasUpdates = false;
+                
+                if (contentState.going !== undefined && contentState.going !== currentState.going) {
+                    updates.going = contentState.going;
+                    hasUpdates = true;
+                }
+                
+                if (contentState.selector && contentState.selector !== currentState.selector) {
+                    updates.selector = contentState.selector;
+                    hasUpdates = true;
+                }
+                
+                // Update tab tracking
+                this.activeTabs.set(tab.id, {
+                    ...this.activeTabs.get(tab.id),
+                    lastPing: Date.now(),
+                    going: contentState.going,
+                    selector: contentState.selector
+                });
+                
+                this.logMessage('ping-processed', `Heartbeat processed - updates: ${hasUpdates}`);
+                sendResponse({ 
+                    success: true, 
+                    data: hasUpdates ? updates : {},
+                    hasUpdates
+                });
+                
+            } catch (error: any) {
+                this.logMessage('ping-error', `Error processing heartbeat: ${error.message}`);
+                sendResponse({ success: false, error: error.message });
+            }
         }).catch((error) => {
             this.logMessage('ping-error', `Error handling ping: ${error.message}`);
             sendResponse({ success: false, error: error.message });
+        });
+    }
+
+    private async getContentScriptState(tabId: number): Promise<any> {
+        return new Promise((resolve, reject) => {
+            if (typeof chrome === 'undefined' || !chrome.tabs) {
+                reject(new Error('Chrome tabs API not available'));
+                return;
+            }
+            
+            // Send message to content script to get current state
+            console.log("BACKGROUND->CONTENT: Sending get-status message to tab", tabId);
+            chrome.tabs.sendMessage(tabId, {
+                source: 'wave-reader-extension',
+                message: {
+                    from: 'background-script',
+                    name: 'get-status',
+                    timestamp: Date.now()
+                }
+            }, (response) => {
+                console.log("CONTENT->BACKGROUND: Received get-status response:", response);
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                    return;
+                }
+                
+                // Default state if no response
+                const defaultState = {
+                    going: false,
+                    selector: null,
+                    activeTab: tabId,
+                    lastActivity: Date.now()
+                };
+                
+                resolve(response || defaultState);
+            });
         });
     }
 
@@ -380,8 +470,32 @@ export class LogViewBackgroundSystem {
         console.log("🌊 Log-View-Machine: Handling health check message");
         this.logMessage('health-check-requested', 'Health check requested');
         
-        const healthStatus = this.performHealthCheck();
-        sendResponse({ success: true, status: healthStatus });
+        // Update health status
+        this.healthStatus.lastHeartbeat = Date.now();
+        this.healthStatus.activeConnections = this.activeTabs.size;
+        
+        // Prepare comprehensive health data for sync system
+        const healthData = {
+            success: true,
+            status: this.healthStatus.status,
+            uptime: Date.now() - this.healthStatus.uptime,
+            messageCount: this.healthStatus.messageCount,
+            activeConnections: this.healthStatus.activeConnections,
+            sessionId: this.sessionId,
+            lastHeartbeat: this.healthStatus.lastHeartbeat,
+            errorCount: this.healthStatus.errorCount,
+            // Additional sync data
+            activeTabs: Array.from(this.activeTabs.entries()).map(([tabId, tabData]) => ({
+                tabId,
+                lastPing: tabData.lastPing || 0,
+                going: tabData.going || false,
+                selector: tabData.selector || null
+            })),
+            extensionState: this.extensionState
+        };
+        
+        // Send comprehensive health status response
+        sendResponse(healthData);
     }
 
     private handleMLRecommendationRequest(message: any, sender: any, sendResponse: any) {
@@ -531,6 +645,7 @@ export class LogViewBackgroundSystem {
             }
             
             // Send start message to content script via chrome.tabs.sendMessage
+            console.log("BACKGROUND->CONTENT: Sending start message to tab", tab.id);
             await this.injectMessageToContentScript(tab.id, {
                 from: 'background-script',
                 name: 'start',
@@ -543,11 +658,21 @@ export class LogViewBackgroundSystem {
                 ...this.activeTabs.get(tab.id),
                 state: 'waving',
                 startTime: Date.now(),
-                options: message.options
+                options: message.options,
+                going: true,
+                lastActivity: Date.now()
             });
             
             this.logMessage('start-success', 'Wave reader started successfully');
-            sendResponse({ success: true, message: 'Wave reader started' });
+            sendResponse({ 
+                success: true, 
+                message: 'Wave reader started',
+                data: {
+                    going: true,
+                    tabId: tab.id,
+                    startTime: Date.now()
+                }
+            });
             
         } catch (error: any) {
             console.error('🌊 Log-View-Machine: Failed to start wave reader:', error);
@@ -568,6 +693,7 @@ export class LogViewBackgroundSystem {
             }
             
             // Send stop message to content script via chrome.tabs.sendMessage
+            console.log("BACKGROUND->CONTENT: Sending stop message to tab", tab.id);
             await this.injectMessageToContentScript(tab.id, {
                 from: 'background-script',
                 name: 'stop',
@@ -579,11 +705,21 @@ export class LogViewBackgroundSystem {
                 const tabInfo = this.activeTabs.get(tab.id);
                 tabInfo.state = 'stopped';
                 tabInfo.stopTime = Date.now();
+                tabInfo.going = false;
+                tabInfo.lastActivity = Date.now();
                 this.activeTabs.set(tab.id, tabInfo);
             }
             
             this.logMessage('stop-success', 'Wave reader stopped successfully');
-            sendResponse({ success: true, message: 'Wave reader stopped' });
+            sendResponse({ 
+                success: true, 
+                message: 'Wave reader stopped',
+                data: {
+                    going: false,
+                    tabId: tab.id,
+                    stopTime: Date.now()
+                }
+            });
             
         } catch (error: any) {
             console.error('🌊 Log-View-Machine: Failed to stop wave reader:', error);
@@ -634,7 +770,7 @@ export class LogViewBackgroundSystem {
         return chrome.scripting.executeScript({
             target: { tabId },
             func: (messageData) => {
-                console.log("🌊 Log-View-Machine: Background script injecting message to content script:", messageData);
+                console.log("BACKGROUND->CONTENT: Injecting message to content script:", messageData);
                 // Note: In service worker context, we use chrome.tabs.sendMessage instead of window.postMessage
                 // This is handled by injectMessageToContentScript method
                 chrome.tabs.sendMessage(tabId, {
@@ -663,7 +799,7 @@ export class LogViewBackgroundSystem {
         return this.sessionId;
     }
 
-    public getHealthStatus() {
+    public getHealthStatusLegacy() {
         return this.performHealthCheck();
     }
 
@@ -675,6 +811,70 @@ export class LogViewBackgroundSystem {
         this.extensionState = 'inactive';
         
         this.logMessage('system-destroyed', 'Background system destroyed');
+    }
+
+    // Health monitoring methods for background router
+    private startHealthMonitoring() {
+        console.log("🌊 Background Router: Starting health monitoring");
+        
+        // Ping health every 30 seconds
+        setInterval(() => {
+            this.updateHealthStatus();
+        }, 30000);
+
+        // Log health status every 5 minutes
+        setInterval(() => {
+            this.logHealthStatus();
+        }, 300000);
+    }
+
+    private updateHealthStatus() {
+        this.healthStatus.lastHeartbeat = Date.now();
+        
+        // Check if system is responsive
+        const timeSinceLastHeartbeat = Date.now() - this.healthStatus.lastHeartbeat;
+        const errorRate = this.healthStatus.errorCount / Math.max(this.healthStatus.messageCount, 1);
+        
+        // Determine health status
+        if (errorRate > 0.1 || timeSinceLastHeartbeat > 60000) {
+            this.healthStatus.status = 'unhealthy';
+        } else if (errorRate > 0.05 || timeSinceLastHeartbeat > 30000) {
+            this.healthStatus.status = 'degraded';
+        } else {
+            this.healthStatus.status = 'healthy';
+        }
+        
+        // Update active connections count
+        this.healthStatus.activeConnections = this.activeTabs.size;
+    }
+
+    private logHealthStatus() {
+        const uptime = Date.now() - this.healthStatus.uptime;
+        console.log(`🌊 Background Router Health:`, {
+            status: this.healthStatus.status,
+            uptime: `${Math.floor(uptime / 1000)}s`,
+            messageCount: this.healthStatus.messageCount,
+            errorCount: this.healthStatus.errorCount,
+            activeConnections: this.healthStatus.activeConnections,
+            lastHeartbeat: new Date(this.healthStatus.lastHeartbeat).toLocaleTimeString()
+        });
+    }
+
+    public getHealthStatus() {
+        this.updateHealthStatus();
+        return {
+            ...this.healthStatus,
+            uptime: Date.now() - this.healthStatus.uptime
+        };
+    }
+
+    // Increment message count and track errors
+    private trackMessage(hasError = false) {
+        this.healthStatus.messageCount++;
+        if (hasError) {
+            this.healthStatus.errorCount++;
+        }
+        this.healthStatus.lastHeartbeat = Date.now();
     }
 }
 

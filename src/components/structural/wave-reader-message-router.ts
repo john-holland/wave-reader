@@ -1,4 +1,4 @@
-import { StructuralSystem } from '../../mocks/log-view-machine';
+import { StructuralSystem } from 'log-view-machine';
 import WaveReaderStructuralConfig from './wave-reader-structural-config';
 
 /**

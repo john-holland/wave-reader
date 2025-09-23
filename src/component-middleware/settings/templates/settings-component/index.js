@@ -5,7 +5,7 @@
  * and separate views for different settings categories.
  */
 
-import { createViewStateMachine } from '../../../../../../log-view-machine/src/core/ViewStateMachine.tsx';
+import { createViewStateMachine } from 'log-view-machine';
 
 const SettingsComponentTemplate = {
   id: 'settings-component',

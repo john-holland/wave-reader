@@ -167,7 +167,7 @@ class BackgroundInterchange {
     handleIncomingMessage(message, sender, sendResponse) {
         const { type, data, source, target, traceId } = message;
         
-        console.log('🌊 Background: Received message:', { type, source, target, traceId });
+        console.log('BACKGROUND-INTERCHANGE: Received message:', { type, source, target, traceId });
         
         try {
             switch (type) {
@@ -177,6 +177,10 @@ class BackgroundInterchange {
                     
                 case 'STOP_WAVE_READER':
                     this.handleStopWaveReader(message, sender, sendResponse);
+                    break;
+                    
+                case 'TOGGLE_WAVE_READER':
+                    this.handleToggleWaveReader(message, sender, sendResponse);
                     break;
                     
                 case 'PAUSE_WAVE_READER':
@@ -345,6 +349,36 @@ class BackgroundInterchange {
             
         } catch (error) {
             console.error('🌊 Background: Failed to stop wave reader:', error);
+            sendResponse({ success: false, error: error.message });
+        }
+    }
+
+    async handleToggleWaveReader(message, sender, sendResponse) {
+        try {
+            console.log('🌊 Background: Handling toggle wave reader request');
+            
+            // Get active tab
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (!tab) {
+                throw new Error('No active tab found');
+            }
+            
+            // Check current state
+            const tabInfo = this.activeTabs.get(tab.id);
+            const isCurrentlyActive = tabInfo && tabInfo.state === 'waving';
+            
+            if (isCurrentlyActive) {
+                // Currently active, so stop it
+                console.log('🌊 Background: Currently active, stopping wave reader');
+                await this.handleStopWaveReader(message, sender, sendResponse);
+            } else {
+                // Not active, so start it
+                console.log('🌊 Background: Not active, starting wave reader');
+                await this.handleStartWaveReader(message, sender, sendResponse);
+            }
+            
+        } catch (error) {
+            console.error('🌊 Background: Failed to toggle wave reader:', error);
             sendResponse({ success: false, error: error.message });
         }
     }

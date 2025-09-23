@@ -5,7 +5,7 @@
  * and provides a fallback UI with recovery options.
  */
 
-import { createViewStateMachine } from '../../../../../../log-view-machine/src/core/ViewStateMachine.tsx';
+import { createViewStateMachine } from 'log-view-machine';
 
 const ErrorBoundaryComponentTemplate = {
   id: 'error-boundary-component',

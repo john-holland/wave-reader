@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Wave Reader",
   "short_name": "🌊r.",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "Smoothly wobble text blocks, to improve eye tracking for reading!",
   "icons": {
     "16": "icons/waver16.jpg",

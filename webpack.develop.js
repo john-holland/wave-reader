@@ -4,7 +4,7 @@ const path = require("path");
 
 const config = merge(common, {
     mode: "development",
-    devtool: "cheap-module-source-map",
+    devtool: "source-map",
     entry: {
         config: path.join(__dirname, "./src/config/config.develop.js")
     },

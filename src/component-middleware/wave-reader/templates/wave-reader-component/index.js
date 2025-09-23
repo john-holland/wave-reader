@@ -5,7 +5,7 @@
  * Includes routing support for wave reader operations and state management.
  */
 
-import { createViewStateMachine } from '../../../../../../log-view-machine/src/core/ViewStateMachine.tsx';
+import { createViewStateMachine } from 'log-view-machine';
 
 const WaveReaderComponentTemplate = {
   id: 'wave-reader-component',

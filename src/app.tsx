@@ -785,6 +785,200 @@ const renderSettingsView = (viewModel: any, onSettingsUpdated?: (settings: any) 
     );
 };
 
+// Sync system helper functions
+const SyncSystem = {
+    // Initialize sync - gather data from all sources
+    async initializeSync(log: any, machine: any) {
+        log('🌊 Sync System: Initializing sync from all sources...');
+        
+        const syncData = {
+            cachedData: null as any,
+            contentData: null as any,
+            backgroundData: null as any
+        };
+        
+        // Get cached data from Chrome storage
+        syncData.cachedData = await this.getCachedData(log);
+        
+        // Get real-time data from content script via background
+        syncData.contentData = await this.getContentScriptData(log, machine);
+        
+        // Get background script state
+        syncData.backgroundData = await this.getBackgroundScriptData(log, machine);
+        
+        log('🌊 Sync System: All sync data gathered', syncData);
+        return syncData;
+    },
+    
+    async getCachedData(log: any) {
+        const defaultData = {
+            selector: '',
+            saved: true,
+            going: false,
+            selectors: [],
+            currentView: 'main',
+            isExtension: false,
+            settings: null,
+            showNotifications: true
+        };
+        
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+            try {
+                const storageResult = await chrome.storage.sync.get([
+                    'waveReaderSettings', 
+                    'waveReaderSelectors',
+                    'currentSelector',
+                    'going',
+                    'waveReaderCurrentView',
+                    'waveReaderShowNotifications',
+                    'lastSyncTimestamp'
+                ]);
+                
+                const cachedData = {
+                    ...defaultData,
+                    selector: storageResult.currentSelector || '',
+                    going: storageResult.going?.going || false,
+                    selectors: storageResult.waveReaderSelectors || [],
+                    currentView: storageResult.waveReaderCurrentView || 'main',
+                    isExtension: true,
+                    settings: storageResult.waveReaderSettings || null,
+                    showNotifications: storageResult.waveReaderShowNotifications !== false,
+                    lastSyncTimestamp: storageResult.lastSyncTimestamp || 0
+                };
+                
+                log('🌊 Sync System: Loaded cached data from Chrome sync storage', cachedData);
+                return cachedData;
+            } catch (storageError) {
+                log('🌊 Sync System: Failed to load from Chrome sync storage, using defaults', storageError);
+            }
+        }
+        
+        return defaultData;
+    },
+    
+    async getContentScriptData(log: any, machine: any) {
+        try {
+            const statusResponse = await machine.parentMachine.getSubMachine('background-proxy')?.send({
+                from: 'popup',
+                name: 'get-status',
+                timestamp: Date.now()
+            });
+            
+            if (statusResponse && statusResponse.success) {
+                const contentState = (statusResponse as any).data || statusResponse;
+                const contentData = {
+                    going: contentState.going || false,
+                    selector: contentState.selector,
+                    activeTab: contentState.activeTab,
+                    lastActivity: contentState.lastActivity || Date.now()
+                };
+                
+                log('🌊 Sync System: Retrieved content script data', contentData);
+                return contentData;
+            }
+        } catch (error: any) {
+            log('🌊 Sync System: Could not get content script data', error);
+        }
+        
+        return null;
+    },
+    
+    async getBackgroundScriptData(log: any, machine: any) {
+        try {
+            const healthResponse = await machine.parentMachine.getSubMachine('background-proxy')?.send({
+                from: 'popup',
+                name: 'health-check',
+                timestamp: Date.now()
+            });
+            
+            if (healthResponse && healthResponse.success) {
+                const backgroundState = (healthResponse as any).data || healthResponse;
+                const backgroundData = {
+                    sessionId: backgroundState.sessionId,
+                    activeConnections: backgroundState.activeConnections || 0,
+                    healthStatus: backgroundState.status || 'unknown',
+                    lastHeartbeat: backgroundState.lastHeartbeat || Date.now()
+                };
+                
+                log('🌊 Sync System: Retrieved background script data', backgroundData);
+                return backgroundData;
+            }
+        } catch (error: any) {
+            log('🌊 Sync System: Could not get background script data', error);
+        }
+        
+        return null;
+    },
+    
+    async saveViewModelToStorage(viewModel: any, log: any) {
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+            try {
+                await chrome.storage.sync.set({
+                    currentSelector: viewModel.selector,
+                    going: { going: viewModel.going },
+                    waveReaderSelectors: viewModel.selectors,
+                    waveReaderCurrentView: viewModel.currentView,
+                    waveReaderShowNotifications: viewModel.showNotifications,
+                    waveReaderSettings: viewModel.settings,
+                    lastSyncTimestamp: Date.now()
+                });
+                log('🌊 Sync System: Saved viewModel to Chrome sync storage');
+                return true;
+            } catch (saveError) {
+                log('🌊 Sync System: Failed to save viewModel to storage', saveError);
+                return false;
+            }
+        }
+        return false;
+    },
+    
+    // Heartbeat sync - lightweight sync for active tabs
+    async heartbeatSync(context: any, log: any, machine: any) {
+        log('🌊 Sync System: Performing heartbeat sync...');
+        
+        try {
+            // Send ping to background to get current state
+            const pingResponse = await machine.parentMachine.getSubMachine('background-proxy')?.send({
+                from: 'popup',
+                name: 'ping',
+                timestamp: Date.now(),
+                currentState: {
+                    going: context.viewModel.going,
+                    selector: context.viewModel.selector
+                }
+            });
+            
+            if (pingResponse && pingResponse.success) {
+                const updates = (pingResponse as any).data || {};
+                
+                // Apply lightweight updates
+                let hasChanges = false;
+                if (updates.going !== undefined && updates.going !== context.viewModel.going) {
+                    context.viewModel.going = updates.going;
+                    hasChanges = true;
+                }
+                
+                if (updates.selector && updates.selector !== context.viewModel.selector) {
+                    context.viewModel.selector = updates.selector;
+                    hasChanges = true;
+                }
+                
+                if (hasChanges) {
+                    context.viewModel.saved = false;
+                    context.viewModel.lastHeartbeat = Date.now();
+                    log('🌊 Sync System: Heartbeat sync applied changes', updates);
+                }
+                
+                return hasChanges;
+            }
+        } catch (error: any) {
+            log('🌊 Sync System: Heartbeat sync failed', error);
+        }
+        
+        return false;
+    }
+};
+
 const AppMachineRaw = createViewStateMachine({
     machineId: 'app-machine',
     xstateConfig: {
@@ -870,7 +1064,8 @@ const AppMachineRaw = createViewStateMachine({
             settingsUpdating: {
                 on: { 
                     SETTINGS_UPDATE_COMPLETE: { target: 'idle', actions: ['completeSettingsUpdate'] },
-                    SETTINGS_UPDATE_CANCELLED: { target: 'idle', actions: ['cancelSettingsUpdate'] }
+                    SETTINGS_UPDATE_CANCELLED: { target: 'idle', actions: ['cancelSettingsUpdate'] },
+                    SETTINGS_CHANGE: { target: 'settingsUpdating', actions: ['handleSettingsChange'] }
                 },
                 entry: 'updateSettings'
             },
@@ -937,164 +1132,76 @@ const AppMachineRaw = createViewStateMachine({
             initializeApp: {
                 type: 'function',
                 fn: async ({context, event, send, log, transition, machine}: any) => {
-                    log('🌊 App Tome: Initialize app');
+                    log('🌊 App Tome: Initialize app with proper sync system');
                     
                     try {
-                        // Data synchronization strategy: Use a combination approach
-                        // 1. Load from Chrome storage (fast, cached data)
-                        // 2. Query content script for real-time state (accurate, current)
-                        // 3. Merge and resolve conflicts with content script taking precedence
+                        // Step 1: Initialize sync system - get state from all sources
+                        const syncData = await SyncSystem.initializeSync(log, machine);
                         
-                        log('🌊 App Tome: Starting data synchronization...');
-                        
-                        // Step 1: Load cached data from Chrome storage
-                        let cachedData = {
-                            selector: '',
-                            saved: true,
-                            going: false,
-                            selectors: [],
-                            currentView: 'main',
-                            isExtension: false,
-                            settings: null,
-                            showNotifications: true
-                        };
-                        
-                        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                            try {
-                                const storageResult = await chrome.storage.local.get([
-                                    'waveReaderSettings', 
-                                    'waveReaderSelectors',
-                                    'currentSelector',
-                                    'going',
-                                    'waveReaderCurrentView',
-                                    'waveReaderShowNotifications'
-                                ]);
-                                
-                                cachedData = {
-                                    selector: storageResult.currentSelector || '',
-                                    saved: true,
-                                    going: storageResult.going?.going || false,
-                                    selectors: storageResult.waveReaderSelectors || [],
-                                    currentView: storageResult.waveReaderCurrentView || 'main',
-                                    isExtension: true,
-                                    settings: storageResult.waveReaderSettings || null,
-                                    showNotifications: storageResult.waveReaderShowNotifications !== false
-                                };
-                                
-                                log('🌊 App Tome: Loaded cached data from Chrome storage', cachedData);
-                            } catch (storageError) {
-                                log('🌊 App Tome: Failed to load from Chrome storage, using defaults', storageError);
-                            }
-                        }
-                        
-                        // Step 2: Query content script for real-time state
-                        let realtimeData: any = null;
-                        try {
-                        const statusResponse = await machine.parentMachine.getSubMachine('background-proxy')?.send({
-                            from: 'popup',
-                            name: 'get-status',
-                            timestamp: Date.now()
-                        });
-                        
-                        if (statusResponse && statusResponse.success) {
-                            const contentState = (statusResponse as any).data || statusResponse;
-                            realtimeData = {
-                                going: contentState.going || false,
-                                // Content script may have additional state we want to sync
-                                contentState: contentState
-                            };
-                                log('🌊 App Tome: Retrieved real-time state from content script', realtimeData);
-                            }
-                        } catch (contentError: any) {
-                            log('🌊 App Tome: Could not get real-time state from content script, using cached data', contentError);
-                        }
-                        
-                        // Step 3: Merge data with content script taking precedence for critical state
+                        // Step 2: Create merged viewModel with proper precedence
                         const viewModel = {
-                            ...cachedData,
-                            // Override with real-time data where available
-                            ...(realtimeData && {
-                                going: realtimeData.going,
-                                // Mark as unsaved if real-time state differs from cached
-                                saved: realtimeData.going === cachedData.going
-                            })
+                            ...syncData.cachedData,
+                            // Content script data takes precedence for critical state
+                            ...(syncData.contentData && {
+                                going: syncData.contentData.going,
+                                selector: syncData.contentData.selector || syncData.cachedData.selector,
+                                // Mark as unsaved if states differ
+                                saved: syncData.contentData.going === syncData.cachedData.going &&
+                                       (syncData.contentData.selector === syncData.cachedData.selector || !syncData.contentData.selector)
+                            }),
+                            // Background data provides additional context
+                            ...(syncData.backgroundData && {
+                                activeConnections: syncData.backgroundData.activeConnections,
+                                sessionId: syncData.backgroundData.sessionId,
+                                healthStatus: syncData.backgroundData.healthStatus
+                            }),
+                            // Always mark initialization timestamp
+                            lastInitialized: Date.now()
                         };
                         
-                        log('🌊 App Tome: Final synchronized viewModel', viewModel);
+                        log('🌊 App Tome: Synchronized viewModel created', viewModel);
                         
-                        // Step 4: Save synchronized state back to Chrome storage for consistency
-                        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                            try {
-                                await chrome.storage.local.set({
-                                    currentSelector: viewModel.selector,
-                                    going: { going: viewModel.going },
-                                    waveReaderSelectors: viewModel.selectors,
-                                    waveReaderCurrentView: viewModel.currentView,
-                                    waveReaderShowNotifications: viewModel.showNotifications,
-                                    lastSyncTimestamp: Date.now()
-                                });
-                                log('🌊 App Tome: Saved synchronized state to Chrome storage');
-                            } catch (saveError) {
-                                log('🌊 App Tome: Failed to save synchronized state', saveError);
-                            }
-                        }
+                        // Step 3: Save synchronized state for consistency
+                        await SyncSystem.saveViewModelToStorage(viewModel, log);
                         
-                        // Update context with initialized viewModel
+                        // Step 4: Update context and complete initialization
                         context.viewModel = viewModel;
-                        
-                        // Send completion event
                         send('INITIALIZATION_COMPLETE');
                         
                     } catch (error: any) {
                         console.error('🌊 App Tome: Initialization failed', error);
-                        send('INITIALIZATION_FAILED');
+                        context.viewModel.error = error.message || 'Initialization failed';
+                        send('INITIALIZATION_FAILED', { error: error.message });
                     }
                 }
             },
-            // Periodic sync action that can be called to refresh state
+            // Heartbeat/ping sync - lightweight sync for active tabs
             refreshStateFromContentScript: {
                 type: 'function',
                 fn: async ({context, send, log, machine}: any) => {
-                    log('🌊 App Tome: Refreshing state from content script...');
+                    log('🌊 App Tome: Performing heartbeat sync...');
                     
                     try {
-                        // Call the sync function directly
-                        const statusResponse = await machine.parentMachine.getSubMachine('background-proxy')?.send({
-                            from: 'popup',
-                            name: 'get-status',
-                            timestamp: Date.now()
-                        });
+                        // Use the sync system's heartbeat function
+                        const hasChanges = await SyncSystem.heartbeatSync(context, log, machine);
                         
-                        if (statusResponse && statusResponse.success) {
-                            const contentState = (statusResponse as any).data || statusResponse;
-                            const previousGoing = context.viewModel.going;
-                            
-                            // Update critical state from content script
-                            context.viewModel.going = contentState.going || false;
-                            
-                            // Sync any additional state that content script provides
-                            if (contentState.selector) {
-                                context.viewModel.selector = contentState.selector;
-                            }
-                            
-                            // Update the saved flag based on whether state changed
-                            context.viewModel.saved = contentState.going === previousGoing;
+                        if (hasChanges) {
+                            // Save updated state
+                            await SyncSystem.saveViewModelToStorage(context.viewModel, log);
                             
                             // Trigger a state update event
                             send('STATE_REFRESHED', { 
-                                contentState, 
-                                previousGoing,
-                                currentGoing: contentState.going 
+                                hasChanges: true,
+                                timestamp: Date.now()
                             });
                             
-                            log('🌊 App Tome: State refreshed successfully', {
-                                previousGoing,
-                                currentGoing: contentState.going,
-                                saved: context.viewModel.saved
-                            });
+                            log('🌊 App Tome: Heartbeat sync completed with changes');
+                        } else {
+                            log('🌊 App Tome: Heartbeat sync completed - no changes');
                         }
+                        
                     } catch (error: any) {
-                        log('🌊 App Tome: Failed to refresh state', error);
+                        log('🌊 App Tome: Heartbeat sync failed', error);
                         send('STATE_REFRESH_FAILED', { error: error.message });
                     }
                 }
@@ -1178,45 +1285,91 @@ const AppMachineRaw = createViewStateMachine({
             },
             startApp: {
                 type: 'function',
-                fn: ({context, event, send, log, transition, machine}: any) => {
-                    machine.parentMachine.getSubMachine('background-proxy')?.send('START');
+                fn: async ({context, event, send, log, transition, machine}: any) => {
+                    log('🌊 App Tome: Starting Wave Reader with sync...');
+                    
+                    try {
+                        // Send start command to background
+                        const response = await machine.parentMachine.getSubMachine('background-proxy')?.send('START');
+                        
+                        if (response && response.success) {
+                            // Update viewModel state
+                            context.viewModel.going = true;
+                            context.viewModel.saved = false;
+                            
+                            // Sync and save state
+                            await SyncSystem.saveViewModelToStorage(context.viewModel, log);
+                            
+                            log('🌊 App Tome: Wave Reader started successfully');
+                            send('APP_STARTED');
+                        } else {
+                            throw new Error(response?.error || 'Failed to start Wave Reader');
+                        }
+                    } catch (error: any) {
+                        log('🌊 App Tome: Failed to start Wave Reader', error);
+                        context.viewModel.error = error.message;
+                        send('ERROR', { error: error.message });
+                    }
                 }
             },
             stopApp: {
                 type: 'function',
-                fn: ({context, event, send, log, transition, machine}: any) => {
-                    machine.parentMachine.getSubMachine('background-proxy')?.send('STOP');
+                fn: async ({context, event, send, log, transition, machine}: any) => {
+                    log('🌊 App Tome: Stopping Wave Reader with sync...');
+                    
+                    try {
+                        // Send stop command to background
+                        const response = await machine.parentMachine.getSubMachine('background-proxy')?.send('STOP');
+                        
+                        if (response && response.success) {
+                            // Update viewModel state
+                            context.viewModel.going = false;
+                            context.viewModel.saved = false;
+                            
+                            // Sync and save state
+                            await SyncSystem.saveViewModelToStorage(context.viewModel, log);
+                            
+                            log('🌊 App Tome: Wave Reader stopped successfully');
+                            send('APP_STOPPED');
+                        } else {
+                            throw new Error(response?.error || 'Failed to stop Wave Reader');
+                        }
+                    } catch (error: any) {
+                        log('🌊 App Tome: Failed to stop Wave Reader', error);
+                        context.viewModel.error = error.message;
+                        send('ERROR', { error: error.message });
+                    }
                 }
             },
-            toggleApp: {
-                type: 'function',
-                fn: ({context, event, send, log, transition, machine}: any) => {
-                    console.log('🌊 App Tome: Toggle app');
-
-                    try {
-                        // Send toggle message to content script via background script
-                        const toggleMessage = {
-                            name: 'toggle',
-                            from: 'popup-state-machine'
-                        };
-                        
-                        const response = machine.parentMachine.getSubMachine('background-proxy')?.send('TOGGLE');
-                        console.log('🌊 App Tome: Keyboard toggle response', response);
-                        
-                        // Update the viewModel going state
-                        // Toggle the current going state in viewModel
-                        context.viewModel.going = !context.viewModel.going;
-                        context.viewModel.saved = false; // Mark as unsaved since state changed
-                        
-                        log(`🌊 App Tome: Updated viewModel.going to ${context.viewModel.going}`);
-                        
-                        // Send completion event
-                        send('KEYBOARD_TOGGLE_COMPLETE');
-                        
-                    } catch (error: any) {
-                        console.error('🌊 App Tome: Keyboard toggle error', error);
-                        send('ERROR');
+            toggleApp: ({context, event, send, log, transition, machine}: any) => {
+                console.log('🌊 App Tome: Toggle app action');
+                
+                try {
+                    // Send toggle message to content script via background script
+                    const toggleMessage = {
+                        name: 'toggle',
+                        from: 'popup-state-machine'
+                    };
+                    
+                    const response = machine.parentMachine.getSubMachine('background-proxy')?.send('TOGGLE');
+                    console.log('🌊 App Tome: Toggle response', response);
+                    
+                    // Update the viewModel going state
+                    context.viewModel.going = !context.viewModel.going;
+                    context.viewModel.saved = false; // Mark as unsaved since state changed
+                    
+                    log(`🌊 App Tome: Updated viewModel.going to ${context.viewModel.going}`);
+                    
+                    // Send appropriate completion event based on the new state
+                    if (context.viewModel.going) {
+                        send('TOGGLE_COMPLETE_WAVING');
+                    } else {
+                        send('TOGGLE_COMPLETE');
                     }
+                    
+                } catch (error: any) {
+                    console.error('🌊 App Tome: Toggle error', error);
+                    send('ERROR');
                 }
             },
             handleKeyboardToggle: {
@@ -1238,11 +1391,15 @@ const AppMachineRaw = createViewStateMachine({
                     }
                 }
             },
-            completeToggle: {
-                type: 'function',
-                fn: (context: any, event: any) => {
-                    console.log('🌊 App Tome: Complete toggle');
-                }
+            completeToggle: (context: any, event: any) => {
+                console.log('🌊 App Tome: Complete toggle action');
+                // Toggle completed successfully
+                context.viewModel.saved = true;
+            },
+            completeToggleWaving: (context: any, event: any) => {
+                console.log('🌊 App Tome: Complete toggle waving action');
+                // Toggle to waving state completed successfully
+                context.viewModel.saved = true;
             },
             completeSelectorUpdate: {
                 type: 'function',
@@ -1254,14 +1411,58 @@ const AppMachineRaw = createViewStateMachine({
                 type: 'function',
                 fn: ({context, event, send, log, transition, machine}: any) => {
                     console.log('🌊 App Tome: Complete settings update');
+                    
+                    // Mark settings as saved
+                    context.viewModel.saved = true;
+                    
+                    // Save settings to Chrome sync storage if available
+                    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+                        try {
+                            chrome.storage.sync.set({
+                                'waveReaderSettings': context.viewModel.settings,
+                                'waveReaderShowNotifications': context.viewModel.showNotifications,
+                                'waveReaderCurrentView': context.viewModel.currentView,
+                                'waveReaderSelector': context.viewModel.selector
+                            });
+                            console.log('🌊 App Tome: Settings saved to Chrome sync storage');
+                        } catch (error) {
+                            console.warn('🌊 App Tome: Failed to save settings to Chrome storage:', error);
+                        }
+                    }
+                    
                     log('🌊 App Tome: Settings update completed successfully');
+                    
+                    // Transition back to idle state
+                    send('SETTINGS_UPDATE_COMPLETE');
                 }
             },
             cancelSettingsUpdate: {
                 type: 'function',
                 fn: ({context, event, send, log, transition, machine}: any) => {
                     console.log('🌊 App Tome: Cancel settings update');
+                    
+                    // Revert any unsaved changes by reloading from storage
+                    // For now, just mark as saved to hide the edit indicator
+                    context.viewModel.saved = true;
+                    
                     log('🌊 App Tome: Settings update cancelled by user');
+                    
+                    // Transition back to idle state
+                    send('SETTINGS_UPDATE_CANCELLED');
+                }
+            },
+            handleSettingsChange: {
+                type: 'function',
+                fn: ({context, event, send, log, transition, machine}: any) => {
+                    console.log('🌊 App Tome: Handle settings change', event);
+                    
+                    // Update the specific setting in the viewModel
+                    if (event.key && event.value !== undefined) {
+                        context.viewModel[event.key] = event.value;
+                        context.viewModel.saved = false; // Mark as unsaved
+                        
+                        console.log('🌊 App Tome: Updated setting', event.key, 'to', event.value);
+                    }
                 }
             },
             recoverFromError: {
@@ -1302,6 +1503,7 @@ const AppMachineRaw = createViewStateMachine({
                 type: 'function',
                 fn: async (context: any, event: any, machine: any) => {
                     // Get current settings and create wave
+                    debugger;
                     const currentOptions = await context.settingsService?.getCurrentSettings() || {};
                     const options = new Options(currentOptions);
                     
@@ -1845,7 +2047,7 @@ const SettingsTome = createTomeConfig({
     }
 });
 
-const AppTome = createTomeConfig({
+const appTomeConfig = {
     id: 'app-tome',
     name: 'App Tome',
     description: 'Main Application Tome with integrated UI components',
@@ -1857,6 +2059,469 @@ const AppTome = createTomeConfig({
         'settingsTome': SettingsTome as any
     },
     dependencies: ['log-view-machine'],
+    render: () => {
+        // Get current state from the app machine
+        const appState = AppMachine.getState();
+        const appContext = AppMachine.getContext();
+        
+        console.log('🌊 AppTome: Rendering with state:', appState.value);
+        
+        // PAMSwitch Configuration - controls which non-structural features are enabled
+        const PAMSwitch = {
+            enableProxyControls: true,   // Set to true to enable proxy-dependent controls
+            enableDebugControls: true,   // Set to false to hide debug/development controls
+            enableAdvancedSettings: false // Set to true to show advanced settings options
+        };
+
+        // Render control buttons that work with the state machine (PAMSwitch controlled)
+        const renderControlButtons = () => {
+            const isGoing = appContext.viewModel?.going;
+            const isWaving = appState.value === 'waving';
+            
+            return (
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    {/* Core structural controls - always available */}
+                    <button
+                        onClick={() => {
+                            console.log('🌊 App: Settings button clicked');
+                            AppMachine.send('SETTINGS_UPDATE');
+                        }}
+                        style={{
+                            padding: '10px 20px',
+                            backgroundColor: '#6c757d',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                        }}
+                        onMouseOver={(e) => (e.target as HTMLButtonElement).style.opacity = '0.9'}
+                        onMouseOut={(e) => (e.target as HTMLButtonElement).style.opacity = '1'}
+                    >
+                        ⚙️ Settings
+                    </button>
+
+                    {/* PAMSwitch: Debug/Development controls */}
+                    {PAMSwitch.enableDebugControls && (
+                        <button
+                            onClick={() => {
+                                console.log('🌊 App: State info button clicked');
+                                console.log('Current state:', appState.value);
+                                console.log('Context:', appContext);
+                                console.log('PAMSwitch config:', PAMSwitch);
+                            }}
+                            style={{
+                                padding: '10px 20px',
+                                backgroundColor: '#17a2b8',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                fontWeight: '500',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                            }}
+                            onMouseOver={(e) => (e.target as HTMLButtonElement).style.opacity = '0.9'}
+                            onMouseOut={(e) => (e.target as HTMLButtonElement).style.opacity = '1'}
+                        >
+                            📊 State Info
+                        </button>
+                    )}
+
+                    {/* PAMSwitch: Proxy-dependent controls */}
+                    {PAMSwitch.enableProxyControls && (
+                        <>
+                            <button
+                                onClick={() => {
+                                    console.log('🌊 App: Toggle button clicked (proxy enabled)');
+                                    AppMachine.send('TOGGLE');
+                                }}
+                                style={{
+                                    padding: '10px 20px',
+                                    backgroundColor: isGoing ? '#dc3545' : '#28a745',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease'
+                                }}
+                                onMouseOver={(e) => (e.target as HTMLButtonElement).style.opacity = '0.9'}
+                                onMouseOut={(e) => (e.target as HTMLButtonElement).style.opacity = '1'}
+                            >
+                                {isGoing ? '🛑 Stop Wave' : '🌊 Start Wave'}
+                            </button>
+                            
+                            <button
+                                onClick={() => {
+                                    console.log('🌊 App: Refresh button clicked (proxy enabled)');
+                                    AppMachine.send('REFRESH_STATE');
+                                }}
+                                style={{
+                                    padding: '10px 20px',
+                                    backgroundColor: '#17a2b8',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease'
+                                }}
+                                onMouseOver={(e) => (e.target as HTMLButtonElement).style.opacity = '0.9'}
+                                onMouseOut={(e) => (e.target as HTMLButtonElement).style.opacity = '1'}
+                            >
+                                🔄 Refresh
+                            </button>
+                        </>
+                    )}
+
+                    {/* PAMSwitch: Advanced settings controls */}
+                    {PAMSwitch.enableAdvancedSettings && (
+                        <button
+                            onClick={() => {
+                                console.log('🌊 App: Advanced settings clicked');
+                                // Toggle PAMSwitch settings (for development)
+                                console.log('Current PAMSwitch config:', PAMSwitch);
+                            }}
+                            style={{
+                                padding: '10px 20px',
+                                backgroundColor: '#6f42c1',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                fontWeight: '500',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                            }}
+                            onMouseOver={(e) => (e.target as HTMLButtonElement).style.opacity = '0.9'}
+                            onMouseOut={(e) => (e.target as HTMLButtonElement).style.opacity = '1'}
+                        >
+                            🔧 Advanced
+                        </button>
+                    )}
+
+                    {/* PAMSwitch status indicator */}
+                    {PAMSwitch.enableDebugControls && (
+                        <div style={{
+                            padding: '5px 10px',
+                            backgroundColor: '#f8f9fa',
+                            border: '1px solid #dee2e6',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            color: '#6c757d',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                        }}>
+                            <span>PAM:</span>
+                            {PAMSwitch.enableProxyControls && <span style={{color: '#28a745'}}>🔗</span>}
+                            {PAMSwitch.enableDebugControls && <span style={{color: '#17a2b8'}}>🐛</span>}
+                            {PAMSwitch.enableAdvancedSettings && <span style={{color: '#6f42c1'}}>⚙️</span>}
+                        </div>
+                    )}
+
+                    {/* Observer Status Button */}
+                    {PAMSwitch.enableDebugControls && (
+                        <button
+                            onClick={() => {
+                                console.log('🌊 App: Observer status clicked');
+                                const status = appTomeObserver.getStatus();
+                                console.log('Observer Status:', status);
+                                
+                                // Show observer status in an alert for now
+                                alert(`Observer Status:
+• Observing: ${status.isObserving ? 'Yes' : 'No'}
+• Last Sync: ${new Date(status.lastSyncTime).toLocaleTimeString()}
+• Sync Interval: ${status.syncIntervalMs}ms
+• Tome ID: ${status.tomeId}`);
+                            }}
+                            style={{
+                                padding: '8px 16px',
+                                backgroundColor: '#28a745',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                            }}
+                            onMouseOver={(e) => (e.target as HTMLButtonElement).style.opacity = '0.9'}
+                            onMouseOut={(e) => (e.target as HTMLButtonElement).style.opacity = '1'}
+                        >
+                            📡 Observer
+                        </button>
+                    )}
+                </div>
+            );
+        };
+        
+        // Render based on current state
+        switch (appState.value) {
+            case 'idle':
+                const hasUnsavedChangesIdle = !appContext.viewModel?.saved;
+                
+                return (
+                    <div style={{ padding: '20px', textAlign: 'center' }}>
+                        <h3>🌊 Wave Reader - Idle State</h3>
+                        <p>Ready for user interaction</p>
+                        
+                        {/* Edit Indicator */}
+                        {hasUnsavedChangesIdle && (
+                            <div style={{
+                                padding: '8px 12px',
+                                backgroundColor: '#fff3cd',
+                                border: '1px solid #ffeaa7',
+                                borderRadius: '6px',
+                                color: '#856404',
+                                fontSize: '14px',
+                                fontWeight: '500',
+                                margin: '10px 0',
+                                display: 'inline-block'
+                            }}>
+                                ⚠️ You have unsaved changes
+                            </div>
+                        )}
+                        
+                        <div style={{ marginBottom: '20px' }}>
+                            <p><strong>Machine Status:</strong> {appState.value}</p>
+                            <p><strong>Going:</strong> {appContext.viewModel?.going ? 'Yes' : 'No'}</p>
+                            <p><strong>Selector:</strong> {appContext.viewModel?.selector || 'None'}</p>
+                            <p><strong>Saved:</strong> {appContext.viewModel?.saved ? 'Yes' : 'No'}</p>
+                        </div>
+                        {renderControlButtons()}
+                    </div>
+                );
+            case 'initializing':
+                return (
+                    <div style={{ padding: '20px', textAlign: 'center' }}>
+                        <h3>🌊 Wave Reader - Initializing</h3>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div className="spinner" style={{
+                                width: '20px',
+                                height: '20px',
+                                border: '2px solid #f3f3f3',
+                                borderTop: '2px solid #3498db',
+                                borderRadius: '50%',
+                                animation: 'spin 1s linear infinite'
+                            }}></div>
+                            <span>Setting up application...</span>
+                        </div>
+                    </div>
+                );
+            case 'waving':
+                return (
+                    <div style={{ padding: '20px', textAlign: 'center' }}>
+                        <h3>🌊 Wave Reader - Waving</h3>
+                        <p>Wave animation is active</p>
+                        <div style={{ marginBottom: '20px' }}>
+                            <p><strong>Machine Status:</strong> {appState.value}</p>
+                            <p><strong>Going:</strong> {appContext.viewModel?.going ? 'Yes' : 'No'}</p>
+                            <p><strong>Selector:</strong> {appContext.viewModel?.selector || 'None'}</p>
+                        </div>
+                        {renderControlButtons()}
+                    </div>
+                );
+            case 'settingsUpdating':
+                const hasUnsavedChanges = !appContext.viewModel?.saved;
+                
+                return (
+                    <div style={{ padding: '20px', textAlign: 'center' }}>
+                        <h3>🌊 Wave Reader - Settings</h3>
+                        <div style={{ marginBottom: '20px' }}>
+                            <p><strong>Machine Status:</strong> {appState.value}</p>
+                            <p>Configure your Wave Reader settings below:</p>
+                            
+                            {/* Edit Indicator */}
+                            {hasUnsavedChanges && (
+                                <div style={{
+                                    padding: '8px 12px',
+                                    backgroundColor: '#fff3cd',
+                                    border: '1px solid #ffeaa7',
+                                    borderRadius: '6px',
+                                    color: '#856404',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    margin: '10px 0',
+                                    display: 'inline-block'
+                                }}>
+                                    ⚠️ You have unsaved changes
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Settings Modal Content */}
+                        <div style={{
+                            background: '#f8f9fa',
+                            border: '1px solid #dee2e6',
+                            borderRadius: '8px',
+                            padding: '20px',
+                            marginBottom: '20px',
+                            textAlign: 'left'
+                        }}>
+                            <h4 style={{ marginTop: 0, color: '#495057' }}>⚙️ Settings Configuration</h4>
+                            
+                            <div style={{ marginBottom: '15px' }}>
+                                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                                    Show Notifications:
+                                </label>
+                                <input
+                                    type="checkbox"
+                                    checked={appContext.viewModel?.showNotifications !== false}
+                                    onChange={(e) => {
+                                        // Update settings through state machine
+                                        AppMachine.send({
+                                            type: 'SETTINGS_CHANGE',
+                                            key: 'showNotifications',
+                                            value: e.target.checked
+                                        });
+                                    }}
+                                    style={{ marginRight: '8px' }}
+                                />
+                                <span>Enable notification popups</span>
+                            </div>
+                            
+                            {/* Domain-specific setting: Wave State */}
+                            <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#f8f9fa', border: '1px solid #e9ecef', borderRadius: '6px' }}>
+                                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', color: '#6c757d' }}>
+                                    🌊 Wave State (Domain-specific):
+                                </label>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{
+                                        padding: '4px 12px',
+                                        backgroundColor: appContext.viewModel?.going ? '#28a745' : '#6c757d',
+                                        color: 'white',
+                                        borderRadius: '4px',
+                                        fontSize: '12px',
+                                        fontWeight: '500'
+                                    }}>
+                                        {appContext.viewModel?.going ? '🟢 Active' : '⚫ Inactive'}
+                                    </div>
+                                    <span style={{ fontSize: '12px', color: '#6c757d' }}>
+                                        {appContext.viewModel?.going ? 'Wave animation is running' : 'Wave animation is stopped'}
+                                    </span>
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#6c757d', marginTop: '4px' }}>
+                                    This setting changes automatically and is specific to each website
+                                </div>
+                            </div>
+                            
+                            <div style={{ marginBottom: '15px' }}>
+                                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                                    Current View:
+                                </label>
+                                <select
+                                    value={appContext.viewModel?.currentView || 'main'}
+                                    onChange={(e) => {
+                                        AppMachine.send({
+                                            type: 'SETTINGS_CHANGE',
+                                            key: 'currentView',
+                                            value: e.target.value
+                                        });
+                                    }}
+                                    style={{
+                                        padding: '8px',
+                                        border: '1px solid #ced4da',
+                                        borderRadius: '4px',
+                                        fontSize: '14px'
+                                    }}
+                                >
+                                    <option value="main">Main View</option>
+                                    <option value="compact">Compact View</option>
+                                    <option value="detailed">Detailed View</option>
+                                </select>
+                            </div>
+                            
+                            <div style={{ marginBottom: '15px' }}>
+                                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
+                                    CSS Selector:
+                                </label>
+                                <input
+                                    type="text"
+                                    value={appContext.viewModel?.selector || ''}
+                                    onChange={(e) => {
+                                        AppMachine.send({
+                                            type: 'SELECTOR_UPDATE',
+                                            selector: e.target.value
+                                        });
+                                    }}
+                                    placeholder="Enter CSS selector for elements to wave"
+                                    style={{
+                                        width: '100%',
+                                        padding: '8px',
+                                        border: '1px solid #ced4da',
+                                        borderRadius: '4px',
+                                        fontSize: '14px'
+                                    }}
+                                />
+                            </div>
+                        </div>
+                        
+                        {/* Settings Action Buttons */}
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                            <button
+                                onClick={() => AppMachine.send('SETTINGS_UPDATE_COMPLETE')}
+                                style={{
+                                    padding: '10px 20px',
+                                    backgroundColor: '#28a745',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                ✅ Save Settings
+                            </button>
+                            <button
+                                onClick={() => AppMachine.send('SETTINGS_UPDATE_CANCELLED')}
+                                style={{
+                                    padding: '10px 20px',
+                                    backgroundColor: '#6c757d',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                ❌ Cancel
+                            </button>
+                        </div>
+                    </div>
+                );
+            case 'error':
+                return (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#dc3545' }}>
+                        <h3>🌊 Wave Reader - Error</h3>
+                        <p>An error occurred. Auto-recovering...</p>
+                        <div style={{ marginBottom: '20px' }}>
+                            <p><strong>Machine Status:</strong> {appState.value}</p>
+                        </div>
+                        {renderControlButtons()}
+                    </div>
+                );
+            default:
+                return (
+                    <div style={{ padding: '20px', textAlign: 'center' }}>
+                        <h3>🌊 Wave Reader - {appState.value}</h3>
+                        <p>Current state: {appState.value}</p>
+                        <div style={{ marginBottom: '20px' }}>
+                            <p><strong>Going:</strong> {appContext.viewModel?.going ? 'Yes' : 'No'}</p>
+                            <p><strong>Selector:</strong> {appContext.viewModel?.selector || 'None'}</p>
+                        </div>
+                        {renderControlButtons()}
+                    </div>
+                );
+        }
+    },
     routing: {
         basePath: '/',
         routes: {
@@ -1864,11 +2529,61 @@ const AppTome = createTomeConfig({
                 path: '/background-proxy-machine',
                 method: 'POST',
                 transformers: {
-                    input: ({context, event, send, log, transition, machine}: any) => {
-                        machine.parentMachine.send({event});
+                    input: async ({context, event, send, log, transition, machine}: any) => {
+                        console.log('POPUP->BACKGROUND: Sending message to background script:', event);
+                        
+                        // Convert our internal events to background script message format
+                        let messageType = event;
+                        if (typeof event === 'string') {
+                            switch (event) {
+                                case 'TOGGLE':
+                                    messageType = 'TOGGLE_WAVE_READER';
+                                    break;
+                                case 'START':
+                                    messageType = 'START_WAVE_READER';
+                                    break;
+                                case 'STOP':
+                                    messageType = 'STOP_WAVE_READER';
+                                    break;
+                                default:
+                                    messageType = event;
+                            }
+                        } else if (event.type) {
+                            messageType = event.type;
+                        }
+                        
+                        // Send message to background script
+                        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                            try {
+                                const response: any = await chrome.runtime.sendMessage({
+                                    type: messageType,
+                                    source: 'popup',
+                                    target: 'background',
+                                    data: event,
+                                    timestamp: Date.now()
+                                });
+                                console.log('BACKGROUND->POPUP: Background script response:', response);
+                                
+                                // Sync viewModel after successful background operation
+                                if (response && response.success) {
+                                    machine.parentMachine.getSubMachine('appMachine')?.send({
+                                        type: 'SYNC_VIEWMODEL',
+                                        data: response
+                                    });
+                                }
+                                
+                                return response;
+                            } catch (error) {
+                                console.error('POPUP->BACKGROUND: Failed to send message to background script:', error);
+                                return { success: false, error: error instanceof Error ? error.message : String(error) };
+                            }
+                        } else {
+                            console.warn('🌊 AppTome: Chrome runtime not available');
+                            return { success: false, error: 'Chrome runtime not available' };
+                        }
                     },
                     output: ({context, event, send, log, transition, machine}: any) => {
-                        machine.parentMachine.getSubMachine('background-proxy')?.send(context.message);
+                        return context;
                     }
                 }
             },
@@ -1922,7 +2637,235 @@ const AppTome = createTomeConfig({
             }
         }
     }
-});
+} as any;
+
+const AppTome = createTomeConfig(appTomeConfig);
+
+// Recursive Observer System for AppTome Machines
+class AppTomeObserver {
+    private tome: any;
+    private syncInterval: NodeJS.Timeout | null = null;
+    private isObserving = false;
+    private lastSyncTime = 0;
+    private syncIntervalMs = 5000; // Sync every 5 seconds
+
+    constructor(tome: any) {
+        this.tome = tome;
+        console.log('🌊 AppTomeObserver: Initialized for', tome.id);
+    }
+
+    // Start observing all machines recursively
+    startObserving() {
+        if (this.isObserving) {
+            console.log('🌊 AppTomeObserver: Already observing');
+            return;
+        }
+
+        console.log('🌊 AppTomeObserver: Starting recursive observation');
+        this.isObserving = true;
+
+        // Set up recursive observers for all machines
+        this.setupMachineObservers();
+
+        // Set up periodic sync to Google storage
+        this.startPeriodicSync();
+
+        console.log('🌊 AppTomeObserver: Observation started');
+    }
+
+    // Stop observing
+    stopObserving() {
+        if (!this.isObserving) {
+            console.log('🌊 AppTomeObserver: Not currently observing');
+            return;
+        }
+
+        console.log('🌊 AppTomeObserver: Stopping observation');
+        this.isObserving = false;
+
+        // Clear sync interval
+        if (this.syncInterval) {
+            clearInterval(this.syncInterval);
+            this.syncInterval = null;
+        }
+
+        console.log('🌊 AppTomeObserver: Observation stopped');
+    }
+
+    // Set up observers for all machines recursively
+    private setupMachineObservers() {
+        const machines = this.tome.machines || {};
+        
+        Object.keys(machines).forEach(machineId => {
+            const machine = machines[machineId];
+            console.log('🌊 AppTomeObserver: Setting up observer for', machineId);
+            
+            // Subscribe to state changes
+            if (machine && typeof machine.subscribe === 'function') {
+                machine.subscribe((stateData: any) => {
+                    console.log(`🌊 AppTomeObserver: State change detected in ${machineId}:`, stateData);
+                    this.handleMachineStateChange(machineId, stateData);
+                });
+            }
+
+            // If it's a tome with sub-machines, observe recursively
+            if (machine && machine.machines) {
+                console.log(`🌊 AppTomeObserver: ${machineId} has sub-machines, observing recursively`);
+                this.observeSubTomeRecursively(machineId, machine);
+            }
+        });
+    }
+
+    // Recursively observe sub-tomes
+    private observeSubTomeRecursively(parentId: string, tome: any) {
+        const machines = tome.machines || {};
+        
+        Object.keys(machines).forEach(machineId => {
+            const fullMachineId = `${parentId}.${machineId}`;
+            const machine = machines[machineId];
+            
+            console.log(`🌊 AppTomeObserver: Setting up recursive observer for ${fullMachineId}`);
+            
+            if (machine && typeof machine.subscribe === 'function') {
+                machine.subscribe((stateData: any) => {
+                    console.log(`🌊 AppTomeObserver: Recursive state change in ${fullMachineId}:`, stateData);
+                    this.handleMachineStateChange(fullMachineId, stateData);
+                });
+            }
+
+            // Continue recursion if this machine also has sub-machines
+            if (machine && machine.machines) {
+                this.observeSubTomeRecursively(fullMachineId, machine);
+            }
+        });
+    }
+
+    // Handle state changes from any machine
+    private handleMachineStateChange(machineId: string, stateData: any) {
+        console.log(`🌊 AppTomeObserver: Processing state change for ${machineId}`);
+        
+        // Update last sync time to indicate activity
+        this.lastSyncTime = Date.now();
+        
+        // Trigger immediate sync if this is a critical state change
+        if (this.isCriticalStateChange(stateData)) {
+            console.log(`🌊 AppTomeObserver: Critical state change detected, triggering immediate sync`);
+            this.syncToStorage();
+        }
+    }
+
+    // Determine if a state change is critical and needs immediate sync
+    private isCriticalStateChange(stateData: any): boolean {
+        // Define critical state changes that need immediate sync
+        const criticalStates = ['error', 'settingsUpdating', 'saved'];
+        const stateValue = stateData?.value || stateData?.type;
+        
+        return criticalStates.some(critical => 
+            stateValue?.includes?.(critical) || 
+            stateData?.saved === false ||
+            stateData?.type === 'settings_change'
+        );
+    }
+
+    // Start periodic sync to Google storage
+    private startPeriodicSync() {
+        console.log('🌊 AppTomeObserver: Starting periodic sync to Google storage');
+        
+        this.syncInterval = setInterval(() => {
+            if (this.isObserving) {
+                this.syncToStorage();
+            }
+        }, this.syncIntervalMs);
+    }
+
+    // Sync all machine states to Google storage
+    private async syncToStorage() {
+        try {
+            console.log('🌊 AppTomeObserver: Syncing machine states to Google storage');
+            
+            const machineStates = this.collectAllMachineStates();
+            const syncData = {
+                timestamp: Date.now(),
+                tomeId: this.tome.id,
+                machineStates,
+                lastSync: this.lastSyncTime
+            };
+
+            // Save to Chrome sync storage (Google storage in extension context)
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+                await chrome.storage.sync.set({
+                    [`waveReaderTomeStates_${this.tome.id}`]: syncData
+                });
+                console.log('🌊 AppTomeObserver: Successfully synced to Google storage');
+            } else {
+                console.warn('🌊 AppTomeObserver: Chrome storage not available, using localStorage fallback');
+                localStorage.setItem(`waveReaderTomeStates_${this.tome.id}`, JSON.stringify(syncData));
+            }
+
+        } catch (error) {
+            console.error('🌊 AppTomeObserver: Failed to sync to storage:', error);
+        }
+    }
+
+    // Collect states from all machines recursively
+    private collectAllMachineStates(): any {
+        const states: any = {};
+        
+        const collectFromMachine = (machineId: string, machine: any, prefix = '') => {
+            const fullId = prefix ? `${prefix}.${machineId}` : machineId;
+            
+            try {
+                // Get current state and context
+                const state = machine.getState?.() || { value: 'unknown' };
+                const context = machine.getContext?.() || {};
+                const health = machine.getHealth?.() || { status: 'unknown' };
+                
+                states[fullId] = {
+                    state,
+                    context,
+                    health,
+                    timestamp: Date.now(),
+                    machineType: machine.machineType || 'unknown'
+                };
+
+                // Recursively collect from sub-machines
+                if (machine.machines) {
+                    Object.keys(machine.machines).forEach(subMachineId => {
+                        collectFromMachine(subMachineId, machine.machines[subMachineId], fullId);
+                    });
+                }
+            } catch (error) {
+                console.warn(`🌊 AppTomeObserver: Failed to collect state from ${fullId}:`, error);
+                states[fullId] = {
+                    error: error instanceof Error ? error.message : String(error),
+                    timestamp: Date.now()
+                };
+            }
+        };
+
+        // Collect from all root machines
+        const machines = this.tome.machines || {};
+        Object.keys(machines).forEach(machineId => {
+            collectFromMachine(machineId, machines[machineId]);
+        });
+
+        return states;
+    }
+
+    // Get observer status
+    getStatus() {
+        return {
+            isObserving: this.isObserving,
+            lastSyncTime: this.lastSyncTime,
+            syncIntervalMs: this.syncIntervalMs,
+            tomeId: this.tome.id
+        };
+    }
+}
+
+// Initialize and start the observer
+const appTomeObserver = new AppTomeObserver(AppTome);
+appTomeObserver.startObserving();
 
 // AppTome.start();
 
@@ -1941,6 +2884,9 @@ const AppComponent: FunctionComponent = () => {
     const [proxyMachineState, setProxyMachineState] = useState(BackgroundProxyMachine.getState());
     const [appMachineContext, setAppMachineContext] = useState(AppMachine.getContext());
     const [proxyMachineContext, setProxyMachineContext] = useState(BackgroundProxyMachine.getContext());
+    
+    // State for tome rendering
+    const [tomeRenderKey, setTomeRenderKey] = useState(0);
     
     // Set up UI component communication
     const handleUIComponentEvent = (event: any) => {
@@ -2034,6 +2980,8 @@ const AppComponent: FunctionComponent = () => {
             console.log('🌊 App Component: App machine state changed', data);
             setAppMachineState(AppMachine.getState());
             setAppMachineContext(AppMachine.getContext());
+            // Trigger tome re-render
+            setTomeRenderKey(prev => prev + 1);
         };
         
         const handleProxyMachineStateChange = (data: any) => {
@@ -2046,9 +2994,18 @@ const AppComponent: FunctionComponent = () => {
         const appSubscription = AppMachine.subscribe?.(handleAppMachineStateChange);
         const proxySubscription = BackgroundProxyMachine.subscribe?.(handleProxyMachineStateChange);
         
+        // Subscribe to tome events for reactive rendering
+        const handleTomeRender = (data: any) => {
+            console.log('🌊 App Component: Tome render event', data);
+            setTomeRenderKey(prev => prev + 1);
+        };
+        
+        (AppTome as any).on('render', handleTomeRender);
+        
         return () => {
             appSubscription?.unsubscribe?.();
             proxySubscription?.unsubscribe?.();
+            (AppTome as any).off('render', handleTomeRender);
         };
     }, []);
 
@@ -2059,7 +3016,11 @@ const AppComponent: FunctionComponent = () => {
                     <h1>🌊 Wave Reader</h1>
                     <p>Motion Reader for Eye Tracking</p>
                 </PopupHeader>
-                
+                {(AppTome as any).render ? (
+                    <div key={tomeRenderKey}>
+                        {(AppTome as any).render()}
+                    </div>
+                ) : null}
                 <PopupContent>
                     {/* Use WaveTabs with structural components */}
                     <WaveTabs>
@@ -2088,6 +3049,75 @@ const AppComponent: FunctionComponent = () => {
                                         <div>
                                             <strong>Background Proxy:</strong> Extension communication
                                         </div>
+                                    </div>
+                                </div>
+                                
+                                {/* Tome Management Controls */}
+                                <div style={{ 
+                                    padding: '15px', 
+                                    backgroundColor: '#f0f8ff', 
+                                    border: '1px solid #2196f3', 
+                                    borderRadius: '4px',
+                                    marginBottom: '15px'
+                                }}>
+                                    <h4>🎛️ Tome Management (Lazy TomeManager)</h4>
+                                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                                        <button 
+                                            onClick={() => {
+                                                console.log('🌊 App Component: Starting AppTome');
+                                                (AppTome as any).start();
+                                            }}
+                                            style={{
+                                                padding: '6px 12px',
+                                                backgroundColor: '#4caf50',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                fontSize: '12px'
+                                            }}
+                                        >
+                                            Start AppTome
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                console.log('🌊 App Component: Stopping AppTome');
+                                                (AppTome as any).stop();
+                                            }}
+                                            style={{
+                                                padding: '6px 12px',
+                                                backgroundColor: '#f44336',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                fontSize: '12px'
+                                            }}
+                                        >
+                                            Stop AppTome
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                console.log('🌊 App Component: Force rendering');
+                                                (AppTome as any).forceRender();
+                                            }}
+                                            style={{
+                                                padding: '6px 12px',
+                                                backgroundColor: '#ff9800',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                fontSize: '12px'
+                                            }}
+                                        >
+                                            Force Render
+                                        </button>
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#666' }}>
+                                        <p><strong>Tome State:</strong> {(AppTome as any).getState().isStarted ? 'Started' : 'Stopped'}</p>
+                                        <p><strong>Health:</strong> {(AppTome as any).getHealth().status}</p>
+                                        <p><strong>Render Key:</strong> {tomeRenderKey}</p>
                                     </div>
                                 </div>
                             </div>
@@ -2187,48 +3217,7 @@ const AppComponent: FunctionComponent = () => {
                             <div>
                                 <h3>🎮 Controls</h3>
                                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                                    <button 
-                                        onClick={() => {
-                                            console.log('🌊 App Component: Toggling App Machine');
-                                            AppMachine.send('TOGGLE');
-                                            
-                                            // Also notify UI components
-                                            handleUIComponentEvent({
-                                                source: 'app',
-                                                type: 'TOGGLE',
-                                                data: { going: !appMachineState.value }
-                                            });
-                                        }}
-                                        style={{
-                                            padding: '8px 16px',
-                                            backgroundColor: appMachineState.value === 'waving' ? '#dc3545' : '#007bff',
-                                            color: 'white',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            cursor: 'pointer',
-                                            fontWeight: 'bold'
-                                        }}
-                                    >
-                                        {appMachineState.value === 'waving' ? 'Stop Wave' : 'Start Wave'}
-                                    </button>
-                                    <button 
-                                        onClick={() => {
-                                            console.log('🌊 App Component: Opening Settings');
-                                            AppMachine.send('SETTINGS_UPDATE');
-                                        }}
-                                        disabled={appMachineState.value === 'settingsUpdating'}
-                                        style={{
-                                            padding: '8px 16px',
-                                            backgroundColor: appMachineState.value === 'settingsUpdating' ? '#6c757d' : '#6f42c1',
-                                            color: 'white',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            cursor: appMachineState.value === 'settingsUpdating' ? 'not-allowed' : 'pointer',
-                                            fontWeight: 'bold'
-                                        }}
-                                    >
-                                        {appMachineState.value === 'settingsUpdating' ? 'Opening...' : 'Settings'}
-                                    </button>
+                                    {AppMachine.render!()}
                                 </div>
                             </div>
                         </div>

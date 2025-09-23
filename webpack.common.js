@@ -12,7 +12,7 @@ const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 //config: path.join(__dirname, "./src/config/config.common.js")
 const config = {
     mode: "development",
-    devtool: "cheap-module-source-map",
+    devtool: "source-map",
     entry: {
         app: path.join(__dirname, "./static/index.js"),
         background: path.join(__dirname, "./static/background.js"),
@@ -26,14 +26,14 @@ const config = {
     resolve: {
         extensions: [".tsx", ".ts", ".js", ".jsx", ".*"],
         alias: {
-            // Real log-view-machine integration - using local package
-            // "log-view-machine": path.resolve(__dirname, "../log-view-machine/dist")
+            "log-view-machine": path.resolve(__dirname, "../log-view-machine/dist/index.esm.js"),
             "process/browser": require.resolve("process/browser")
         },
         fallback: {
             "path": require.resolve("path-browserify"),
             "tty": require.resolve("tty-browserify"),
             "util": require.resolve("util/"),
+            "util-deprecate": path.resolve(__dirname, "src/polyfills/util-deprecate-browser.js"),
             "fs": false,
             "net": false,
             "stream": require.resolve("stream-browserify"),
@@ -55,7 +55,8 @@ const config = {
         new webpack.ProvidePlugin({
             'config': 'config',
             'process': 'process/browser',
-            'Buffer': ['buffer', 'Buffer']
+            'Buffer': ['buffer', 'Buffer'],
+            'util-deprecate': path.resolve(__dirname, "src/polyfills/util-deprecate-browser.js"),
         }),
         new webpack.DefinePlugin({
             'regeneratorRuntime': 'regeneratorRuntime'
@@ -64,22 +65,39 @@ const config = {
             resourceRegExp: /^\.\/locale$/,
             contextRegExp: /moment$/
         }),
+        // Block the real util-deprecate package to force use of our polyfill
+        new webpack.IgnorePlugin({
+            resourceRegExp: /^util-deprecate$/,
+            contextRegExp: /node_modules/
+        }),
+        // TEMPORARILY DISABLED: Mock replacement plugin
+        // TODO: Re-enable with proper configuration after testing
+        /*
         new webpack.NormalModuleReplacementPlugin(
             /log-view-machine/,
-            path.resolve(__dirname, 'src/mocks/log-view-machine-mock.js')
+            path.resolve(__dirname, 'src/mocks/log-view-machine-mock.js'),
+            function(resource) {
+                // Check if this is being imported in the popup/app context
+                const isPopupApp = resource.context.includes('app.tsx') || 
+                                 resource.context.includes('static/') ||
+                                 resource.context.includes('index.html');
+                
+                // In production, always use real package
+                const isProduction = process.env.NODE_ENV === 'production';
+                
+                const useMock = isPopupApp && !isProduction;
+                
+                console.log(`🌊 Webpack: ${useMock ? 'Using MOCK' : 'Using REAL'} log-view-machine for:`, resource.context, `(NODE_ENV: ${process.env.NODE_ENV})`);
+                return useMock;
+            }
         ),
+        */
         new webpack.DefinePlugin({
             'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
             'global': 'globalThis'
         }),
         new webpack.ProvidePlugin({
             'global': 'globalThis'
-        }),
-        new webpack.IgnorePlugin({
-            resourceRegExp: /deprecate/
-        }),
-        new webpack.IgnorePlugin({
-            resourceRegExp: /node_modules\/deprecate/
         }),
         new HtmlWebpackPlugin({
             title: "boilerplate", // change this to your app title
@@ -141,7 +159,10 @@ const config = {
                     loader: 'ts-loader',
                     options: {
                         // disable type checker - we will use it in fork plugin
-                        transpileOnly: true
+                        transpileOnly: true,
+                        compilerOptions: {
+                            sourceMap: true
+                        }
                     }
                 }
             },

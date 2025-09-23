@@ -2,9 +2,7 @@
 // This file configures RobotCopy instances with PACT test client for the scan-for-input component
 // Specifically designed for Chrome extension communication and keyboard shortcut management
 
-import { createRobotCopy } from '../../../../log-view-machine/src/core/RobotCopy';
-import { createViewStateMachine } from '../../../../log-view-machine/src/core/ViewStateMachine';
-import { createClientGenerator } from '../../../../log-view-machine/src/core/ClientGenerator';
+import { createRobotCopy, createViewStateMachine, createClientGenerator } from 'log-view-machine';
 
 // PACT Test Client Configuration
 const PACT_CONFIG = {
