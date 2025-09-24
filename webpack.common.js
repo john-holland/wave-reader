@@ -26,7 +26,7 @@ const config = {
     resolve: {
         extensions: [".tsx", ".ts", ".js", ".jsx", ".*"],
         alias: {
-            "log-view-machine": path.resolve(__dirname, "../log-view-machine/dist/index.esm.js"),
+            "log-view-machine$": path.resolve(__dirname, "../log-view-machine/dist/index.esm.js"),
             "process/browser": require.resolve("process/browser")
         },
         fallback: {
@@ -40,7 +40,7 @@ const config = {
             "zlib": require.resolve("browserify-zlib"),
             "querystring": require.resolve("querystring-es3"),
             "url": require.resolve("url/"),
-            "http": require.resolve("stream-http"),
+            "http": false,
             "crypto": require.resolve("crypto-browserify"),
             "vm": require.resolve("vm-browserify"),
             "assert": require.resolve("assert/"),
@@ -48,7 +48,15 @@ const config = {
             "buffer": require.resolve("buffer/"),
             "string_decoder": require.resolve("string_decoder/"),
             "async_hooks": false,
-            "process": require.resolve("process/browser")
+            "process": require.resolve("process/browser"),
+            // Additional fallbacks for stream dependencies
+            "readable-stream": require.resolve("readable-stream"),
+            "stream-browserify": require.resolve("stream-browserify"),
+            // Prevent Express-related modules from being bundled
+            "express": false,
+            "send": false,
+            "destroy": false,
+            "morgan": false
         }
     },
     plugins: [
@@ -65,11 +73,26 @@ const config = {
             resourceRegExp: /^\.\/locale$/,
             contextRegExp: /moment$/
         }),
-        // Block the real util-deprecate package to force use of our polyfill
+        // Block the real util-deprecate package to force use of our CSP-compliant polyfill
         new webpack.IgnorePlugin({
             resourceRegExp: /^util-deprecate$/,
             contextRegExp: /node_modules/
         }),
+        // Block util-deprecate from nested node_modules (like in stream-browserify)
+        new webpack.IgnorePlugin({
+            resourceRegExp: /^\.\.\/util-deprecate$/,
+            contextRegExp: /node_modules/
+        }),
+        // Block any util-deprecate references in nested readable-stream
+        new webpack.IgnorePlugin({
+            resourceRegExp: /^util-deprecate$/,
+            contextRegExp: /readable-stream/
+        }),
+        // Replace all util-deprecate references with our polyfill
+        new webpack.NormalModuleReplacementPlugin(
+            /^util-deprecate$/,
+            path.resolve(__dirname, 'src/polyfills/util-deprecate-browser.js')
+        ),
         // TEMPORARILY DISABLED: Mock replacement plugin
         // TODO: Re-enable with proper configuration after testing
         /*

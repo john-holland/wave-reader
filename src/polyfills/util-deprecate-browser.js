@@ -3,12 +3,47 @@
 // Avoids new Function() to comply with CSP
 
 function deprecate(fn, message) {
-    // In browser environments, we'll just log a warning and return the function
-    // Avoid using new Function() to comply with Content Security Policy
-    if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') {
-        console.warn('Deprecation warning:', message);
+    // If no function provided, return a no-op function
+    if (typeof fn !== 'function') {
+        return function() {};
     }
-    return fn;
+    
+    // Check if deprecation warnings are disabled
+    if (config('noDeprecation')) {
+        return fn;
+    }
+
+    var warned = false;
+    
+    // Create a wrapper function that warns once and then calls the original
+    // This avoids new Function() while maintaining the same behavior
+    function deprecated() {
+        if (!warned) {
+            if (config('throwDeprecation')) {
+                throw new Error(message);
+            } else if (config('traceDeprecation')) {
+                console.trace(message);
+            } else {
+                console.warn(message);
+            }
+            warned = true;
+        }
+        return fn.apply(this, arguments);
+    }
+
+    return deprecated;
+}
+
+// Configuration helper function
+function config(name) {
+    try {
+        if (typeof localStorage !== 'undefined') {
+            return localStorage.getItem(name) === 'true';
+        }
+    } catch (e) {
+        // Ignore localStorage errors
+    }
+    return false;
 }
 
 // Add wrapFunction method that util-deprecate uses internally

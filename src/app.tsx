@@ -20,7 +20,7 @@ import {
   WaveReaderMessageRouter,
   useWaveReaderMessageRouter
 } from './components/structural';
-import { createProxyRobotCopyStateMachine, createTomeConfig, createViewStateMachine, TomeManager } from 'log-view-machine';
+import { createProxyRobotCopyStateMachine, createTomeConfig, createViewStateMachine, TomeClient, createRobotCopy } from 'log-view-machine';
 
 /**
  * ISubMachine Interface
@@ -120,7 +120,7 @@ export class ProxyMachineAdapter implements ISubMachine {
     send(event: string | object): void {
         try {
             this.machine.send?.(event);
-        } catch (error) {
+                } catch (error) {
             this.errorCount++;
             this.emit('error', { error, event });
         }
@@ -137,7 +137,7 @@ export class ProxyMachineAdapter implements ISubMachine {
         try {
             await this.machine.start?.();
             this.emit('started', { machineId: this.machineId });
-        } catch (error) {
+            } catch (error) {
             this.errorCount++;
             this.emit('error', { error, action: 'start' });
             throw error;
@@ -148,7 +148,7 @@ export class ProxyMachineAdapter implements ISubMachine {
         try {
             await this.machine.stop?.();
             this.emit('stopped', { machineId: this.machineId });
-        } catch (error) {
+    } catch (error) {
             this.errorCount++;
             this.emit('error', { error, action: 'stop' });
             throw error;
@@ -172,7 +172,7 @@ export class ProxyMachineAdapter implements ISubMachine {
                 return await this.machine.robotCopy.sendMessage(message);
             }
             return { success: false, error: 'No routing capability' };
-        } catch (error) {
+    } catch (error) {
             this.errorCount++;
             this.emit('error', { error, action: 'routeMessage' });
             throw error;
@@ -687,12 +687,16 @@ const BackgroundProxyMachineRaw = createProxyRobotCopyStateMachine({
             }
         }
     },
-    robotCopy: {
-        sendMessage: async (message: any) => {
-            console.log('Mock robot copy send message:', message);
-            return { success: true };
-        }
-    } as any
+    robotCopy: createRobotCopy({
+        enableTracing: false, // Disable tracing in browser extension
+        enableDataDog: false, // Disable DataDog in browser extension
+        kotlinBackendUrl: typeof chrome !== 'undefined' && chrome.runtime?.id 
+            ? `chrome-extension://${chrome.runtime.id}` 
+            : 'chrome-extension://wave-reader',
+        nodeBackendUrl: typeof chrome !== 'undefined' && chrome.runtime?.id 
+            ? `chrome-extension://${chrome.runtime.id}` 
+            : 'chrome-extension://wave-reader'
+    })
 });
 
 // Wrap with adapter to implement ISubMachine interface
@@ -1305,7 +1309,7 @@ const AppMachineRaw = createViewStateMachine({
                         } else {
                             throw new Error(response?.error || 'Failed to start Wave Reader');
                         }
-                    } catch (error: any) {
+                } catch (error: any) {
                         log('🌊 App Tome: Failed to start Wave Reader', error);
                         context.viewModel.error = error.message;
                         send('ERROR', { error: error.message });
@@ -1569,7 +1573,7 @@ const AppMachineRaw = createViewStateMachine({
                 fn: ({ context, event, send, log, transition, machine, viewModel}: any) => {
                     if (viewModel.going) {
                         transition('stopWaveAnimation');
-                    } else {
+        } else {
                         transition('startWaveAnimation');
                     }
                     viewModel.going = !viewModel.going;
@@ -2573,7 +2577,7 @@ const appTomeConfig = {
                                 }
                                 
                                 return response;
-                            } catch (error) {
+        } catch (error) {
                                 console.error('POPUP->BACKGROUND: Failed to send message to background script:', error);
                                 return { success: false, error: error instanceof Error ? error.message : String(error) };
                             }
@@ -3011,7 +3015,7 @@ const AppComponent: FunctionComponent = () => {
 
     return (
         <ErrorBoundary>
-            <WaveReader>
+        <WaveReader>
                 <PopupHeader>
                     <h1>🌊 Wave Reader</h1>
                     <p>Motion Reader for Eye Tracking</p>
@@ -3023,7 +3027,7 @@ const AppComponent: FunctionComponent = () => {
                 ) : null}
                 <PopupContent>
                     {/* Use WaveTabs with structural components */}
-                    <WaveTabs>
+            <WaveTabs>
                         <div>
                             {/* Integrated Tome System Status */}
                             <div style={{ marginBottom: '20px' }}>
@@ -3221,9 +3225,9 @@ const AppComponent: FunctionComponent = () => {
                                 </div>
                             </div>
                         </div>
-                    </WaveTabs>
+            </WaveTabs>
                 </PopupContent>
-            </WaveReader>
+        </WaveReader>
         </ErrorBoundary>
     );
 }

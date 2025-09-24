@@ -1,4 +1,4 @@
-import { createStructuralConfig, AppStructureConfig } from 'log-view-machine';
+import { createStructuralConfig, type AppStructureConfig } from 'log-view-machine';
 import WaveReaderMainTome from './wave-reader-tome-config';
 
 /**

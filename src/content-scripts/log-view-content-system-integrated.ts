@@ -64,7 +64,7 @@ export class LogViewContentSystemIntegrated {
       setTimeout(() => this.init(), 100);
       return;
     }
-    
+
     // Initialize DOM service
     this.domService.initialize();
     

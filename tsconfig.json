@@ -23,7 +23,12 @@
         "jsx": "react",
         "sourceMap": true,
         "inlineSourceMap": false,
-        "inlineSources": false
+        "inlineSources": false,
+        "baseUrl": ".",
+        "paths": {
+            "log-view-machine": ["../log-view-machine/dist/index.esm.js"],
+            "log-view-machine/*": ["../log-view-machine/dist/*"]
+        }
     },
     "include": [
         "src"
