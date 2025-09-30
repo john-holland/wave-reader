@@ -120,6 +120,7 @@ class WaveReaderTomeServer {
     return createMachine({
       id: 'wave-reader',
       initial: 'idle',
+      predictableActionArguments: true,
       context: {
         selector: 'p',
         selectors: [],

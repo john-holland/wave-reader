@@ -1,6 +1,7 @@
 import React, { FunctionComponent, useEffect, useState, useCallback, useRef } from 'react';
 import styled from 'styled-components';
 import { WaveTabsMessageHandler } from './robotcopy-pact-config';
+import Tab from '../../models/tab';
 
 // Styled components for the Tomes-based wave tabs
 const WaveTabsContainer = styled.div`
@@ -320,14 +321,6 @@ const ConfigurationActions = styled.div`
   justify-content: center;
 `;
 
-// Tab interface
-interface Tab {
-  id: string;
-  name: string;
-  content: string;
-  state: Record<string, any>;
-}
-
 // Props interface
 interface WaveTabsTomesProps {
   children?: React.ReactNode;
@@ -337,6 +330,7 @@ interface WaveTabsTomesProps {
   onTabAdd?: (tab: Tab) => void;
   onTabRemove?: (tabId: string) => void;
   className?: string;
+  enableTabManagement?: boolean;
 }
 
 // Main component using withState pattern
@@ -347,7 +341,8 @@ const WaveTabsTomes: FunctionComponent<WaveTabsTomesProps> = ({
   onTabChange,
   onTabAdd,
   onTabRemove,
-  className
+  className,
+  enableTabManagement = true
 }) => {
   // State management using withState pattern
   const [activeTab, setActiveTab] = useState(0);
@@ -359,6 +354,7 @@ const WaveTabsTomes: FunctionComponent<WaveTabsTomesProps> = ({
   const [currentView, setCurrentView] = useState<'tab' | 'management' | 'configuration'>('tab');
   const [messageHandler, setMessageHandler] = useState<WaveTabsMessageHandler | null>(null);
   const [isExtension, setIsExtension] = useState(false);
+  const [isEnableTabManagement, setIsEnableTabManagement] = useState(enableTabManagement);
 
   // Refs
   const tabHistoryRef = useRef<number[]>([]);
@@ -814,6 +810,7 @@ const WaveTabsTomes: FunctionComponent<WaveTabsTomesProps> = ({
           <TabView isActive={true}>
             <TabHeader>
               <TabTitle>{tabs[activeTab]?.name || `Tab ${activeTab + 1}`}</TabTitle>
+              {isEnableTabManagement && (
               <TabActions>
                 <Button className="btn btn-secondary" onClick={handleManageTabs}>
                   ⚙️ Manage Tabs
@@ -822,7 +819,8 @@ const WaveTabsTomes: FunctionComponent<WaveTabsTomesProps> = ({
                   🔧 Configure
                 </Button>
               </TabActions>
-            </TabHeader>
+              )}
+            </TabHeader>  
             
             <TabContent>
               {tabs[activeTab]?.content || <p>No content available for this tab</p>}
@@ -848,6 +846,8 @@ const WaveTabsTomes: FunctionComponent<WaveTabsTomesProps> = ({
                     {tab.name}
                   </Button>
                 ))}
+
+                {tabs[activeTab]?.content || <p>No content available for this tab</p>}
                 
                 {activeTab < tabs.length - 1 && (
                   <Button 

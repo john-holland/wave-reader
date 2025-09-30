@@ -1,6 +1,8 @@
 import React, { FunctionComponent, useEffect, useState, useCallback, useRef } from 'react';
 import styled from 'styled-components';
 import { SettingsMessageHandler } from './robotcopy-pact-config';
+import Wave, { defaultCssTemplate, defaultCssMouseTemplate } from '../../models/wave';
+import Text from '../../models/text';
 
 // Styled components for the Tomes-based settings
 const SettingsContainer = styled.div`
@@ -390,6 +392,7 @@ interface Settings {
   axisRotationAmountYMax: number;
   axisRotationAmountYMin: number;
   autoGenerateCss: boolean;
+  cssGenerationMode: 'template' | 'hardcoded';
 }
 
 // Domain paths interface
@@ -436,6 +439,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
     axisRotationAmountYMax: 5,
     axisRotationAmountYMin: -5,
     autoGenerateCss: true,
+    cssGenerationMode: 'template',
     ...initialSettings
   });
   const [localDomainPaths, setLocalDomainPaths] = useState<DomainPaths[]>(domainPaths);
@@ -491,6 +495,43 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
     settingsRef.current = settings;
   }, [settings]);
 
+  // Auto-generate CSS templates when settings change and auto-generate is enabled
+  useEffect(() => {
+    if (settings.autoGenerateCss) {
+      console.log('⚙️ SettingsTomes: Auto-generating CSS templates');
+      
+      // Create a Wave instance with current settings
+      const wave = new Wave({
+        selector: settings.selector,
+        waveSpeed: settings.waveSpeed,
+        axisTranslateAmountXMax: settings.axisTranslateAmountXMax,
+        axisTranslateAmountXMin: settings.axisTranslateAmountXMin,
+        axisRotationAmountYMax: settings.axisRotationAmountYMax,
+        axisRotationAmountYMin: settings.axisRotationAmountYMin,
+        text: new Text({
+          size: settings.textSize,
+          color: settings.textColor
+        })
+      });
+      
+      // Generate CSS templates
+      const cssTemplate = defaultCssTemplate(wave);
+      const cssMouseTemplate = defaultCssMouseTemplate(wave);
+      
+      // Update settings with generated CSS if they're different
+      setSettings(prev => {
+        if (prev.cssTemplate !== cssTemplate || prev.cssMouseTemplate !== cssMouseTemplate) {
+          return {
+            ...prev,
+            cssTemplate,
+            cssMouseTemplate
+          };
+        }
+        return prev;
+      });
+    }
+  }, [settings.autoGenerateCss, settings.waveSpeed, settings.axisTranslateAmountXMax, settings.axisTranslateAmountXMin, settings.axisRotationAmountYMax, settings.axisRotationAmountYMin, settings.selector, settings.textSize, settings.textColor]);
+
   // Handle Chrome extension messaging
   const sendExtensionMessage = async (message: any) => {
     if (!isExtension || !messageHandler) {
@@ -522,14 +563,40 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
   const handleWaveSettingChange = useCallback((key: keyof Settings, value: any) => {
     console.log('⚙️ SettingsTomes: Updating wave setting:', key, value);
     
-    handleSettingChange(key, value);
+    const newSettings = { ...settings, [key]: value };
+    setSettings(newSettings);
+    setSaved(false);
     
     // Auto-generate CSS if enabled
-    if (settings.autoGenerateCss && ['waveSpeed', 'axisTranslateAmountXMax', 'axisTranslateAmountXMin', 'axisRotationAmountYMax', 'axisRotationAmountYMin'].includes(key)) {
-      // This would trigger CSS auto-generation
+    if (settings.autoGenerateCss && ['waveSpeed', 'axisTranslateAmountXMax', 'axisTranslateAmountXMin', 'axisRotationAmountYMax', 'axisRotationAmountYMin', 'selector', 'textSize'].includes(key)) {
       console.log('⚙️ SettingsTomes: Auto-generating CSS from wave parameters');
+      
+      // Create a Wave instance with current settings
+      const wave = new Wave({
+        selector: newSettings.selector,
+        waveSpeed: newSettings.waveSpeed,
+        axisTranslateAmountXMax: newSettings.axisTranslateAmountXMax,
+        axisTranslateAmountXMin: newSettings.axisTranslateAmountXMin,
+        axisRotationAmountYMax: newSettings.axisRotationAmountYMax,
+        axisRotationAmountYMin: newSettings.axisRotationAmountYMin,
+        text: new Text({
+          size: newSettings.textSize,
+          color: newSettings.textColor
+        })
+      });
+      
+      // Generate CSS templates
+      const cssTemplate = defaultCssTemplate(wave);
+      const cssMouseTemplate = defaultCssMouseTemplate(wave);
+      
+      // Update settings with generated CSS
+      setSettings(prev => ({
+        ...prev,
+        cssTemplate,
+        cssMouseTemplate
+      }));
     }
-  }, [handleSettingChange, settings.autoGenerateCss]);
+  }, [settings, setSettings]);
 
   const handleCssSettingChange = useCallback((key: keyof Settings, value: any) => {
     console.log('⚙️ SettingsTomes: Updating CSS setting:', key, value);
@@ -632,7 +699,8 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
           axisTranslateAmountXMin: -10,
           axisRotationAmountYMax: 5,
           axisRotationAmountYMin: -5,
-          autoGenerateCss: true
+          autoGenerateCss: true,
+          cssGenerationMode: 'template'
         };
         
         setSettings(defaultSettings);
@@ -897,6 +965,21 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                   Auto-generate CSS from parameters
                 </SettingLabel>
                 <HelpText>When enabled, CSS templates are automatically generated from animation parameters</HelpText>
+              </SettingItem>
+              
+              <SettingItem>
+                <SettingLabel>CSS Generation Mode:</SettingLabel>
+                <SettingSelect
+                  value={settings.cssGenerationMode}
+                  onChange={(e) => handleSettingChange('cssGenerationMode', e.target.value)}
+                >
+                  <option value="template">Template-based (Dynamic)</option>
+                  <option value="hardcoded">Hardcoded (Static)</option>
+                </SettingSelect>
+                <HelpText>
+                  Template-based: CSS is generated from parameters dynamically<br/>
+                  Hardcoded: Use predefined CSS templates
+                </HelpText>
               </SettingItem>
             </SettingGroup>
             

@@ -6,9 +6,10 @@ import {SelectorDefault} from "./defaults";
 export const defaultCssTemplate = (options: Wave) => `
 @-webkit-keyframes wobble {
   0% { transform: translateX(0%); rotateY(0deg); }
-  15% { transform: translateX(-1%) rotateY(-2deg); }
-  30% { transform: translateX(0%) rotateY(2deg); }
-  100% { transform: translateX(0%) rotateY(0deg); }
+  25% { transform: translateX(${options.axisTranslateAmountXMin}%); rotateY(${options.axisRotationAmountYMin}deg); }
+  50% { transform: translateX(0%); rotateY(${options.axisRotationAmountYMax}deg); }
+  75% { transform: translateX(${options.axisTranslateAmountXMax}%); rotateY(${options.axisRotationAmountYMin}deg); }
+  100% { transform: translateX(0%); rotateY(0deg); }
 }
 
 ${options.selector || '.wave-reader__text'} {

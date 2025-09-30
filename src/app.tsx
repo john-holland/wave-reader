@@ -4,6 +4,7 @@ import './styles.scss';
 import { ErrorBoundary } from './components/error-boundary';
 import { Settings } from './components/settings';
 import WaveTabs from './components/wave-tabs';
+import Tab from './models/tab';
 import About from './components/about';
 import ErrorTestComponent from './components/ErrorTestComponent';
 import ErrorDemoComponent from './components/ErrorDemoComponent';
@@ -21,6 +22,7 @@ import {
   useWaveReaderMessageRouter
 } from './components/structural';
 import { createProxyRobotCopyStateMachine, createTomeConfig, createViewStateMachine, TomeClient, createRobotCopy } from 'log-view-machine';
+import { actionTypes } from 'xstate/lib/actions';
 
 /**
  * ISubMachine Interface
@@ -643,6 +645,177 @@ const StatusIndicator = styled.div<StatusIndicatorProps>`
   }
 `;
 
+// New styled components for bifocal modal structure
+const ModalContainer = styled.div`
+  width: 400px;
+  max-height: 600px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+`;
+
+const ModalHeader = styled.div`
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const HeaderTitle = styled.h1`
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+`;
+
+const HeaderActions = styled.div`
+  display: flex;
+  gap: 8px;
+  align-items: center;
+`;
+
+const StartWaveButton = styled.button`
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+`;
+
+const CollapseButton = styled.button`
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+`;
+
+const TabNavigation = styled.div`
+  display: flex;
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+`;
+
+const TabButton = styled.button<{ isActive: boolean }>`
+  flex: 1;
+  padding: 12px 16px;
+  border: none;
+  background: ${props => props.isActive ? 'white' : 'transparent'};
+  color: ${props => props.isActive ? '#667eea' : '#6c757d'};
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid ${props => props.isActive ? '#667eea' : 'transparent'};
+  
+  &:hover {
+    background: ${props => props.isActive ? 'white' : 'rgba(102, 126, 234, 0.05)'};
+    color: #667eea;
+  }
+`;
+
+const TabContent = styled.div`
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+`;
+
+const HowToContent = styled.div`
+  line-height: 1.6;
+  
+  h3 {
+    color: #2c3e50;
+    margin-bottom: 16px;
+    font-size: 1.2rem;
+  }
+  
+  p {
+    margin-bottom: 12px;
+    color: #495057;
+  }
+  
+  .shortcut {
+    background: #e9ecef;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 13px;
+    color: #495057;
+    display: inline-block;
+    margin: 4px 0;
+  }
+`;
+
+const AboutContent = styled.div`
+  line-height: 1.6;
+  
+  h3 {
+    color: #2c3e50;
+    margin-bottom: 16px;
+    font-size: 1.2rem;
+  }
+  
+  p {
+    margin-bottom: 12px;
+    color: #495057;
+  }
+  
+  .donation-section {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    margin: 20px 0;
+  }
+  
+  .donation-image {
+    width: 60%;
+    margin: 16px auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .donation-image img {
+    width: 100%;
+    height: auto;
+    max-width: 300px;
+    display: block;
+  }
+  
+  .address {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+    color: #6c757d;
+    word-break: break-all;
+  }
+`;
+
 // Unified App component using Tome architecture
 
 
@@ -983,6 +1156,95 @@ const SyncSystem = {
     }
 };
 
+
+class AppMachineTab implements Tab {
+    static nextFreeTabId = 0;
+    id: number; 
+    name: string;
+    content: any;
+    state: Record<string, any>;
+
+    constructor(attributes: any = {
+        id: AppMachineTab.nextFreeTabId++,
+        name: 'New Tab',
+        content: (<p>Tab Content Here!</p>),
+        state: {}
+    } as Partial<Tab>) {
+        this.id = attributes.id;
+        this.name = attributes.name;
+        this.content = attributes.content;
+        this.state = attributes.state || {};
+    }
+}
+
+const tabs = [
+    new AppMachineTab({ 
+        id: 'how-to', label: 'How to', icon: 'ℹ️', enabled: true,
+        content: (context: any, event: any, view: any, transition: any, send: any, log: any) => {
+            return (<div>
+                <p>Click "Start Wave" to animate the page.</p>
+                <h3>Keyboard Shortcuts: </h3> <p>Toggle Wave: {context.viewModel.toggleKeys.keyChord.join(' + ')}</p>
+            </div>)
+        }
+    }),
+    new AppMachineTab({ 
+        id: 'settings', label: 'Settings', icon: '⚙️', enabled: true,
+        content: (context: any, event: any, view: any, transition: any, send: any, log: any) => {
+            return (<Settings />)
+        }
+    }),
+    new AppMachineTab({ id: 'about', label: 'About', icon: 'ℹ️', enabled: true,
+        content: (context: any, event: any, view: any, transition: any, send: any, log: any) => {
+            return (<About />)
+        }
+    })
+];
+
+const tabSectionTabView = createViewStateMachine({
+    machineId: 'tab-section-tab-view',
+    xstateConfig: {
+        initial: 'idle',
+        context: {
+            activeTab: 'how-to',
+            tabs: tabs
+        },
+        states: {
+            idle: {
+                on: {
+                    TAB_CHANGE: { target: 'changing', actions: ['changeTab'] }
+                }
+            },
+            changing: {
+                on: {
+                    TAB_SELECTION_COMPLETE: { target: 'idle', action: ['change'] }
+                }
+            }
+        },
+        actions: {
+            changeTab: {
+                type: 'function',
+                fn: ({context, event, send, log, transition, machine}: any) => {
+                    context.activeTab = event.tab;
+                }
+            },
+            change: {
+                type: 'function',
+                fn: ({context, event, send, log, transition, machine, transition, log, clear}: any) => {
+                    clear();
+                }
+            }
+        }
+    }
+}).
+withState('idle', async ({context, event, view, transition, send, log}: any) => {
+    const tabContent = context.tabs[context.activeTab]?.content(context, event, view, transition, send, log) || <div>No content available for this tab</div>;
+    view(tabContent);
+}).
+withState('changing', async ({context, event, view, transition, send, log, clear}: any) => {
+    clear();
+    send('TAB_SELECTION_COMPLETE');
+});
+
 const AppMachineRaw = createViewStateMachine({
     machineId: 'app-machine',
     xstateConfig: {
@@ -997,7 +1259,9 @@ const AppMachineRaw = createViewStateMachine({
                 currentView: 'main',
                 isExtension: false,
                 settings: null,
-                showNotifications: true
+                showNotifications: true,
+                activeTab: 'how-to',
+                isCollapsed: false
             }
         },
         states: {
@@ -1010,6 +1274,8 @@ const AppMachineRaw = createViewStateMachine({
                     KEYBOARD_TOGGLE: { target: 'keyboardToggling', actions: ['handleKeyboardToggle'] },
                     SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
                     SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
+                    TAB_CHANGE: { target: 'idle', actions: ['changeTab'] },
+                    TOGGLE_COLLAPSE: { target: 'idle', actions: ['toggleCollapse'] },
                     ERROR: { target: 'error', actions: ['handleError'] }
                 }
             },
@@ -1027,6 +1293,8 @@ const AppMachineRaw = createViewStateMachine({
                     KEYBOARD_TOGGLE: { target: 'keyboardToggling', actions: ['handleKeyboardToggle'] },
                     SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
                     SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
+                    TAB_CHANGE: { target: 'ready', actions: ['changeTab'] },
+                    TOGGLE_COLLAPSE: { target: 'ready', actions: ['toggleCollapse'] },
                     REFRESH_STATE: { target: 'ready', actions: ['refreshStateFromContentScript'] },
                     STATE_REFRESHED: { target: 'ready', actions: ['logStateRefresh'] },
                     STATE_REFRESH_FAILED: { target: 'ready', actions: ['logStateRefreshError'] },
@@ -1098,6 +1366,13 @@ const AppMachineRaw = createViewStateMachine({
                 type: 'function',
                 fn: ({context, event, send, log, transition, machine}: any) => {
                     console.log('🌊 App Tome: Toggle complete waving');
+                }
+            },
+            toggleCollapse: {
+                type: 'function',
+                fn: ({context, event, send, log, transition, machine}: any) => {
+                    console.log('🌊 App Tome: Toggle collapse');
+                    context.viewModel.isCollapsed = !context.viewModel.isCollapsed;
                 }
             },
             // Helper function for data synchronization
@@ -1612,19 +1887,7 @@ const AppMachineRaw = createViewStateMachine({
                 >
                     Start Wave
                 </button>
-                <button 
-                    onClick={() => send('SETTINGS_UPDATE')}
-                    style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#007bff',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                    }}
-                >
-                    Settings
-                </button>
+                {tabSectionTabView.render(context)}
             </div>
         </div>
     );
@@ -1672,47 +1935,7 @@ const AppMachineRaw = createViewStateMachine({
                 <p>Selector: {context.viewModel?.selector || 'None'}</p>
             </div>
             <div>
-                <button 
-                    onClick={() => send('START')}
-                    style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#28a745',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        marginRight: '10px'
-                    }}
-                >
-                    Start Wave
-                </button>
-                <button 
-                    onClick={() => send('TOGGLE')}
-                    style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#ffc107',
-                        color: 'black',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        marginRight: '10px'
-                    }}
-                >
-                    Toggle
-                </button>
-                <button 
-                    onClick={() => send('SETTINGS_UPDATE')}
-                    style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#007bff',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                    }}
-                >
-                    Settings
-                </button>
+                {tabSectionTabView.render(context)}
             </div>
         </div>
     );
@@ -1768,33 +1991,7 @@ const AppMachineRaw = createViewStateMachine({
                 </p>
             </div>
             <div>
-                <button 
-                    onClick={() => send('STOP')}
-                    style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#dc3545',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        marginRight: '10px'
-                    }}
-                >
-                    Stop Wave
-                </button>
-                <button 
-                    onClick={() => send('TOGGLE')}
-                    style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#ffc107',
-                        color: 'black',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                    }}
-                >
-                    Toggle
-                </button>
+                {tabSectionTabView.render(context)}
             </div>
         </div>
     );
@@ -1890,20 +2087,7 @@ const AppMachineRaw = createViewStateMachine({
                 />
             </div>
             <div>
-                <button 
-                    onClick={() => send('SETTINGS_UPDATE_CANCELLED')}
-                    style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#6c757d',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        marginRight: '10px'
-                    }}
-                >
-                    Cancel
-                </button>
+                {tabSectionTabView.render(context)}
             </div>
         </div>
     );
@@ -2882,6 +3066,10 @@ const AppComponent: FunctionComponent = () => {
     const [isExtension, setIsExtension] = useState(false);
     const [settings, setSettings] = useState<Options | null>(null);
     const [showNotifications, setShowNotifications] = useState(true);
+    
+    // New state for modal structure
+    const [activeTab, setActiveTab] = useState<'how-to' | 'settings' | 'about'>('how-to');
+    const [isCollapsed, setIsCollapsed] = useState(false);
     
     // Add state for reactive UI updates
     const [appMachineState, setAppMachineState] = useState(AppMachine.getState());

@@ -8,6 +8,7 @@ export default class Text extends AttributeConstructor<Text> {
         size: 'initial',
         color: 'initial'
     }) {
-        super(attributes)
+        super(attributes);
+        this.assign(attributes);
     }
 }

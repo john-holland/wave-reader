@@ -18,6 +18,7 @@ class BackgroundInterchange {
         return createMachine({
             id: 'background-interchange',
             initial: 'idle',
+            predictableActionArguments: true,
             context: {
                 globalState: 'idle',
                 activeSelectors: new Set(),
@@ -164,6 +165,36 @@ class BackgroundInterchange {
         });
     }
 
+    async ensureContentScriptInjected(tabId) {
+        try {
+            // Check if content script is already injected by trying to send a ping
+            try {
+                await chrome.tabs.sendMessage(tabId, { type: 'PING' });
+                console.log('🌊 Background: Content script already injected in tab:', tabId);
+                return;
+            } catch (error) {
+                // Content script not injected, proceed with injection
+                console.log('🌊 Background: Content script not found, injecting into tab:', tabId);
+            }
+
+            // Inject content scripts
+            await chrome.scripting.executeScript({
+                target: { tabId: tabId },
+                files: ['content.js']
+            });
+
+            await chrome.scripting.executeScript({
+                target: { tabId: tabId },
+                files: ['shadowContent.js']
+            });
+
+            console.log('🌊 Background: Content scripts injected successfully into tab:', tabId);
+        } catch (error) {
+            console.error('🌊 Background: Failed to inject content scripts into tab:', tabId, error);
+            throw error;
+        }
+    }
+
     handleIncomingMessage(message, sender, sendResponse) {
         const { type, data, source, target, traceId } = message;
         
@@ -255,6 +286,9 @@ class BackgroundInterchange {
                 throw new Error('No active tab found');
             }
             
+            // Ensure content script is injected
+            await this.ensureContentScriptInjected(tab.id);
+            
             // Send message to content script
             await chrome.tabs.sendMessage(tab.id, {
                 type: 'START_WAVE_READER',
@@ -316,6 +350,9 @@ class BackgroundInterchange {
             if (!tab) {
                 throw new Error('No active tab found');
             }
+            
+            // Ensure content script is injected
+            await this.ensureContentScriptInjected(tab.id);
             
             // Send message to content script
             await chrome.tabs.sendMessage(tab.id, {
@@ -394,6 +431,9 @@ class BackgroundInterchange {
                 throw new Error('No active tab found');
             }
             
+            // Ensure content script is injected
+            await this.ensureContentScriptInjected(tab.id);
+            
             // Send message to content script
             await chrome.tabs.sendMessage(tab.id, {
                 type: 'PAUSE_WAVE_READER',
@@ -426,6 +466,9 @@ class BackgroundInterchange {
             if (!tab) {
                 throw new Error('No active tab found');
             }
+            
+            // Ensure content script is injected
+            await this.ensureContentScriptInjected(tab.id);
             
             // Send message to content script
             await chrome.tabs.sendMessage(tab.id, {

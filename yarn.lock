@@ -8155,10 +8155,10 @@ log-update@^6.1.0:
     strip-ansi "^7.1.0"
     wrap-ansi "^9.0.0"
 
-log-view-machine@^1.3.0:
-  version "1.3.0"
-  resolved "https://registry.npmjs.org/log-view-machine/-/log-view-machine-1.3.0.tgz"
-  integrity sha512-JPGZb/fP0XPpKlplZ3Lzk0kjwMFQS3J27HR+tiKjRaWKLzn0Gm5XT3VzX1HRKfiMn0arB1fMmjg8NW39go1+wg==
+log-view-machine@^1.3.1:
+  version "1.3.1"
+  resolved "https://registry.npmjs.org/log-view-machine/-/log-view-machine-1.3.1.tgz"
+  integrity sha512-xPLCHPYRfBT7RZRo1OjCeg0tgPmJ/FcAQKgDeX87vptHHlPoZup4AA6LOkvStf+beD/PalfER9FlM3Q2/s7vdg==
   dependencies:
     "@opentelemetry/api" "^1.4.0"
     "@opentelemetry/exporter-metrics-otlp-http" "^0.44.0"

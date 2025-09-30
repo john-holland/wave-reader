@@ -1,4 +1,4 @@
-import { createStructuralConfig, type AppStructureConfig } from 'log-view-machine';
+import { createStructuralConfig } from 'log-view-machine';
 import WaveReaderMainTome from './wave-reader-tome-config';
 
 /**
@@ -8,7 +8,7 @@ import WaveReaderMainTome from './wave-reader-tome-config';
  * existing wave-reader components and provides message routing between them.
  */
 
-export const WaveReaderStructuralConfig: AppStructureConfig = createStructuralConfig({
+export const WaveReaderStructuralConfig = createStructuralConfig({
   // Application structure definition
   AppStructure: {
     id: 'wave-reader-app',
