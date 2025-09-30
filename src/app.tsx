@@ -22,6 +22,9 @@ import {
   useWaveReaderMessageRouter
 } from './components/structural';
 import { createProxyRobotCopyStateMachine, createTomeConfig, createViewStateMachine, TomeClient, createRobotCopy } from 'log-view-machine';
+import SettingsTomes from './component-middleware/settings/SettingsTomes';
+import AboutTome from './component-middleware/about/AboutTome';
+import WaveTabsTomes from './component-middleware/wave-tabs/WaveTabsTomes';
 import { actionTypes } from 'xstate/lib/actions';
 
 /**
@@ -1190,12 +1193,12 @@ const tabs = [
     new AppMachineTab({ 
         id: 'settings', label: 'Settings', icon: '⚙️', enabled: true,
         content: (context: any, event: any, view: any, transition: any, send: any, log: any) => {
-            return (<Settings />)
+            return (<SettingsTomes />)
         }
     }),
     new AppMachineTab({ id: 'about', label: 'About', icon: 'ℹ️', enabled: true,
         content: (context: any, event: any, view: any, transition: any, send: any, log: any) => {
-            return (<About />)
+            return (<AboutTome />)
         }
     })
 ];
@@ -1229,7 +1232,7 @@ const tabSectionTabView = createViewStateMachine({
             },
             change: {
                 type: 'function',
-                fn: ({context, event, send, log, transition, machine, transition, log, clear}: any) => {
+                fn: ({context, event, send, log, transition, machine, clear}: any) => {
                     clear();
                 }
             }
@@ -1373,6 +1376,13 @@ const AppMachineRaw = createViewStateMachine({
                 fn: ({context, event, send, log, transition, machine}: any) => {
                     console.log('🌊 App Tome: Toggle collapse');
                     context.viewModel.isCollapsed = !context.viewModel.isCollapsed;
+                }
+            },
+            changeTab: {
+                type: 'function',
+                fn: ({context, event, send, log, transition, machine}: any) => {
+                    console.log('🌊 App Tome: Change tab to', event.tab);
+                    context.viewModel.activeTab = event.tab || 'how-to';
                 }
             },
             // Helper function for data synchronization
@@ -3201,221 +3211,87 @@ const AppComponent: FunctionComponent = () => {
         };
     }, []);
 
+    // Helper functions for tab management
+    const handleTabChange = (tab: 'how-to' | 'settings' | 'about') => {
+        AppMachine.send({ type: 'TAB_CHANGE', tab });
+    };
+
+    const handleToggleCollapse = () => {
+        AppMachine.send({ type: 'TOGGLE_COLLAPSE' });
+    };
+
+    const handleStartWave = () => {
+        AppMachine.send({ type: 'START' });
+    };
+
     return (
         <ErrorBoundary>
-        <WaveReader>
-                <PopupHeader>
-                    <h1>🌊 Wave Reader</h1>
-                    <p>Motion Reader for Eye Tracking</p>
-                </PopupHeader>
-                {(AppTome as any).render ? (
-                    <div key={tomeRenderKey}>
-                        {(AppTome as any).render()}
-                    </div>
-                ) : null}
-                <PopupContent>
-                    {/* Use WaveTabs with structural components */}
-            <WaveTabs>
-                        <div>
-                            {/* Integrated Tome System Status */}
-                            <div style={{ marginBottom: '20px' }}>
-                                <h3>🏗️ Integrated Tome System</h3>
-                                <div style={{ 
-                                    padding: '15px', 
-                                    backgroundColor: '#e8f5e8', 
-                                    border: '1px solid #4caf50', 
-                                    borderRadius: '4px',
-                                    marginBottom: '15px'
-                                }}>
-                                    <h4>📚 Available Tomes</h4>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px' }}>
-                                        <div>
-                                            <strong>App Tome:</strong> Main application with UI integration
-                                        </div>
-                                        <div>
-                                            <strong>WaveTabs Tome:</strong> Tab management UI component
-                                        </div>
-                                        <div>
-                                            <strong>Settings Tome:</strong> Settings UI component
-                                        </div>
-                                        <div>
-                                            <strong>Background Proxy:</strong> Extension communication
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                {/* Tome Management Controls */}
-                                <div style={{ 
-                                    padding: '15px', 
-                                    backgroundColor: '#f0f8ff', 
-                                    border: '1px solid #2196f3', 
-                                    borderRadius: '4px',
-                                    marginBottom: '15px'
-                                }}>
-                                    <h4>🎛️ Tome Management (Lazy TomeManager)</h4>
-                                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
-                                        <button 
-                                            onClick={() => {
-                                                console.log('🌊 App Component: Starting AppTome');
-                                                (AppTome as any).start();
-                                            }}
-                                            style={{
-                                                padding: '6px 12px',
-                                                backgroundColor: '#4caf50',
-                                                color: 'white',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                cursor: 'pointer',
-                                                fontSize: '12px'
-                                            }}
-                                        >
-                                            Start AppTome
-                                        </button>
-                                        <button 
-                                            onClick={() => {
-                                                console.log('🌊 App Component: Stopping AppTome');
-                                                (AppTome as any).stop();
-                                            }}
-                                            style={{
-                                                padding: '6px 12px',
-                                                backgroundColor: '#f44336',
-                                                color: 'white',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                cursor: 'pointer',
-                                                fontSize: '12px'
-                                            }}
-                                        >
-                                            Stop AppTome
-                                        </button>
-                                        <button 
-                                            onClick={() => {
-                                                console.log('🌊 App Component: Force rendering');
-                                                (AppTome as any).forceRender();
-                                            }}
-                                            style={{
-                                                padding: '6px 12px',
-                                                backgroundColor: '#ff9800',
-                                                color: 'white',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                cursor: 'pointer',
-                                                fontSize: '12px'
-                                            }}
-                                        >
-                                            Force Render
-                                        </button>
-                                    </div>
-                                    <div style={{ fontSize: '11px', color: '#666' }}>
-                                        <p><strong>Tome State:</strong> {(AppTome as any).getState().isStarted ? 'Started' : 'Stopped'}</p>
-                                        <p><strong>Health:</strong> {(AppTome as any).getHealth().status}</p>
-                                        <p><strong>Render Key:</strong> {tomeRenderKey}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            {/* Machine Status Tab */}
-                            <div style={{ marginBottom: '20px' }}>
-                                <h3>🔧 Machine Status</h3>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                                    <div style={{ 
-                                        padding: '15px', 
-                                        backgroundColor: '#f8f9fa', 
-                                        border: '1px solid #dee2e6', 
-                                        borderRadius: '4px' 
-                                    }}>
-                                        <h4>Background Proxy Machine</h4>
-                                        <p><strong>ID:</strong> {BackgroundProxyMachine.machineId}</p>
-                                        <p><strong>Type:</strong> {BackgroundProxyMachine.machineType}</p>
-                                        <p><strong>State:</strong> 
-                                            <span style={{ 
-                                                color: proxyMachineState.value === 'active' ? '#28a745' : 
-                                                       proxyMachineState.value === 'connected' ? '#17a2b8' : '#6c757d',
-                                                fontWeight: 'bold'
-                                            }}>
-                                                {proxyMachineState.value}
-                                            </span>
-                                        </p>
-                                        <p><strong>Connected:</strong> {proxyMachineContext.proxyData?.connected ? 'Yes' : 'No'}</p>
-                                        <p><strong>Health:</strong> 
-                                            <span style={{ 
-                                                color: BackgroundProxyMachine.getHealth().status === 'healthy' ? '#28a745' : 
-                                                       BackgroundProxyMachine.getHealth().status === 'degraded' ? '#ffc107' : '#dc3545'
-                                            }}>
-                                                {BackgroundProxyMachine.getHealth().status}
-                                            </span>
-                                        </p>
-                                    </div>
-                                    <div style={{ 
-                                        padding: '15px', 
-                                        backgroundColor: '#f8f9fa', 
-                                        border: '1px solid #dee2e6', 
-                                        borderRadius: '4px' 
-                                    }}>
-                                        <h4>App Machine</h4>
-                                        <p><strong>ID:</strong> {AppMachine.machineId}</p>
-                                        <p><strong>Type:</strong> {AppMachine.machineType}</p>
-                                        <p><strong>State:</strong> 
-                                            <span style={{ 
-                                                color: appMachineState.value === 'waving' ? '#28a745' : 
-                                                       appMachineState.value === 'settingsUpdating' ? '#6f42c1' : '#6c757d',
-                                                fontWeight: 'bold'
-                                            }}>
-                                                {appMachineState.value}
-                                            </span>
-                                        </p>
-                                        <p><strong>Health:</strong> 
-                                            <span style={{ 
-                                                color: AppMachine.getHealth().status === 'healthy' ? '#28a745' : 
-                                                       AppMachine.getHealth().status === 'degraded' ? '#ffc107' : '#dc3545'
-                                            }}>
-                                                {AppMachine.getHealth().status}
-                                            </span>
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            {/* View Model Status */}
-                            <div style={{ marginBottom: '20px' }}>
-                                <h3>📊 View Model Status</h3>
-                                <div style={{ 
-                                    padding: '15px', 
-                                    backgroundColor: '#e3f2fd', 
-                                    border: '1px solid #bbdefb', 
-                                    borderRadius: '4px' 
-                                }}>
-                                    <p><strong>Selector:</strong> {appMachineContext.viewModel?.selector || selector || 'None'}</p>
-                                    <p><strong>Going:</strong> 
-                                        <span style={{ 
-                                            color: (appMachineContext.viewModel?.going || going) ? '#28a745' : '#dc3545',
-                                            fontWeight: 'bold'
-                                        }}>
-                                            {(appMachineContext.viewModel?.going || going) ? 'Yes' : 'No'}
-                                        </span>
+            <ModalContainer>
+                <ModalHeader>
+                    <HeaderTitle>🌊 Wave Reader</HeaderTitle>
+                    <HeaderActions>
+                        <StartWaveButton onClick={handleStartWave}>
+                            {going ? 'Stop Wave' : 'Start Wave'}
+                        </StartWaveButton>
+                        <CollapseButton 
+                            onClick={handleToggleCollapse}
+                            title={isCollapsed ? 'Expand tabs' : 'Collapse tabs'}
+                        >
+                            {isCollapsed ? '⇲' : '⇳'}
+                        </CollapseButton>
+                    </HeaderActions>
+                </ModalHeader>
+                
+                {!isCollapsed && (
+                    <>
+                        <TabNavigation>
+                            <TabButton 
+                                isActive={activeTab === 'how-to'}
+                                onClick={() => handleTabChange('how-to')}
+                            >
+                                How to
+                            </TabButton>
+                            <TabButton 
+                                isActive={activeTab === 'settings'}
+                                onClick={() => handleTabChange('settings')}
+                            >
+                                Settings
+                            </TabButton>
+                            <TabButton 
+                                isActive={activeTab === 'about'}
+                                onClick={() => handleTabChange('about')}
+                            >
+                                About
+                            </TabButton>
+                        </TabNavigation>
+                        
+                        <TabContent>
+                            {activeTab === 'how-to' && (
+                                <HowToContent>
+                                    <h3>🌊 How to Use Wave Reader</h3>
+                                    <p>Click "Start Wave" to animate the page and help with reading comprehension.</p>
+                                    <p>
+                                        <strong>Keyboard Shortcut:</strong> 
+                                        <span className="shortcut">Alt + S</span> to toggle page animation
                                     </p>
-                                    <p><strong>Saved:</strong> 
-                                        <span style={{ 
-                                            color: (appMachineContext.viewModel?.saved || saved) ? '#28a745' : '#dc3545',
-                                            fontWeight: 'bold'
-                                        }}>
-                                            {(appMachineContext.viewModel?.saved || saved) ? 'Yes' : 'No'}
-                                        </span>
+                                    <p>
+                                        The wave animation applies gentle wobble effects to text elements, 
+                                        helping your eyes follow the content more naturally and reducing eye strain.
                                     </p>
-                                </div>
-                            </div>
+                                </HowToContent>
+                            )}
                             
-                            {/* Control Buttons */}
-                            <div>
-                                <h3>🎮 Controls</h3>
-                                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                                    {AppMachine.render!()}
-                                </div>
-                            </div>
-                        </div>
-            </WaveTabs>
-                </PopupContent>
-        </WaveReader>
+                            {activeTab === 'settings' && (
+                                <SettingsTomes />
+                            )}
+                            
+                            {activeTab === 'about' && (
+                                <AboutTome />
+                            )}
+                        </TabContent>
+                    </>
+                )}
+            </ModalContainer>
         </ErrorBoundary>
     );
 }

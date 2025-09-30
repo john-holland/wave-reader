@@ -162,6 +162,16 @@ const AboutReadingDisabilityView = () => {
         creating a gentle wobble effect that mimics natural eye movement patterns. This can help reduce 
         eye strain and improve reading speed for many users.
       </SectionText>
+      <SectionText>
+        <strong>Features:</strong>
+      </SectionText>
+      <ul style={{ color: '#495057', paddingLeft: '20px' }}>
+        <li>Customizable wave animations</li>
+        <li>Selector mode for choosing text elements</li>
+        <li>Keyboard shortcuts for quick activation</li>
+        <li>Settings persistence across sessions</li>
+        <li>Cross-browser compatibility</li>
+      </ul>
     </Section>
   );
 };
@@ -175,15 +185,10 @@ const AboutNielsonResearchView = () => {
         that eye movement patterns can be improved through subtle visual cues and animations.
       </SectionText>
       <SectionText>
-        <strong>Features:</strong>
+        The theoretical foundation draws from Nielsen Research findings on how the average reader scans 
+        webpages uniformly, which we use to support the approach of assisting those with tracking 
+        problems through gentle page animations.
       </SectionText>
-      <ul style={{ color: '#495057', paddingLeft: '20px' }}>
-        <li>Customizable wave animations</li>
-        <li>Selector mode for choosing text elements</li>
-        <li>Keyboard shortcuts for quick activation</li>
-        <li>Settings persistence across sessions</li>
-        <li>Cross-browser compatibility</li>
-      </ul>
     </Section>
   );
 };

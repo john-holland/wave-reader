@@ -871,6 +871,34 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
               
             </SettingGroup>
             
+            <SettingGroup>
+              <SettingGroupTitle>Accessibility & Safety</SettingGroupTitle>
+              
+              <SettingItem>
+                <Button 
+                  className="btn btn-danger"
+                  onClick={() => {
+                    console.log('🚨 Epileptic animation reported');
+                    // TODO: Implement epileptic animation reporting
+                    alert('Thank you for reporting this. We take accessibility seriously and will investigate this animation.');
+                  }}
+                  title="Report epileptic triggering animation"
+                  style={{ 
+                    fontSize: '14px',
+                    padding: '12px 20px',
+                    marginBottom: '12px'
+                  }}
+                >
+                  🚨 Report Epileptic Animation
+                </Button>
+                <HelpText>
+                  If any animation triggers epileptic symptoms or seizures, please report it immediately. 
+                  We prioritize accessibility and will investigate all reports.
+                </HelpText>
+              </SettingItem>
+              
+            </SettingGroup>
+            
             <SettingsActions>
               <Button className="btn btn-primary" onClick={handleSaveSettings}>
                 💾 Save Settings
