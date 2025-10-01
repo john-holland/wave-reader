@@ -1162,13 +1162,13 @@ const SyncSystem = {
 
 class AppMachineTab implements Tab {
     static nextFreeTabId = 0;
-    id: number; 
+    id: string; 
     name: string;
     content: any;
     state: Record<string, any>;
 
     constructor(attributes: any = {
-        id: AppMachineTab.nextFreeTabId++,
+        id: `tab-${AppMachineTab.nextFreeTabId++}`,
         name: 'New Tab',
         content: (<p>Tab Content Here!</p>),
         state: {}
