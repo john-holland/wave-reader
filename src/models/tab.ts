@@ -1,7 +1,7 @@
 
 // Tab interface
 export default interface Tab {
-    id: number;
+    id: string;
     name: string;
     content: any;
     state: Record<string, any>;

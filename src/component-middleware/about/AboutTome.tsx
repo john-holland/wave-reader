@@ -1,6 +1,5 @@
 import React, { FunctionComponent, useEffect, useState, useCallback, useRef } from 'react';
 import styled from 'styled-components';
-import { AboutPageComponentViewStateMachineTemplate } from './templates/about-page-component/index.js';
 import { createViewStateMachine } from 'log-view-machine';
 
 // Styled components for the Tomes-based about page
@@ -181,8 +180,8 @@ const AboutNielsonResearchView = () => {
     <Section>
       <SectionTitle>📊 Research Foundation</SectionTitle>
       <SectionText>
-        Wave Reader is based on research into how people read and scan web content. Studies have shown 
-        that eye movement patterns can be improved through subtle visual cues and animations.
+        {/* todo: substantiate (i think so): Wave Reader is based on research into how people read and scan web content. Studies have shown 
+        that eye movement patterns can be improved through subtle visual cues and animations. */}
       </SectionText>
       <SectionText>
         The theoretical foundation draws from Nielsen Research findings on how the average reader scans 
@@ -258,7 +257,7 @@ interface AboutTomeProps {
   donors?: Array<{name: string, amount: string, crypto?: string}>;
 }
 
-const AboutPageComponentView = (donated: boolean, hasEasterEggs: boolean, donors: Array<{name: string, amount: string, crypto?: string}>) => {
+const AboutPageComponentView = (donated: boolean, hasEasterEggs: boolean, donors: Array<{name: string, amount: string, crypto?: string}>, error?: string | null) => {
   return (
     <AboutView>
       <AboutHeader>
@@ -266,6 +265,39 @@ const AboutPageComponentView = (donated: boolean, hasEasterEggs: boolean, donors
       </AboutHeader>  
       
       <AboutContent>
+        {error && (
+          <Section>
+            <div style={{ 
+              background: '#f8d7da', 
+              color: '#721c24', 
+              padding: '16px', 
+              borderRadius: '8px', 
+              border: '1px solid #f5c6cb',
+              marginBottom: '20px'
+            }}>
+              <h4 style={{ margin: '0 0 8px 0', color: '#721c24' }}>⚠️ Error Loading Donation Status</h4>
+              <p style={{ margin: 0, fontSize: '14px' }}>{error}</p>
+              <button 
+                onClick={() => {
+                  // This would trigger a retry
+                  console.log('Retry donation status loading');
+                }}
+                style={{
+                  marginTop: '8px',
+                  padding: '8px 16px',
+                  background: '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          </Section>
+        )}
+        
         <AboutReadingDisabilityView />
         <AboutNielsonResearchView />
         <DonateView donated={donated} hasEasterEggs={hasEasterEggs} donors={donors} />
@@ -280,21 +312,194 @@ const AboutPageComponentView = (donated: boolean, hasEasterEggs: boolean, donors
   );
 };
 
-const AboutPageComponent = createViewStateMachine({
-  ...AboutPageComponentViewStateMachineTemplate,
-  context: {
-    donated: false,
-    hasEasterEggs: false,
-    donors: [
-      { name: "Anonymous Supporter", amount: "0.1 ETH", crypto: "ETH" },
-      { name: "Beta Tester", amount: "0.05 BTC", crypto: "BTC" },
-      { name: "Reading Enthusiast", amount: "0.2 ETH", crypto: "ETH" }
-    ]
+// GraphQL queries and mutations for donation status
+const DONATION_STATUS_QUERY = `
+  query GetDonationStatus($userId: String!) {
+    donationStatus(userId: $userId) {
+      donated
+      hasEasterEggs
+      donors {
+        name
+        amount
+        crypto
+        timestamp
+      }
+      totalDonations
+      lastDonationDate
+    }
   }
-}).withState('idle', ({ context, event, send, log, transition, machine, view }: any) => {
-  return view(AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors));
-}).withState('initialize', ({ context, event, send, log, transition, machine, view }: any) => {
-  return view(AboutPageComponentView(false, false, context.donors));
+`;
+
+const DONATION_REPORT_MUTATION = `
+  mutation ReportEpilepticAnimation($report: EpilepticReportInput!) {
+    reportEpilepticAnimation(report: $report) {
+      success
+      reportId
+      message
+    }
+  }
+`;
+
+const DONATION_STATUS_SUBSCRIPTION = `
+  subscription DonationStatusUpdates($userId: String!) {
+    donationStatusUpdated(userId: $userId) {
+      donated
+      hasEasterEggs
+      donors {
+        name
+        amount
+        crypto
+        timestamp
+      }
+    }
+  }
+`;
+
+const AboutPageComponent = createViewStateMachine({
+  machineId: 'about-page-component',
+  xstateConfig: {
+    initial: 'idle',
+    context: {
+      donated: false,
+      hasEasterEggs: false,
+      donors: [
+        { name: "Anonymous Supporter", amount: "0.1 ETH", crypto: "ETH" },
+        { name: "Beta Tester", amount: "0.05 BTC", crypto: "BTC" },
+        { name: "Reading Enthusiast", amount: "0.2 ETH", crypto: "ETH" }
+      ],
+      isLoading: false,
+      error: null,
+      userId: 'anonymous', // This would come from auth context
+      subscription: null
+    },
+    states: {
+      idle: {
+        on: {
+          LOAD_DONATION_STATUS: 'loading',
+          REPORT_EPILEPTIC: 'reporting'
+        }
+      },
+      loading: {
+        on: {
+          DONATION_STATUS_LOADED: 'idle',
+          DONATION_STATUS_ERROR: 'error'
+        }
+      },
+      error: {
+        on: {
+          RETRY: 'loading',
+          CLEAR_ERROR: 'idle'
+        }
+      },
+      reporting: {
+        on: {
+          REPORT_SUBMITTED: 'idle',
+          REPORT_ERROR: 'error'
+        }
+      }
+    }
+  }
+}).withState('idle', async ({ context, event, send, log, transition, machine, view }: any) => {
+  // Auto-load donation status on idle if not already loaded
+  if (!context.donated && !context.isLoading) {
+    await log('Loading donation status...');
+    send({ type: 'LOAD_DONATION_STATUS' });
+  }
+  
+  return view(AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error));
+}).withState('loading', async ({ context, event, send, log, transition, machine, view, graphql }: any) => {
+  try {
+    await log('Fetching donation status from GraphQL...');
+    
+    // Execute GraphQL query
+    const result = await graphql.query(DONATION_STATUS_QUERY, {
+      userId: context.userId
+    });
+    
+    if (result.data && result.data.donationStatus) {
+      const donationData = result.data.donationStatus;
+      
+      // Update context with GraphQL data
+      context.donated = donationData.donated || false;
+      context.hasEasterEggs = donationData.hasEasterEggs || false;
+      context.donors = donationData.donors || context.donors;
+      context.isLoading = false;
+      
+      await log('Donation status loaded successfully', donationData);
+      
+      // Start subscription for real-time updates
+      if (!context.subscription) {
+        try {
+          context.subscription = await graphql.subscription(DONATION_STATUS_SUBSCRIPTION, {
+            userId: context.userId
+          });
+          
+          // Handle subscription updates
+          context.subscription.subscribe({
+            next: (update: any) => {
+              if (update.data && update.data.donationStatusUpdated) {
+                const updatedData = update.data.donationStatusUpdated;
+                context.donated = updatedData.donated;
+                context.hasEasterEggs = updatedData.hasEasterEggs;
+                context.donors = updatedData.donors;
+                log('Donation status updated via subscription', updatedData);
+              }
+            },
+            error: (error: any) => {
+              log('Subscription error', error);
+            }
+          });
+        } catch (subError) {
+          await log('Failed to start subscription', subError);
+        }
+      }
+      
+      send({ type: 'DONATION_STATUS_LOADED', payload: donationData });
+    } else {
+      throw new Error('Invalid GraphQL response format');
+    }
+  } catch (error) {
+    await log('Failed to load donation status', error);
+    context.error = error instanceof Error ? error.message : 'Unknown error occurred';
+    context.isLoading = false;
+    send({ type: 'DONATION_STATUS_ERROR', payload: error });
+  }
+  
+  return view(AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error));
+}).withState('error', ({ context, event, send, log, transition, machine, view }: any) => {
+  return view(AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error));
+}).withState('reporting', async ({ context, event, send, log, transition, machine, view, graphql }: any) => {
+  try {
+    await log('Reporting epileptic animation...');
+    
+    const reportData = {
+      userId: context.userId,
+      timestamp: new Date().toISOString(),
+      description: event.description || 'Epileptic animation reported',
+      severity: event.severity || 'medium',
+      url: window.location.href
+    };
+    
+    // Execute GraphQL mutation
+    const result = await graphql.mutation(DONATION_REPORT_MUTATION, {
+      report: reportData
+    });
+    
+    if (result.data && result.data.reportEpilepticAnimation) {
+      const reportResult = result.data.reportEpilepticAnimation;
+      await log('Epileptic animation reported successfully', reportResult);
+      context.error = null;
+      send({ type: 'REPORT_SUBMITTED', payload: reportResult });
+    } else {
+      throw new Error('Invalid mutation response');
+    }
+  } catch (error) {
+    await log('Failed to report epileptic animation', error);
+    context.error = error instanceof Error ? error.message : 'Unknown error occurred';
+    send({ type: 'REPORT_ERROR', payload: error });
+  }
+  
+  return view(AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error));
 });
 
 // Main component using withState pattern
