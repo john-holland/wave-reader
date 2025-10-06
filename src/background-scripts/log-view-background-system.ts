@@ -316,6 +316,11 @@ export class LogViewBackgroundSystem {
                     this.handleToggle(message, sender, sendResponse);
                     break;
                     
+                case 'LOOP_DETECTION_STATS':
+                    console.log("BACKGROUND->LOOP: Processing loop detection stats");
+                    this.handleLoopDetectionStats(message, sender, sendResponse);
+                    break;
+                    
                 default:
                     console.log(`🌊 Log-View-Machine: Unknown runtime message type: ${messageName}`);
                     this.logMessage('unknown-runtime-message', `Unknown message type: ${messageName}`);
@@ -679,6 +684,50 @@ export class LogViewBackgroundSystem {
             this.logMessage('start-error', `Failed to start: ${error.message}`);
             sendResponse({ success: false, error: error.message });
         }
+    }
+
+    private handleLoopDetectionStats(message: any, sender: any, sendResponse: any) {
+        const { data } = message;
+        const { timestamp, currentState, recentEvents, recentStates, eventFrequency, stateFrequency, source } = data;
+        
+        // Log detailed stats to background console
+        console.log('🔄 LOOP-DETECTION-STATS:', {
+            timestamp: new Date(timestamp).toISOString(),
+            source,
+            currentState,
+            recentEvents,
+            recentStates,
+            eventFrequency,
+            stateFrequency
+        });
+        
+        // Check for suspicious patterns
+        if (recentEvents > 10) {
+            console.warn('🔄 HIGH EVENT FREQUENCY:', recentEvents, 'events in 10 seconds');
+        }
+        
+        if (recentStates > 5) {
+            console.warn('🔄 HIGH STATE FREQUENCY:', recentStates, 'state changes in 10 seconds');
+        }
+        
+        // Check for specific event loops
+        Object.entries(eventFrequency || {}).forEach(([event, count]) => {
+            if ((count as number) > 5) {
+                console.warn(`🔄 EVENT LOOP DETECTED: '${event}' fired ${count} times`);
+            }
+        });
+        
+        // Check for state loops
+        Object.entries(stateFrequency || {}).forEach(([state, count]) => {
+            if ((count as number) > 3) {
+                console.warn(`🔄 STATE LOOP DETECTED: '${state}' visited ${count} times`);
+            }
+        });
+        
+        // Store stats for analysis
+        this.logMessage('loop-detection-stats', `State: ${currentState}, Events: ${recentEvents}, States: ${recentStates}`);
+        
+        sendResponse({ success: true, received: true });
     }
 
     private async handleStop(message: any, sender: any, sendResponse: any) {

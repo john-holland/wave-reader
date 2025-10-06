@@ -26,7 +26,7 @@ const ErrorBoundaryComponentTemplate = {
         errorInfo: null,
         errorTime: null,
         recoveryAttempts: 0,
-        maxRecoveryAttempts: 3,
+        maxRecoveryAttempts: 1,
         isDevelopment: false,
         componentName: 'Unknown Component',
         errorBoundaryId: null

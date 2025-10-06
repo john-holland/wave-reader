@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wave Cycle Test - Manual</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        .start-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .start-btn:hover {
+            background-color: #45a049;
+        }
+        .stop-btn {
+            background-color: #f44336;
+            color: white;
+        }
+        .stop-btn:hover {
+            background-color: #da190b;
+        }
+        .test-btn {
+            background-color: #2196F3;
+            color: white;
+        }
+        .test-btn:hover {
+            background-color: #0b7dda;
+        }
+        .clear-btn {
+            background-color: #ff9800;
+            color: white;
+        }
+        .clear-btn:hover {
+            background-color: #e68900;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.running {
+            background-color: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #bbdefb;
+        }
+        .status.stopped {
+            background-color: #ffebee;
+            color: #d32f2f;
+            border: 1px solid #ffcdd2;
+        }
+        .status.testing {
+            background-color: #fff3e0;
+            color: #f57c00;
+            border: 1px solid #ffcc02;
+        }
+        .stats {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .cycle-results {
+            margin: 20px 0;
+        }
+        .cycle-item {
+            background-color: #f8f9fa;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .cycle-item.success {
+            border-left-color: #28a745;
+        }
+        .cycle-item.failed {
+            border-left-color: #dc3545;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .warning {
+            color: #ffc107;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌊 Wave Cycle Test - Manual</h1>
+        <p>This page helps you manually test the wave start/stop cycle to verify the loop detection fixes.</p>
+        
+        <div class="test-controls">
+            <button id="startWave" class="start-btn">Start Wave</button>
+            <button id="stopWave" class="stop-btn">Stop Wave</button>
+            <button id="runTest" class="test-btn">Run 10-Cycle Test</button>
+            <button id="clearResults" class="clear-btn">Clear Results</button>
+        </div>
+        
+        <div id="status" class="status stopped">Status: Stopped</div>
+        
+        <div id="stats" class="stats">
+            <div>Loop Detection Stats:</div>
+            <div id="statsContent">Click "Start Wave" to see stats...</div>
+        </div>
+        
+        <div id="cycleResults" class="cycle-results" style="display: none;">
+            <h3>Cycle Test Results:</h3>
+            <div id="cycleContent"></div>
+        </div>
+        
+        <div id="console" style="margin-top: 20px;">
+            <h3>Console Output:</h3>
+            <div id="consoleContent" style="background-color: #000; color: #0f0; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; height: 200px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentCycle = 0;
+        let testResults = [];
+        let statsInterval = null;
+        
+        // Console logging
+        function log(message, type = 'info') {
+            const console = document.getElementById('consoleContent');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#f00' : type === 'warning' ? '#ff0' : '#0f0';
+            console.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            console.scrollTop = console.scrollHeight;
+        }
+        
+        // Update status
+        function updateStatus(status, message) {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `status ${status}`;
+            statusEl.textContent = `Status: ${message}`;
+        }
+        
+        // Get loop detection stats
+        async function getLoopStats() {
+            try {
+                if (typeof chrome !== 'undefined' && chrome.runtime) {
+                    return new Promise((resolve) => {
+                        chrome.runtime.sendMessage({
+                            type: 'GET_LOOP_STATS'
+                        }, (response) => {
+                            resolve(response || {});
+                        });
+                    });
+                } else {
+                    // Fallback for testing outside extension
+                    return {
+                        currentState: 'unknown',
+                        recentEvents: Math.floor(Math.random() * 5),
+                        recentStates: Math.floor(Math.random() * 3),
+                        eventFrequency: {},
+                        stateFrequency: {}
+                    };
+                }
+            } catch (error) {
+                log(`Error getting stats: ${error.message}`, 'error');
+                return {};
+            }
+        }
+        
+        // Update stats display
+        async function updateStats() {
+            const stats = await getLoopStats();
+            const statsContent = document.getElementById('statsContent');
+            statsContent.innerHTML = `
+                <div>Current State: ${stats.currentState || 'unknown'}</div>
+                <div>Recent Events: ${stats.recentEvents || 0}</div>
+                <div>Recent States: ${stats.recentStates || 0}</div>
+                <div>Event Frequency: ${JSON.stringify(stats.eventFrequency || {})}</div>
+                <div>State Frequency: ${JSON.stringify(stats.stateFrequency || {})}</div>
+                <div>Last Updated: ${new Date().toLocaleTimeString()}</div>
+            `;
+        }
+        
+        // Start wave
+        async function startWave() {
+            log('🌊 Starting wave...');
+            updateStatus('running', 'Starting...');
+            
+            try {
+                // Try to access the extension's AppMachine
+                if (typeof chrome !== 'undefined' && chrome.runtime) {
+                    // Send message to background script to start wave
+                    chrome.runtime.sendMessage({
+                        type: 'START_WAVE'
+                    }, (response) => {
+                        if (response && response.success) {
+                            log('✅ Wave started successfully');
+                            updateStatus('running', 'Running');
+                        } else {
+                            log('❌ Failed to start wave', 'error');
+                            updateStatus('stopped', 'Start Failed');
+                        }
+                    });
+                } else {
+                    // Fallback for testing
+                    log('⚠️ Chrome extension API not available, simulating start...');
+                    updateStatus('running', 'Running (Simulated)');
+                }
+            } catch (error) {
+                log(`❌ Error starting wave: ${error.message}`, 'error');
+                updateStatus('stopped', 'Error');
+            }
+        }
+        
+        // Stop wave
+        async function stopWave() {
+            log('🛑 Stopping wave...');
+            updateStatus('stopped', 'Stopping...');
+            
+            try {
+                if (typeof chrome !== 'undefined' && chrome.runtime) {
+                    chrome.runtime.sendMessage({
+                        type: 'STOP_WAVE'
+                    }, (response) => {
+                        if (response && response.success) {
+                            log('✅ Wave stopped successfully');
+                            updateStatus('stopped', 'Stopped');
+                        } else {
+                            log('❌ Failed to stop wave', 'error');
+                            updateStatus('stopped', 'Stop Failed');
+                        }
+                    });
+                } else {
+                    // Fallback for testing
+                    log('⚠️ Chrome extension API not available, simulating stop...');
+                    updateStatus('stopped', 'Stopped (Simulated)');
+                }
+            } catch (error) {
+                log(`❌ Error stopping wave: ${error.message}`, 'error');
+                updateStatus('stopped', 'Error');
+            }
+        }
+        
+        // Run single cycle
+        async function runCycle(cycleNumber) {
+            log(`\n🔄 Cycle ${cycleNumber}/10`);
+            
+            // Clear loop detection cache before each cycle for accurate per-cycle stats
+            if (typeof window !== 'undefined' && window.clearLoopDetection) {
+                window.clearLoopDetection();
+                log(`  🧹 Cleared loop detection cache for cycle ${cycleNumber}`);
+            }
+            
+            const cycleStartTime = Date.now();
+            
+            // Get initial stats
+            const initialStats = await getLoopStats();
+            log(`  📊 Initial: Events=${initialStats.recentEvents || 0}, States=${initialStats.recentStates || 0}`);
+            
+            // Start wave
+            await startWave();
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+            
+            // Get stats after start
+            const afterStartStats = await getLoopStats();
+            log(`  📊 After Start: Events=${afterStartStats.recentEvents || 0}, States=${afterStartStats.recentStates || 0}`);
+            
+            // Stop wave
+            await stopWave();
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+            
+            // Get final stats
+            const finalStats = await getLoopStats();
+            log(`  📊 Final: Events=${finalStats.recentEvents || 0}, States=${finalStats.recentStates || 0}`);
+            
+            const cycleTime = Date.now() - cycleStartTime;
+            log(`  ⏱️ Cycle ${cycleNumber} completed in ${cycleTime}ms`);
+            
+            // Determine if cycle was successful
+            const success = (finalStats.recentEvents || 0) < 20 && (finalStats.recentStates || 0) < 10;
+            log(`  ${success ? '✅' : '❌'} Cycle ${cycleNumber} ${success ? 'PASSED' : 'FAILED'}`);
+            
+            return {
+                cycle: cycleNumber,
+                success: success,
+                initial: initialStats,
+                afterStart: afterStartStats,
+                final: finalStats,
+                duration: cycleTime
+            };
+        }
+        
+        // Run 10-cycle test
+        async function runTest() {
+            log('\n🌊 Starting 10-Cycle Test...');
+            updateStatus('testing', 'Running Test...');
+            
+            testResults = [];
+            currentCycle = 0;
+            
+            // Show cycle results section
+            document.getElementById('cycleResults').style.display = 'block';
+            document.getElementById('cycleContent').innerHTML = '';
+            
+            for (let i = 1; i <= 10; i++) {
+                currentCycle = i;
+                const result = await runCycle(i);
+                testResults.push(result);
+                
+                // Update cycle results display
+                const cycleContent = document.getElementById('cycleContent');
+                const cycleEl = document.createElement('div');
+                cycleEl.className = `cycle-item ${result.success ? 'success' : 'failed'}`;
+                cycleEl.innerHTML = `
+                    <strong>Cycle ${i}:</strong> ${result.success ? 'PASSED' : 'FAILED'} (${result.duration}ms)
+                    <br>Events: ${result.final.recentEvents || 0}, States: ${result.final.recentStates || 0}
+                `;
+                cycleContent.appendChild(cycleEl);
+                
+                // Wait between cycles
+                if (i < 10) {
+                    log(`  ⏳ Waiting 1 second before next cycle...`);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+            
+            // Analyze results
+            const successfulCycles = testResults.filter(r => r.success).length;
+            const failedCycles = testResults.filter(r => !r.success).length;
+            const maxEvents = Math.max(...testResults.map(r => r.final.recentEvents || 0));
+            const maxStates = Math.max(...testResults.map(r => r.final.recentStates || 0));
+            
+            log(`\n🎯 Test Results:`);
+            log(`  Successful Cycles: ${successfulCycles}/10`);
+            log(`  Failed Cycles: ${failedCycles}/10`);
+            log(`  Success Rate: ${(successfulCycles / 10 * 100).toFixed(1)}%`);
+            log(`  Max Events: ${maxEvents}`);
+            log(`  Max States: ${maxStates}`);
+            
+            const testPassed = successfulCycles >= 8 && maxEvents < 20 && maxStates < 10;
+            log(`\nTest ${testPassed ? 'PASSED' : 'FAILED'}`, testPassed ? 'success' : 'error');
+            
+            updateStatus('stopped', `Test Complete - ${testPassed ? 'PASSED' : 'FAILED'}`);
+        }
+        
+        // Clear results
+        function clearResults() {
+            testResults = [];
+            currentCycle = 0;
+            document.getElementById('cycleResults').style.display = 'none';
+            document.getElementById('consoleContent').innerHTML = '';
+            log('🧹 Results cleared');
+        }
+        
+        // Event listeners
+        document.getElementById('startWave').addEventListener('click', startWave);
+        document.getElementById('stopWave').addEventListener('click', stopWave);
+        document.getElementById('runTest').addEventListener('click', runTest);
+        document.getElementById('clearResults').addEventListener('click', clearResults);
+        
+        // Start stats monitoring
+        statsInterval = setInterval(updateStats, 1000);
+        
+        // Initial log
+        log('🌊 Wave Cycle Test - Manual Interface Ready');
+        log('Click "Start Wave" to begin, or "Run 10-Cycle Test" for automated testing');
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (statsInterval) {
+                clearInterval(statsInterval);
+            }
+        });
+    </script>
+</body>
+</html>

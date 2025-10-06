@@ -827,6 +827,7 @@ const AboutContent = styled.div`
 
 const BackgroundProxyMachineRaw = createProxyRobotCopyStateMachine({
     machineId: 'background-proxy-machine',
+    predictableActionArguments: false, // Disable typed parameters
     xstateConfig: {
         initial: 'idle',
         context: {
@@ -877,6 +878,17 @@ const BackgroundProxyMachineRaw = createProxyRobotCopyStateMachine({
 
 // Wrap with adapter to implement ISubMachine interface
 const BackgroundProxyMachine = new ProxyMachineAdapter(BackgroundProxyMachineRaw);
+
+// Add debugging to BackgroundProxyMachine
+const originalBackgroundSend = BackgroundProxyMachine.send.bind(BackgroundProxyMachine);
+BackgroundProxyMachine.send = function(event: string | object) {
+    const eventName = typeof event === 'string' ? event : (event as any).type || 'unknown';
+    if (eventName === 'INITIALIZE') {
+        console.log('🔄 BackgroundProxyMachine: Received INITIALIZE event');
+        console.trace('🔄 BackgroundProxyMachine INITIALIZE call stack:');
+    }
+    return originalBackgroundSend(event);
+};
 
 // Render function for AppTome that uses viewModel
 const renderAppView = (viewModel: any) => {
@@ -1205,6 +1217,7 @@ const tabs = [
 
 const tabSectionTabView = createViewStateMachine({
     machineId: 'tab-section-tab-view',
+    predictableActionArguments: false, // Disable typed parameters
     xstateConfig: {
         initial: 'idle',
         context: {
@@ -1248,8 +1261,49 @@ withState('changing', async ({context, event, view, transition, send, log, clear
     send('TAB_SELECTION_COMPLETE');
 });
 
+// Import middleware system
+import { createStateMachineMiddlewareManager, createLoggingMiddleware, createPerformanceMiddleware } from './utils/StateMachineMiddleware';
+
+// Create middleware manager with loop detection
+const middlewareManager = createStateMachineMiddlewareManager();
+middlewareManager.addMiddleware(createLoggingMiddleware('🌊 App'));
+middlewareManager.addMiddleware(createPerformanceMiddleware());
+
+// Helper function to wrap actions with middleware
+function wrapAction(actionName: string, actionFn: any) {
+    return {
+        type: 'function',
+        fn: async (params: any) => {
+            const { context, event, send, log, transition, machine } = params;
+            const currentState = machine?.getState?.()?.value || 'unknown';
+            
+            // Notify middleware of action start
+            middlewareManager.notifyAction(actionName, currentState, { context, event });
+            
+            try {
+                const result = await actionFn(params);
+                return result;
+            } catch (error) {
+                middlewareManager.notifyError(error as Error, currentState, { context, event });
+                throw error;
+            }
+        }
+    };
+}
+
+// Helper function to wrap state transitions with middleware
+function wrapTransition(fromState: string, toState: string, context?: any) {
+    middlewareManager.notifyStateChange(fromState, toState, context);
+}
+
+// Helper function to wrap events with middleware
+function wrapEvent(event: string, state: string, context?: any) {
+    middlewareManager.notifyEvent(event, state, context);
+}
+
 const AppMachineRaw = createViewStateMachine({
     machineId: 'app-machine',
+    predictableActionArguments: false, // Disable typed parameters
     xstateConfig: {
         initial: 'idle',
         context: {
@@ -1421,6 +1475,16 @@ const AppMachineRaw = createViewStateMachine({
             initializeApp: {
                 type: 'function',
                 fn: async ({context, event, send, log, transition, machine}: any) => {
+                    // Circuit breaker to prevent multiple initialization calls
+                    if (context.initializationInProgress) {
+                        console.warn('🔄 INITIALIZE: Already in progress, ignoring duplicate call');
+                        debugger; // This will hit if called multiple times
+                        return;
+                    }
+                    
+                    context.initializationInProgress = true;
+                    console.log('🌊 App Tome: Starting initialization (first call)');
+                    debugger; // Breakpoint for debugging initialization
                     log('🌊 App Tome: Initialize app with proper sync system');
                     
                     try {
@@ -1455,11 +1519,13 @@ const AppMachineRaw = createViewStateMachine({
                         
                         // Step 4: Update context and complete initialization
                         context.viewModel = viewModel;
+                        context.initializationInProgress = false; // Reset circuit breaker
                         send('INITIALIZATION_COMPLETE');
                         
                     } catch (error: any) {
                         console.error('🌊 App Tome: Initialization failed', error);
                         context.viewModel.error = error.message || 'Initialization failed';
+                        context.initializationInProgress = false; // Reset circuit breaker on error
                         send('INITIALIZATION_FAILED', { error: error.message });
                     }
                 }
@@ -1594,7 +1660,7 @@ const AppMachineRaw = createViewStateMachine({
                         } else {
                             throw new Error(response?.error || 'Failed to start Wave Reader');
                         }
-                } catch (error: any) {
+                    } catch (error: any) {
                         log('🌊 App Tome: Failed to start Wave Reader', error);
                         context.viewModel.error = error.message;
                         send('ERROR', { error: error.message });
@@ -2152,6 +2218,58 @@ const AppMachineRaw = createViewStateMachine({
 
 // Wrap with adapter to implement ISubMachine interface
 const AppMachine = new ViewMachineAdapter(AppMachineRaw);
+
+// Add middleware event tracking to the machine
+const originalSend = AppMachine.send.bind(AppMachine);
+AppMachine.send = function(event: string | object) {
+    const eventName = typeof event === 'string' ? event : (event as any).type || 'unknown';
+    const currentState = this.getState()?.value || 'unknown';
+    const context = this.getContext();
+    
+    // Debug log for events
+    console.log(`🌊 App Machine: Sending event '${eventName}' from state '${currentState}'`);
+    if (eventName === 'INITIALIZE') {
+        console.trace('🔄 INITIALIZE event call stack:');
+    }
+    
+    // Notify middleware of event
+    middlewareManager.notifyEvent(eventName, currentState, { context, event });
+    
+    // Call original send
+    return originalSend(event);
+};
+
+// Add state change tracking
+const originalGetState = AppMachine.getState.bind(AppMachine);
+let lastState = 'unknown';
+AppMachine.getState = function() {
+    const currentState = originalGetState();
+    const currentStateValue = currentState?.value || 'unknown';
+    
+    if (currentStateValue !== lastState) {
+        console.log(`🌊 App Machine: State change from '${lastState}' to '${currentStateValue}'`);
+        middlewareManager.notifyStateChange(lastState, currentStateValue, this.getContext());
+        lastState = currentStateValue;
+    }
+    
+    return currentState;
+};
+
+// Expose middleware stats for debugging
+(window as any).getLoopDetectionStats = () => middlewareManager.getStats();
+(window as any).clearLoopDetection = () => middlewareManager.clear();
+
+// Expose circuit breaker controls for debugging
+(window as any).resetInitializationCircuitBreaker = () => {
+    (window as any).appInitializationInProgress = false;
+    console.log('🔄 Circuit breaker reset manually');
+};
+(window as any).getInitializationStatus = () => {
+    return {
+        inProgress: (window as any).appInitializationInProgress || false,
+        canInitialize: !(window as any).appInitializationInProgress
+    };
+};
 
 // Create UI Component Tome Configurations
 const WaveTabsTome = createTomeConfig({
@@ -3143,17 +3261,35 @@ const AppComponent: FunctionComponent = () => {
             showNotifications
         };
         
-        // Initialize the AppMachine
-        // AppMachine.send('INITIALIZE');
-        
         // Register and start the tome
-        // TomeManager.getInstance().registerTome(AppTome);
-        // TomeManager.getInstance().startTome('app-tome');
+        AppTome.start();
+
+        // Initialize the AppMachine with circuit breaker
+        if ((window as any).appInitializationInProgress) {
+            console.warn('🔄 APP INITIALIZE: Already in progress, ignoring duplicate call');
+            console.trace('🔄 Duplicate INITIALIZE call stack:');
+            return;
+        }
+        
+        console.log('🌊 App: Will send INITIALIZE event after machine starts');
+        console.trace('🔄 INITIALIZE call stack from main component:');
+        
         
         // Set up ISubMachine event listeners to demonstrate the platform capabilities
-        AppMachine.on('started', (data: any) => {
-            console.log('🌊 App Machine started:', data);
-        });
+        // Only set up the started listener once to prevent multiple INITIALIZE calls
+        if (!(window as any).appMachineStartedListenerSet) {
+            (window as any).appMachineStartedListenerSet = true;
+            AppMachine.on('started', (data: any) => {
+                console.log('🌊 App Machine started:', data);
+                // Only send INITIALIZE if not already in progress
+                if (!(window as any).appInitializationInProgress) {
+                    (window as any).appInitializationInProgress = true;
+                    AppMachine.send('INITIALIZE');
+                } else {
+                    console.log('🌊 App Machine started: INITIALIZE already in progress, skipping');
+                }
+            });
+        }
         
         AppMachine.on('stopped', (data: any) => {
             console.log('🌊 App Machine stopped:', data);
@@ -3161,6 +3297,16 @@ const AppComponent: FunctionComponent = () => {
         
         AppMachine.on('error', (data: any) => {
             console.error('🌊 App Machine error:', data);
+            // Reset circuit breaker on error
+            (window as any).appInitializationInProgress = false;
+        });
+        
+        // Listen for initialization completion to reset circuit breaker
+        AppMachine.on('stateChanged', (data: any) => {
+            if (data.state === 'ready' || data.state === 'error') {
+                console.log('🌊 App: Initialization completed, resetting circuit breaker');
+                (window as any).appInitializationInProgress = false;
+            }
         });
         
         BackgroundProxyMachine.on('started', (data: any) => {
@@ -3224,6 +3370,95 @@ const AppComponent: FunctionComponent = () => {
         AppMachine.send({ type: 'START' });
     };
 
+    // Debug functions for loop detection
+    const handleShowLoopStats = () => {
+        const stats = (window as any).getLoopDetectionStats();
+        console.log('🔄 Loop Detection Stats:', stats);
+        alert(`Loop Detection Stats:\n\nEvents: ${stats.middleware_0?.recentEvents || 0}\nStates: ${stats.middleware_0?.recentStates || 0}\nCurrent: ${stats.middleware_0?.currentState || 'unknown'}\n\nCheck console for full details.`);
+    };
+
+    const handleClearLoopStats = () => {
+        (window as any).clearLoopDetection();
+        console.log('🔄 Loop detection stats cleared');
+    };
+
+    // Auto-report loop detection stats to background.js every 1ms with throttling
+    React.useEffect(() => {
+        let lastReportTime = 0;
+        let lastState = '';
+        let lastEventCount = 0;
+        let lastStateCount = 0;
+        
+        const interval = setInterval(() => {
+            const stats = (window as any).getLoopDetectionStats();
+            if (stats && stats.middleware_0) {
+                const { recentEvents, recentStates, currentState, eventFrequency, stateFrequency } = stats.middleware_0;
+                const now = Date.now();
+                
+                // Throttle: Only report if there's actual change or every 100ms minimum
+                const hasStateChange = currentState !== lastState;
+                const hasEventChange = recentEvents !== lastEventCount;
+                const hasStateCountChange = recentStates !== lastStateCount;
+                const timeSinceLastReport = now - lastReportTime;
+                
+                if ((hasStateChange || hasEventChange || hasStateCountChange || timeSinceLastReport > 100) && 
+                    (recentEvents > 0 || recentStates > 0)) {
+                    
+                    // Update tracking variables
+                    lastState = currentState;
+                    lastEventCount = recentEvents;
+                    lastStateCount = recentStates;
+                    lastReportTime = now;
+                    
+                    // Send to background script for logging
+                    try {
+                        if (typeof chrome !== 'undefined' && chrome.runtime) {
+                            chrome.runtime.sendMessage({
+                                type: 'LOOP_DETECTION_STATS',
+                                data: {
+                                    timestamp: now,
+                                    currentState,
+                                    recentEvents,
+                                    recentStates,
+                                    eventFrequency,
+                                    stateFrequency,
+                                    source: 'popup',
+                                    hasStateChange,
+                                    hasEventChange,
+                                    hasStateCountChange
+                                }
+                            }, (response) => {
+                                if (chrome.runtime.lastError) {
+                                    // Fallback to console if background isn't available
+                                    console.log('🔄 Auto-Stats (fallback):', {
+                                        currentState,
+                                        recentEvents,
+                                        recentStates,
+                                        eventFrequency,
+                                        stateFrequency
+                                    });
+                                }
+                            });
+                        } else {
+                            // Fallback to console if chrome API isn't available
+                            console.log('🔄 Auto-Stats (fallback):', {
+                                currentState,
+                                recentEvents,
+                                recentStates,
+                                eventFrequency,
+                                stateFrequency
+                            });
+                        }
+                    } catch (error) {
+                        console.log('🔄 Auto-Stats (error):', error);
+                    }
+                }
+            }
+        }, 1); // Every 1ms for maximum granularity monitoring
+
+        return () => clearInterval(interval);
+    }, []);
+
     return (
         <ErrorBoundary>
             <ModalContainer>
@@ -3239,6 +3474,38 @@ const AppComponent: FunctionComponent = () => {
                         >
                             {isCollapsed ? '⇲' : '⇳'}
                         </CollapseButton>
+                        <button 
+                            onClick={handleShowLoopStats}
+                            style={{
+                                background: 'rgba(255, 255, 255, 0.1)',
+                                color: 'white',
+                                border: '1px solid rgba(255, 255, 255, 0.3)',
+                                borderRadius: '4px',
+                                padding: '4px 8px',
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                                marginLeft: '4px'
+                            }}
+                            title="Show loop detection stats"
+                        >
+                            🔄 Stats
+                        </button>
+                        <button 
+                            onClick={handleClearLoopStats}
+                            style={{
+                                background: 'rgba(255, 255, 255, 0.1)',
+                                color: 'white',
+                                border: '1px solid rgba(255, 255, 255, 0.3)',
+                                borderRadius: '4px',
+                                padding: '4px 8px',
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                                marginLeft: '2px'
+                            }}
+                            title="Clear loop detection stats"
+                        >
+                            🧹 Clear
+                        </button>
                     </HeaderActions>
                 </ModalHeader>
                 

@@ -11,15 +11,15 @@ const WaveTabsComponentTemplate = {
   id: 'wave-tabs-component',
   name: 'Wave Tabs Component',
   description: 'Tabbed interface with state management and separate views for each tab',
-  version: '1.0.0',
+  version: '1.0.0-1',
   dependencies: ['log-view-machine'],
   
   // Template configuration
   config: {
     machineId: 'wave-tabs-component',
-    xstateConfig: {
-      id: 'wave-tabs-component',
-      initial: 'tab-0',
+      xstateConfig: {
+        id: 'wave-tabs-component',
+        initial: 'active-tab',
       context: {
         activeTab: 0,
         tabs: [],
@@ -41,54 +41,9 @@ const WaveTabsComponentTemplate = {
         ...config.xstateConfig
       },
       logStates: {
-        'tab-0': async (context) => {
-          await context.log('Displaying tab 0');
-          return context.view(renderTabView(context, 0));
-        },
-        
-        'tab-1': async (context) => {
-          await context.log('Displaying tab 1');
-          return context.view(renderTabView(context, 1));
-        },
-        
-        'tab-2': async (context) => {
-          await context.log('Displaying tab 2');
-          return context.view(renderTabView(context, 2));
-        },
-        
-        'tab-3': async (context) => {
-          await context.log('Displaying tab 3');
-          return context.view(renderTabView(context, 3));
-        },
-        
-        'tab-4': async (context) => {
-          await context.log('Displaying tab 4');
-          return context.view(renderTabView(context, 4));
-        },
-        
-        'tab-5': async (context) => {
-          await context.log('Displaying tab 5');
-          return context.view(renderTabView(context, 5));
-        },
-        
-        'tab-6': async (context) => {
-          await context.log('Displaying tab 6');
-          return context.view(renderTabView(context, 6));
-        },
-        
-        'tab-7': async (context) => {
-          await context.log('Displaying tab 7');
-          return context.view(renderTabView(context, 7));
-        },
-        
-        'tab-8': async (context) => {
-          await context.log('Displaying tab 8');
-          return context.view(renderTabView(context, 8));
-        },
-        
-        'tab-9': async (context) => {
-          await context.log('Displaying tab 9');
-          return context.view(renderTabView(context, 9));
+        'active-tab': async (context) => {
+          await context.log('Displaying active tab:', context.model.activeTab);
+          return context.view(renderTabView(context, context.model.activeTab));
         },
         
         'tab-management': async (context) => {
@@ -104,181 +59,9 @@ const WaveTabsComponentTemplate = {
       
       // State machine configuration
       states: {
-        'tab-0': {
+        'active-tab': {
           on: {
-            SWITCH_TAB: [
-              { target: 'tab-1', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-2', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-3', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-4', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-5', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-6', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-7', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-8', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-9', cond: 'isValidTab', actions: ['switchTab'] }
-            ],
-            MANAGE_TABS: { target: 'tab-management' },
-            CONFIGURE_TABS: { target: 'tab-configuration' }
-          }
-        },
-        
-        'tab-1': {
-          on: {
-            SWITCH_TAB: [
-              { target: 'tab-0', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-2', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-3', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-4', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-5', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-6', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-7', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-8', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-9', cond: 'isValidTab', actions: ['switchTab'] }
-            ],
-            MANAGE_TABS: { target: 'tab-management' },
-            CONFIGURE_TABS: { target: 'tab-configuration' }
-          }
-        },
-        
-        'tab-2': {
-          on: {
-            SWITCH_TAB: [
-              { target: 'tab-0', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-1', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-3', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-4', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-5', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-6', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-7', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-8', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-9', cond: 'isValidTab', actions: ['switchTab'] }
-            ],
-            MANAGE_TABS: { target: 'tab-management' },
-            CONFIGURE_TABS: { target: 'tab-configuration' }
-          }
-        },
-        
-        'tab-3': {
-          on: {
-            SWITCH_TAB: [
-              { target: 'tab-0', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-1', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-2', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-4', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-5', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-6', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-7', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-8', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-9', cond: 'isValidTab', actions: ['switchTab'] }
-            ],
-            MANAGE_TABS: { target: 'tab-management' },
-            CONFIGURE_TABS: { target: 'tab-configuration' }
-          }
-        },
-        
-        'tab-4': {
-          on: {
-            SWITCH_TAB: [
-              { target: 'tab-0', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-1', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-2', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-3', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-5', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-6', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-7', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-8', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-9', cond: 'isValidTab', actions: ['switchTab'] }
-            ],
-            MANAGE_TABS: { target: 'tab-management' },
-            CONFIGURE_TABS: { target: 'tab-configuration' }
-          }
-        },
-        
-        'tab-5': {
-          on: {
-            SWITCH_TAB: [
-              { target: 'tab-0', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-1', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-2', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-3', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-4', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-6', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-7', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-8', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-9', cond: 'isValidTab', actions: ['switchTab'] }
-            ],
-            MANAGE_TABS: { target: 'tab-management' },
-            CONFIGURE_TABS: { target: 'tab-configuration' }
-          }
-        },
-        
-        'tab-6': {
-          on: {
-            SWITCH_TAB: [
-              { target: 'tab-0', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-1', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-2', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-3', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-4', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-5', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-7', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-8', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-9', cond: 'isValidTab', actions: ['switchTab'] }
-            ],
-            MANAGE_TABS: { target: 'tab-management' },
-            CONFIGURE_TABS: { target: 'tab-configuration' }
-          }
-        },
-        
-        'tab-7': {
-          on: {
-            SWITCH_TAB: [
-              { target: 'tab-0', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-1', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-2', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-3', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-4', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-5', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-6', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-8', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-9', cond: 'isValidTab', actions: ['switchTab'] }
-            ],
-            MANAGE_TABS: { target: 'tab-management' },
-            CONFIGURE_TABS: { target: 'tab-configuration' }
-          }
-        },
-        
-        'tab-8': {
-          on: {
-            SWITCH_TAB: [
-              { target: 'tab-0', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-1', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-2', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-3', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-4', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-5', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-6', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-7', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-9', cond: 'isValidTab', actions: ['switchTab'] }
-            ],
-            MANAGE_TABS: { target: 'tab-management' },
-            CONFIGURE_TABS: { target: 'tab-configuration' }
-          }
-        },
-        
-        'tab-9': {
-          on: {
-            SWITCH_TAB: [
-              { target: 'tab-0', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-1', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-2', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-3', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-4', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-5', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-6', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-7', cond: 'isValidTab', actions: ['switchTab'] },
-              { target: 'tab-8', cond: 'isValidTab', actions: ['switchTab'] }
-            ],
+            SWITCH_TAB: { actions: ['switchTab'] },
             MANAGE_TABS: { target: 'tab-management' },
             CONFIGURE_TABS: { target: 'tab-configuration' }
           }
@@ -286,7 +69,7 @@ const WaveTabsComponentTemplate = {
         
         'tab-management': {
           on: {
-            BACK_TO_TAB: { target: 'tab-0', actions: ['restoreActiveTab'] },
+            BACK_TO_TAB: { target: 'active-tab', actions: ['restoreActiveTab'] },
             ADD_TAB: { actions: ['addTab'] },
             REMOVE_TAB: { actions: ['removeTab'] },
             REORDER_TABS: { actions: ['reorderTabs'] }
@@ -295,7 +78,7 @@ const WaveTabsComponentTemplate = {
         
         'tab-configuration': {
           on: {
-            BACK_TO_TAB: { target: 'tab-0', actions: ['restoreActiveTab'] },
+            BACK_TO_TAB: { target: 'active-tab', actions: ['restoreActiveTab'] },
             SAVE_CONFIG: { actions: ['saveTabConfiguration'] },
             RESET_CONFIG: { actions: ['resetTabConfiguration'] }
           }
@@ -304,10 +87,7 @@ const WaveTabsComponentTemplate = {
       
       // Guards
       guards: {
-        isValidTab: (context, event) => {
-          const targetTab = parseInt(event.targetTab);
-          return targetTab >= 0 && targetTab < context.model.tabs.length;
-        }
+        // Removed isValidTab guard - validation now handled in switchTab action
       },
       
       // Actions
@@ -315,6 +95,18 @@ const WaveTabsComponentTemplate = {
         switchTab: async (context, event) => {
           await context.log('Switching to tab:', event.targetTab);
           const targetTab = parseInt(event.targetTab);
+          
+          // Validate the target tab
+          if (targetTab < 0 || targetTab >= context.model.tabs.length) {
+            await context.log('Invalid tab index:', targetTab);
+            return; // Don't switch if invalid
+          }
+          
+          // Don't switch to the same tab
+          if (targetTab === context.model.activeTab) {
+            await context.log('Already on tab:', targetTab);
+            return;
+          }
           
           // Add to history
           context.model.tabHistory.push(context.model.activeTab);
@@ -328,6 +120,12 @@ const WaveTabsComponentTemplate = {
           if (context.model.onTabChange) {
             context.model.onTabChange(targetTab);
           }
+          
+          // Trigger state transition based on the target tab
+          const targetState = `tab-${targetTab}`;
+          await context.log('Transitioning to state:', targetState);
+          
+          // The state machine will handle the transition based on the updated model
         },
         
         restoreActiveTab: async (context) => {
