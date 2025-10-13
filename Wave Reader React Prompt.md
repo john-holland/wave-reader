@@ -6,7 +6,7 @@ This document describes how to construct Wave Reader as a one-prompt Cursor-AI p
 
 Please select here, whether or not to use XState with graphQL adapters as state machine management, use the existing RobotCopy system, or a classic POJO state machine management system with actions and reducers:
 
-- XState with graphQL adapters as state machine management
+- XState with local server facade and graphQL adapters as state machine management
 - Use the existing RobotCopy system
 - A classic POJO state machine management system with actions and reducers
 
@@ -19,10 +19,11 @@ Please select here, whether or not to use XState with graphQL adapters as state 
         - interchange service (intermediate router machine for chromium api messaging RPC (remote procedure call))
 - popup
     - sync service
-    - settings
     - go button
-    - about
-    - how to
+    - tabs
+        - about
+        - how to
+        - settings
 - content
     - sync service
     - ui css selector service

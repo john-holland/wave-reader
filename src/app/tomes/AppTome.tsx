@@ -40,8 +40,18 @@ class AppTomeClass extends TomeBase {
             // Register with router
             this.router.register('BackgroundProxyMachine', this.backgroundProxyMachine);
             
-            // Create App Machine with view state rendering
-            const appMachineRaw = createAppMachine();
+            // Create async routed send helper for services
+            const routedSend = async (targetMachine: string, event: string, payload?: any): Promise<any> => {
+                console.log(`🌊 AppTome: Routing ${event} to ${targetMachine}`, payload);
+                const target = this.router.resolve(targetMachine);
+                if (!target) {
+                    throw new Error(`Machine ${targetMachine} not found in router`);
+                }
+                return target.send(event, payload);
+            };
+            
+            // Create App Machine with view state rendering and routed send
+            const appMachineRaw = createAppMachine(routedSend);
             
             // Attach view rendering using withState pattern
             this.appMachine = this.attachViewRendering(appMachineRaw);

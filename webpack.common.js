@@ -117,7 +117,6 @@ const config = {
         */
         new webpack.DefinePlugin({
             'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
-            'process.env.USE_ORIGINAL_APP': JSON.stringify(process.env.USE_ORIGINAL_APP || 'false'),
             'global': 'globalThis'
         }),
         new webpack.ProvidePlugin({

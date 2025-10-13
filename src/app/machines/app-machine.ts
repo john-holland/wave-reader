@@ -2,6 +2,12 @@ import { createViewStateMachine } from 'log-view-machine';
 import { SyncSystem } from '../../systems/sync';
 
 /**
+ * Async routed send function type for services
+ * Allows services to communicate with other machines via the router
+ */
+export type RoutedSend = (targetMachine: string, event: string, payload?: any) => Promise<any>;
+
+/**
  * App Machine
  * 
  * Main application state machine that orchestrates:
@@ -10,8 +16,10 @@ import { SyncSystem } from '../../systems/sync';
  * - Settings and selector management
  * - Tab navigation
  * - Error handling
+ * 
+ * @param routedSend - Async function to send events to other machines via router
  */
-export const createAppMachine = () => {
+export const createAppMachine = (routedSend?: RoutedSend) => {
     return createViewStateMachine({
         machineId: 'app-machine',
         predictableActionArguments: false,
@@ -398,8 +406,17 @@ export const createAppMachine = () => {
                     
                     log('🌊 App Machine: Starting Wave Reader...');
                     
-                    // TODO: Send START to background proxy via chrome.runtime.sendMessage
-                    // For now, just update local state
+                    if (routedSend) {
+                        try {
+                            // Send START to background proxy via router
+                            const response = await routedSend('BackgroundProxyMachine', 'START');
+                            log('🌊 App Machine: Background proxy response', response);
+                        } catch (error: any) {
+                            log('🌊 App Machine: Background proxy not available, updating local state only', error.message);
+                        }
+                    }
+                    
+                    // Update local state
                     context.viewModel.going = true;
                     context.viewModel.saved = false;
                     
@@ -413,8 +430,17 @@ export const createAppMachine = () => {
                     
                     log('🌊 App Machine: Stopping Wave Reader...');
                     
-                    // TODO: Send STOP to background proxy via chrome.runtime.sendMessage
-                    // For now, just update local state
+                    if (routedSend) {
+                        try {
+                            // Send STOP to background proxy via router
+                            const response = await routedSend('BackgroundProxyMachine', 'STOP');
+                            log('🌊 App Machine: Background proxy response', response);
+                        } catch (error: any) {
+                            log('🌊 App Machine: Background proxy not available, updating local state only', error.message);
+                        }
+                    }
+                    
+                    // Update local state
                     context.viewModel.going = false;
                     context.viewModel.saved = false;
                     
@@ -428,8 +454,17 @@ export const createAppMachine = () => {
                     
                     log('🌊 App Machine: Toggling Wave Reader...');
                     
-                    // TODO: Send TOGGLE to background proxy via chrome.runtime.sendMessage
-                    // For now, just update local state
+                    if (routedSend) {
+                        try {
+                            // Send TOGGLE to background proxy via router
+                            const response = await routedSend('BackgroundProxyMachine', 'TOGGLE');
+                            log('🌊 App Machine: Background proxy response', response);
+                        } catch (error: any) {
+                            log('🌊 App Machine: Background proxy not available, updating local state only', error.message);
+                        }
+                    }
+                    
+                    // Update local state
                     context.viewModel.going = !context.viewModel.going;
                     context.viewModel.saved = false;
                     
