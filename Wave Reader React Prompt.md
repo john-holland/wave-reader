@@ -51,6 +51,21 @@ content and backend permissions
 
 ### Sync Service
 
+Manages the backend api requests for settings, as well as local storage.
+
+Load order:
+ - local storage
+ - backend api settings
+ - if no local storage: persist backend api to local storage
+
+Data:
+ - settings
+ - lastSync: number // +new Date()
+ - apiSettings
+ - fromPopupMessages: Message[]
+ - fromContentMessages: Message[]
+ - 
+
 ### Sync Service adapters
 
 ### Settings Service

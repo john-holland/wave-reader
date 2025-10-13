@@ -1,11 +1,13 @@
-import { createViewStateMachine } from 'log-view-machine';
+import { createViewStateMachine, MachineRouter } from 'log-view-machine';
 import { SyncSystem } from '../../systems/sync';
 
-/**
- * Async routed send function type for services
- * Allows services to communicate with other machines via the router
- */
-export type RoutedSend = (targetMachine: string, event: string, payload?: any) => Promise<any>;
+// ServiceMeta type (from log-view-machine but defined locally due to webpack alias)
+interface ServiceMeta {
+    routedSend?: (target: string, event: string, payload?: any) => Promise<any>;
+    machineId: string;
+    router?: MachineRouter;
+    machine?: any;
+}
 
 /**
  * App Machine
@@ -17,12 +19,13 @@ export type RoutedSend = (targetMachine: string, event: string, payload?: any) =
  * - Tab navigation
  * - Error handling
  * 
- * @param routedSend - Async function to send events to other machines via router
+ * @param router - Optional MachineRouter for inter-machine communication
  */
-export const createAppMachine = (routedSend?: RoutedSend) => {
+export const createAppMachine = (router?: MachineRouter) => {
     return createViewStateMachine({
         machineId: 'app-machine',
         predictableActionArguments: false,
+        router: router,  // Pass router to ViewStateMachine
         xstateConfig: {
             initial: 'idle',
             context: {
@@ -401,15 +404,15 @@ export const createAppMachine = (routedSend?: RoutedSend) => {
                         throw error;
                     }
                 },
-                startService: async (context: any) => {
+                startService: async (context: any, event: any, meta: ServiceMeta) => {
                     const log = (msg: string, data?: any) => console.log(msg, data);
                     
                     log('🌊 App Machine: Starting Wave Reader...');
                     
-                    if (routedSend) {
+                    if (meta.routedSend) {
                         try {
                             // Send START to background proxy via router
-                            const response = await routedSend('BackgroundProxyMachine', 'START');
+                            const response = await meta.routedSend('BackgroundProxyMachine', 'START');
                             log('🌊 App Machine: Background proxy response', response);
                         } catch (error: any) {
                             log('🌊 App Machine: Background proxy not available, updating local state only', error.message);
@@ -425,15 +428,15 @@ export const createAppMachine = (routedSend?: RoutedSend) => {
                     log('🌊 App Machine: Wave Reader started successfully');
                     return context.viewModel;
                 },
-                stopService: async (context: any) => {
+                stopService: async (context: any, event: any, meta: ServiceMeta) => {
                     const log = (msg: string, data?: any) => console.log(msg, data);
                     
                     log('🌊 App Machine: Stopping Wave Reader...');
                     
-                    if (routedSend) {
+                    if (meta.routedSend) {
                         try {
                             // Send STOP to background proxy via router
-                            const response = await routedSend('BackgroundProxyMachine', 'STOP');
+                            const response = await meta.routedSend('BackgroundProxyMachine', 'STOP');
                             log('🌊 App Machine: Background proxy response', response);
                         } catch (error: any) {
                             log('🌊 App Machine: Background proxy not available, updating local state only', error.message);
@@ -449,15 +452,15 @@ export const createAppMachine = (routedSend?: RoutedSend) => {
                     log('🌊 App Machine: Wave Reader stopped successfully');
                     return context.viewModel;
                 },
-                toggleService: async (context: any) => {
+                toggleService: async (context: any, event: any, meta: ServiceMeta) => {
                     const log = (msg: string, data?: any) => console.log(msg, data);
                     
                     log('🌊 App Machine: Toggling Wave Reader...');
                     
-                    if (routedSend) {
+                    if (meta.routedSend) {
                         try {
                             // Send TOGGLE to background proxy via router
-                            const response = await routedSend('BackgroundProxyMachine', 'TOGGLE');
+                            const response = await meta.routedSend('BackgroundProxyMachine', 'TOGGLE');
                             log('🌊 App Machine: Background proxy response', response);
                         } catch (error: any) {
                             log('🌊 App Machine: Background proxy not available, updating local state only', error.message);

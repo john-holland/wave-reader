@@ -26,7 +26,7 @@ const config = {
     resolve: {
         extensions: [".tsx", ".ts", ".js", ".jsx", ".*"],
         alias: {
-            "log-view-machine$": path.resolve(__dirname, "../log-view-machine/dist/index.esm.js"),
+            "log-view-machine": path.resolve(__dirname, "../log-view-machine/dist"),
             "process/browser": require.resolve("process/browser")
         },
         fallback: {
