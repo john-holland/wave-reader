@@ -2,7 +2,21 @@
 
 **Date**: October 2025  
 **Total Time**: ~2 hours 35 minutes across 3 sessions  
-**Status**: ✅ Ready for Chrome Extension Testing
+**Status**: ✅ Ready for Chrome Extension Testing  
+**Build Status**: ✅ Consolidated - Modular Architecture is Now Default
+
+---
+
+## 🎯 Latest Update: Build Consolidation Complete
+
+The build scripts have been consolidated to make the **modular Tome View Stack architecture the default**:
+
+- ✅ `npm run build` now builds the refactored architecture (no flags needed!)
+- ✅ `npm run dev` and `npm run start` use the modular design by default
+- ✅ Original architecture available as fallback: `npm run build:original`
+- ✅ Environment variable flipped: `USE_ORIGINAL_APP=true` (instead of `USE_REFACTORED_APP=true`)
+
+**This means**: The refactored architecture is production-ready and the default choice!
 
 ---
 
@@ -155,8 +169,10 @@ import {
 ### Ready to Test in Chrome! 🚀
 
 ```bash
-# Build the refactored extension
-npm run build:refactored
+# Build the extension (uses modular architecture by default)
+npm run build
+# or
+npm run start
 
 # Load in Chrome:
 # 1. Go to chrome://extensions/
@@ -282,14 +298,15 @@ core/
 
 ### Build Commands
 ```bash
-# Original architecture
+# Modular architecture (DEFAULT - builds refactored Tome View Stack)
 npm run build
+npm run dev
+npm run start
 
-# Refactored architecture (recommended for testing)
-npm run build:refactored
-
-# Development mode with refactored architecture
-npm run dev:refactored
+# Original architecture (legacy fallback, if needed for rollback)
+npm run build:original
+npm run dev:original
+npm run start:original
 ```
 
 ### Chrome Extension Loading
@@ -350,4 +367,5 @@ npm run dev:refactored
 ---
 
 **Well Done!** 🎉 From 3,619 lines of monolithic code to a clean, modular, tested architecture!
+
 

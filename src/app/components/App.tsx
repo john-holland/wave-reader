@@ -58,13 +58,13 @@ const AppComponent: FunctionComponent = () => {
           <HeaderActions>
             <StartWaveButton onClick={() => {
               console.log('🌊 App Component: Start button clicked');
-              AppTome.send('START');
+              AppTome.send('AppMachine', 'START');
             }}>
               Start
             </StartWaveButton>
             <CollapseButton onClick={() => {
               console.log('🌊 App Component: Collapse button clicked');
-              AppTome.send('COLLAPSE');
+              AppTome.send('AppMachine', 'COLLAPSE');
             }}>
               ⚙️
             </CollapseButton>

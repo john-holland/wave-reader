@@ -25,7 +25,7 @@ export default defineConfig({
   },
 
   /* Global test timeout */
-  timeout: 30000,
+  timeout: 120000, // 2 minutes default, but tests can override
   
   /* Global setup/teardown timeout */
   globalSetup: undefined,

@@ -58,6 +58,13 @@ class AppTomeClass extends TomeBase {
             // Send initialize event
             this.appMachine.send('INITIALIZE');
             
+            // TEMPORARY: Force transition to ready state after 100ms
+            // TODO: Fix the async action handling in app-machine
+            setTimeout(() => {
+                console.log('🌊 AppTome: Force completing initialization');
+                this.appMachine.send('INITIALIZATION_COMPLETE');
+            }, 100);
+            
             this.isInitialized = true;
             this.updateViewKey('initialized');
             

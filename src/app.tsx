@@ -1313,13 +1313,18 @@ const AppMachineRaw = createViewStateMachine({
                 saved: true,
                 going: false,
                 selectors: [],
-                currentView: 'main',
                 isExtension: false,
                 settings: null,
-                showNotifications: true,
-                activeTab: 'how-to',
-                isCollapsed: false
-            }
+                showNotifications: true
+            },
+            // State machine metadata (not business logic)
+            currentView: 'main',      // Which state/view is currently active (set by view())
+            lastCleared: null,        // Which state last called clear()
+            isCollapsed: false,       // UI collapse state
+            currentTab: 'how-to',     // Current active tab
+            syncStatus: 'idle',
+            lastSync: null,
+            syncError: null
         },
         states: {
             idle: {
@@ -2956,6 +2961,52 @@ const appTomeConfig = {
 } as any;
 
 const AppTome = createTomeConfig(appTomeConfig);
+
+// Internal render key for change detection (Phase 1.1)
+let renderKey = 0;
+const renderKeySubscribers: Set<(key: number) => void> = new Set();
+
+// Get current render key (for React component to track)
+(AppTome as any).getRenderKey = () => renderKey;
+
+// Subscribe to render key changes - canonical React pattern for external stores
+(AppTome as any).subscribeRenderKey = (callback: (key: number) => void) => {
+    renderKeySubscribers.add(callback);
+    // Return unsubscribe function
+    return () => {
+        renderKeySubscribers.delete(callback);
+    };
+};
+
+// Notify all subscribers that render key changed (trigger re-render)
+(AppTome as any).notifyRenderKeyChange = () => {
+    renderKey++;
+    renderKeySubscribers.forEach(callback => {
+        callback(renderKey);
+    });
+};
+
+// Main render function - returns composed view from ViewStateMachine
+(AppTome as any).render = () => {
+    const state = AppMachine.getState();
+    const context = AppMachine.getContext();
+    
+    // Get composed view stack from ViewStateMachine
+    const viewStack = (AppMachineRaw as any).getViewStack?.();
+    
+    if (!viewStack || viewStack.length === 0) {
+        return undefined; // Return undefined if view stack is empty
+    }
+    
+    // Return the composed view wrapped in ErrorBoundary
+    return (
+        <ErrorBoundary key={renderKey}>
+            {viewStack.map((view: any, idx: number) => (
+                <React.Fragment key={idx}>{view}</React.Fragment>
+            ))}
+        </ErrorBoundary>
+    );
+};
 
 // Recursive Observer System for AppTome Machines
 class AppTomeObserver {
