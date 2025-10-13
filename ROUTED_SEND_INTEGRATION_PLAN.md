@@ -108,9 +108,13 @@ export interface ViewStateMachineConfig<TModel = any> {
 
 constructor(config: ViewStateMachineConfig<TModel>) {
     // ... existing code ...
-    this.router = config.router;
     
     // Create routed send function if router provided
+    this.setRouter(config.router);
+}
+
+setRouter(router: MachineRouter) {
+    this.router = router;
     if (this.router) {
         this.routedSend = async (target, event, payload) => {
             return this.router!.send(target, event, payload);
@@ -129,9 +133,10 @@ private wrapServices(services: any): any {
     for (const [serviceName, serviceImpl] of Object.entries(services)) {
         wrappedServices[serviceName] = async (context: any, event: any) => {
             const meta: ServiceMeta = {
-                routedSend: this.routedSend,
+                routedSend: this.createRoutedSendForContext(),
                 machineId: this.machineId,
-                router: this.router
+                router: this.router,
+                machine: this  // Reference to current machine for relative routing
             };
             
             // Call original service with meta
@@ -140,6 +145,29 @@ private wrapServices(services: any): any {
     }
     
     return wrappedServices;
+}
+
+// Create routed send that supports relative paths
+private createRoutedSendForContext(): RoutedSend {
+    return async (target: string, event: string, payload?: any) => {
+        if (!this.router) {
+            throw new Error('Router not available for this machine');
+        }
+        
+        // Try relative resolution first
+        let machine = this.router.resolveRelative(target, this);
+        
+        // Fallback to absolute resolution
+        if (!machine) {
+            machine = this.router.resolve(target);
+        }
+        
+        if (!machine) {
+            throw new Error(`Machine ${target} not found via router`);
+        }
+        
+        return machine.send(event, payload);
+    };
 }
 
 // Use in constructor
@@ -186,6 +214,65 @@ export class MachineRouter {
         
         for (let i = 1; i < parts.length && current; i++) {
             current = current.subMachines?.get(parts[i]);
+        }
+        
+        return current;
+    }
+    
+    // Resolve relative paths from a context machine
+    resolveRelative(path: string, contextMachine: any): any | null {
+        // Handle absolute paths (no . or ..)
+        if (!path.startsWith('.')) {
+            return this.resolveHierarchical(path);
+        }
+        
+        // Handle current machine reference (.)
+        if (path === '.') {
+            return contextMachine;
+        }
+        
+        // Handle parent machine reference (..)
+        if (path === '..') {
+            return contextMachine.parentMachine || null;
+        }
+        
+        // Handle relative child (./ prefix)
+        if (path.startsWith('./')) {
+            const subPath = path.substring(2);
+            return this.navigateFromMachine(contextMachine, subPath);
+        }
+        
+        // Handle relative parent (../ prefix)
+        if (path.startsWith('../')) {
+            const parent = contextMachine.parentMachine;
+            if (!parent) {
+                throw new Error(`No parent machine found for relative path: ${path}`);
+            }
+            const remainingPath = path.substring(3);
+            return this.navigateFromMachine(parent, remainingPath);
+        }
+        
+        return null;
+    }
+    
+    // Navigate from a specific machine following a path
+    private navigateFromMachine(machine: any, path: string): any | null {
+        if (!path) return machine;
+        
+        const parts = path.split('/');
+        let current = machine;
+        
+        for (const part of parts) {
+            if (part === '.') {
+                continue; // Stay at current
+            } else if (part === '..') {
+                current = current.parentMachine;
+                if (!current) return null;
+            } else {
+                // Navigate to sub-machine
+                current = current.subMachines?.get(part);
+                if (!current) return null;
+            }
         }
         
         return current;
@@ -283,6 +370,90 @@ export const createAppMachine = () => {
 
 ---
 
+## 🧭 Relative Path Routing
+
+### Path Syntax
+
+The router supports filesystem-like relative path navigation:
+
+| Path | Description | Example |
+|------|-------------|---------|
+| `MachineName` | Absolute path to registered machine | `BackgroundProxyMachine` |
+| `Parent.Child` | Hierarchical absolute path | `AppMachine.SettingsMachine` |
+| `.` | Current machine (self-reference) | `.` |
+| `..` | Parent machine | `..` |
+| `./SubMachine` | Sub-machine of current machine | `./TabsMachine` |
+| `../SiblingMachine` | Sibling machine (via parent) | `../BackgroundProxy` |
+| `../../GrandparentMachine` | Grandparent machine | `../../AppMachine` |
+| `../SiblingMachine/ChildMachine` | Complex relative path | `../Settings/Theme` |
+
+### Usage Examples
+
+```typescript
+// In a service, sending to different machines:
+services: {
+    myService: async (context, event, meta) => {
+        // Absolute path - top-level registered machine
+        await meta.routedSend('BackgroundProxyMachine', 'START');
+        
+        // Hierarchical absolute path
+        await meta.routedSend('AppMachine.SettingsMachine', 'UPDATE');
+        
+        // Current machine (self-send)
+        await meta.routedSend('.', 'REFRESH');
+        
+        // Parent machine
+        await meta.routedSend('..', 'NOTIFY_PARENT');
+        
+        // Sub-machine of current machine
+        await meta.routedSend('./TabsMachine', 'SWITCH_TAB', { tab: 'settings' });
+        
+        // Sibling machine (go to parent, then to sibling)
+        await meta.routedSend('../BackgroundProxyMachine', 'START');
+        
+        // Complex path - sibling's child
+        await meta.routedSend('../SettingsMachine/ThemeMachine', 'CHANGE_THEME');
+        
+        // Grandparent
+        await meta.routedSend('../..', 'GLOBAL_EVENT');
+    }
+}
+```
+
+### Machine Hierarchy Example
+
+```
+TomeBase (Router)
+├── AppMachine
+│   ├── TabsMachine
+│   │   └── TabMachine
+│   ├── SettingsMachine
+│   │   ├── ThemeMachine
+│   │   └── KeyboardMachine
+│   └── AboutMachine
+└── BackgroundProxyMachine
+```
+
+From `TabMachine`'s perspective:
+- `.` → TabMachine (self)
+- `..` → TabsMachine (parent)
+- `../..` → AppMachine (grandparent)
+- `../../SettingsMachine` → AppMachine's SettingsMachine (uncle)
+- `../../SettingsMachine/ThemeMachine` → ThemeMachine (cousin)
+- `../../BackgroundProxyMachine` → Error (BackgroundProxy is not a child of AppMachine)
+- `BackgroundProxyMachine` → BackgroundProxyMachine (absolute path works!)
+
+### Resolution Logic
+
+1. **Check if path starts with `.`** → Use relative resolution
+2. **Try relative resolution** from current machine context
+3. **Fallback to absolute resolution** if relative fails
+4. **Throw error** if machine not found
+
+This allows mixing absolute and relative paths in the same codebase for maximum flexibility.
+
+---
+
 ## 🎨 API Design Options
 
 ### Option A: Via Meta Parameter (Recommended)
@@ -344,18 +515,36 @@ services: {
 1. Test MachineRouter registration and resolution
 2. Test routed send with existing machines
 3. Test routed send with missing machines (error handling)
-4. Test hierarchical path resolution
+4. Test hierarchical path resolution (Parent.Child)
+5. Test relative path resolution:
+   - Current machine (`.`)
+   - Parent machine (`..`)
+   - Sub-machine (`./SubMachine`)
+   - Sibling machine (`../Sibling`)
+   - Complex paths (`../../Grandparent`, `../Sibling/Child`)
+6. Test error cases:
+   - `..` with no parent
+   - `../` with invalid sibling name
+   - Mixed valid/invalid path segments
 
 ### Integration Tests
 1. Create two ViewStateMachines with router
-2. Send events between them via services
-3. Verify state transitions occur correctly
-4. Test error propagation
+2. Send events between them via services (absolute paths)
+3. Create hierarchical machine structure (parent with sub-machines)
+4. Test relative path routing between machines
+5. Verify state transitions occur correctly
+6. Test error propagation
+7. Test mixing absolute and relative paths
 
 ### Wave Reader Tests
-1. Test AppMachine → BackgroundProxyMachine communication
-2. Verify state synchronization
-3. Test graceful fallback when proxy not available
+1. Test AppMachine → BackgroundProxyMachine communication (absolute)
+2. Test relative path routing in nested machines
+3. Verify state synchronization
+4. Test graceful fallback when proxy not available
+5. Test complex scenarios:
+   - TabMachine sending to SettingsMachine via `../SettingsMachine`
+   - Deep nesting with multiple `..` references
+   - Self-send with `.` for internal events
 
 ---
 
@@ -383,6 +572,7 @@ export interface ServiceMeta {
     routedSend?: RoutedSend;
     machineId: string;
     router?: MachineRouter;
+    machine?: any;  // Reference to current machine for relative routing
 }
 
 // Service function signature
@@ -436,7 +626,8 @@ export type ServiceFunction<TContext = any, TEvent = any> = (
 - [ ] Migration guide for existing users
 
 ### Nice to Have
-- [ ] Hierarchical path resolution (Parent.Child)
+- [x] Hierarchical path resolution (Parent.Child)
+- [x] Relative path resolution (., .., ./, ../)
 - [ ] Router middleware support
 - [ ] Event logging/debugging
 - [ ] Performance metrics
@@ -484,22 +675,39 @@ export type ServiceFunction<TContext = any, TEvent = any> = (
 
 ## 🗓️ Timeline Estimate
 
-- **Phase 1** (Core Infrastructure): 4-6 hours
+- **Phase 1** (Core Infrastructure): 5-7 hours
+  - Base router: 2-3 hours
+  - Relative path resolution: 2-3 hours
+  - Service wrapping: 1 hour
 - **Phase 2** (TomeBase Integration): 2-3 hours  
 - **Phase 3** (Wave Reader Updates): 1-2 hours
-- **Testing & Documentation**: 2-3 hours
-- **Total**: 9-14 hours (1.5-2 days)
+- **Testing & Documentation**: 3-4 hours
+  - Unit tests: 1-2 hours
+  - Integration tests: 1 hour
+  - Documentation: 1 hour
+- **Total**: 11-16 hours (1.5-2 days)
+
+**Note**: Relative path routing adds ~2 hours to implementation and ~1 hour to testing
 
 ---
 
 ## 🎉 Expected Benefits
 
+### Core Benefits
 1. **Cleaner Code**: No more manual routedSend creation
 2. **Better Types**: Native TypeScript support
 3. **Easier Testing**: Mock router easily
 4. **Scalability**: Foundation for complex routing patterns
 5. **Maintainability**: Centralized routing logic
 6. **Reusability**: Pattern works across all projects using log-view-machine
+
+### Relative Path Routing Benefits
+7. **Location Independence**: Machines can be moved in hierarchy without changing their internal routing logic
+8. **Encapsulation**: Sub-machines don't need to know about the global machine registry
+9. **Intuitive Navigation**: Filesystem-like paths are familiar to developers
+10. **Reduced Coupling**: Machines reference neighbors relatively, not by absolute names
+11. **Refactoring Safety**: Rename parent machines without breaking child references
+12. **Self-Documentation**: Paths show relationships (`.` = self, `..` = parent, etc.)
 
 ---
 
