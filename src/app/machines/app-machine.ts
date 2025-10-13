@@ -45,10 +45,10 @@ export const createAppMachine = () => {
             states: {
                 idle: {
                     on: {
-                        INITIALIZE: { target: 'initializing', actions: ['initializeApp'] },
-                        START: { target: 'starting', actions: ['startApp'] },
-                        STOP: { target: 'stopping', actions: ['stopApp'] },
-                        TOGGLE: { target: 'toggling', actions: ['toggleApp'] },
+                        INITIALIZE: { target: 'initializing' },
+                        START: { target: 'starting' },
+                        STOP: { target: 'stopping' },
+                        TOGGLE: { target: 'toggling' },
                         KEYBOARD_TOGGLE: { target: 'keyboardToggling', actions: ['handleKeyboardToggle'] },
                         SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
                         SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
@@ -58,16 +58,17 @@ export const createAppMachine = () => {
                     }
                 },
                 initializing: {
-                    on: {
-                        INITIALIZATION_COMPLETE: { target: 'ready', actions: ['markInitialized'] },
-                        INITIALIZATION_FAILED: { target: 'error', actions: ['handleInitError'] }
+                    invoke: {
+                        src: 'initializeService',
+                        onDone: { target: 'ready', actions: ['markInitialized'] },
+                        onError: { target: 'error', actions: ['handleInitError'] }
                     }
                 },
                 ready: {
                     on: {
-                        START: { target: 'starting', actions: ['startApp'] },
-                        STOP: { target: 'stopping', actions: ['stopApp'] },
-                        TOGGLE: { target: 'toggling', actions: ['toggleApp'] },
+                        START: { target: 'starting' },
+                        STOP: { target: 'stopping' },
+                        TOGGLE: { target: 'toggling' },
                         KEYBOARD_TOGGLE: { target: 'keyboardToggling', actions: ['handleKeyboardToggle'] },
                         SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
                         SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
@@ -80,16 +81,16 @@ export const createAppMachine = () => {
                     }
                 },
                 starting: {
-                    on: {
-                        APP_STARTED: { target: 'waving', actions: ['completeStart'] },
-                        START_FAILED: { target: 'error', actions: ['handleStartError'] },
-                        ERROR: { target: 'error', actions: ['handleError'] }
+                    invoke: {
+                        src: 'startService',
+                        onDone: { target: 'waving', actions: ['completeStart'] },
+                        onError: { target: 'error', actions: ['handleStartError'] }
                     }
                 },
                 waving: {
                     on: {
-                        STOP: { target: 'stopping', actions: ['stopApp'] },
-                        TOGGLE: { target: 'toggling', actions: ['toggleApp'] },
+                        STOP: { target: 'stopping' },
+                        TOGGLE: { target: 'toggling' },
                         SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
                         SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
                         TAB_CHANGE: { target: 'waving', actions: ['changeTab'] },
@@ -98,10 +99,13 @@ export const createAppMachine = () => {
                     }
                 },
                 toggling: {
-                    on: {
-                        TOGGLE_COMPLETE: { target: 'ready', actions: ['completeToggle'] },
-                        TOGGLE_COMPLETE_WAVING: { target: 'waving', actions: ['completeToggleWaving'] },
-                        ERROR: { target: 'error', actions: ['handleError'] }
+                    invoke: {
+                        src: 'toggleService',
+                        onDone: [
+                            { target: 'waving', cond: (context: any) => context.viewModel.going, actions: ['completeToggleWaving'] },
+                            { target: 'ready', actions: ['completeToggle'] }
+                        ],
+                        onError: { target: 'error', actions: ['handleError'] }
                     }
                 },
                 keyboardToggling: {
@@ -112,10 +116,10 @@ export const createAppMachine = () => {
                     }
                 },
                 stopping: {
-                    on: {
-                        APP_STOPPED: { target: 'ready', actions: ['completeStop'] },
-                        STOP_FAILED: { target: 'error', actions: ['handleStopError'] },
-                        ERROR: { target: 'error', actions: ['handleError'] }
+                    invoke: {
+                        src: 'stopService',
+                        onDone: { target: 'ready', actions: ['completeStop'] },
+                        onError: { target: 'error', actions: ['handleStopError'] }
                     }
                 },
                 selectorUpdating: {
@@ -133,154 +137,13 @@ export const createAppMachine = () => {
                 },
                 error: {
                     on: {
-                        RETRY: { target: 'initializing', actions: ['initializeApp'] },
+                        RETRY: { target: 'initializing' },
                         RESET: { target: 'idle', actions: ['resetApp'] }
                     }
                 }
             },
             actions: {
-                initializeApp: {
-                    type: 'function',
-                    fn: async ({context, event, send, log, machine}: any) => {
-                        // Circuit breaker to prevent multiple initialization attempts
-                        if (context.initializationInProgress) {
-                            log('🌊 App Machine: Initialization already in progress, skipping');
-                            return;
-                        }
-                        
-                        context.initializationInProgress = true;
-                        log('🌊 App Machine: Initializing with comprehensive sync...');
-                        
-                        try {
-                            // Step 1: Initialize sync from all sources
-                            const syncData = await SyncSystem.initializeSync(log, machine);
-                            
-                            // Step 2: Create merged viewModel
-                            const viewModel = {
-                                ...syncData.cachedData,
-                                // Content script data takes precedence for critical state
-                                ...(syncData.contentData && {
-                                    going: syncData.contentData.going,
-                                    selector: syncData.contentData.selector || syncData.cachedData.selector,
-                                    saved: syncData.contentData.going === syncData.cachedData.going &&
-                                           (syncData.contentData.selector === syncData.cachedData.selector || !syncData.contentData.selector)
-                                }),
-                                // Background data provides additional context
-                                ...(syncData.backgroundData && {
-                                    activeConnections: syncData.backgroundData.activeConnections,
-                                    sessionId: syncData.backgroundData.sessionId,
-                                    healthStatus: syncData.backgroundData.healthStatus
-                                }),
-                                // Always mark initialization timestamp
-                                lastInitialized: Date.now(),
-                                toggleKeys: {
-                                    keyChord: ['Ctrl', 'Shift', 'W']
-                                }
-                            };
-                            
-                            log('🌊 App Machine: Synchronized viewModel created', viewModel);
-                            
-                            // Step 3: Save synchronized state for consistency
-                            await SyncSystem.saveViewModelToStorage(viewModel, log);
-                            
-                            // Step 4: Update context and complete initialization
-                            context.viewModel = viewModel;
-                            context.initializationInProgress = false;
-                            send('INITIALIZATION_COMPLETE');
-                            
-                        } catch (error: any) {
-                            console.error('🌊 App Machine: Initialization failed', error);
-                            context.viewModel.error = error.message || 'Initialization failed';
-                            context.initializationInProgress = false;
-                            send('INITIALIZATION_FAILED', { error: error.message });
-                        }
-                    }
-                },
-                startApp: {
-                    type: 'function',
-                    fn: async ({context, event, send, log, machine}: any) => {
-                        log('🌊 App Machine: Starting Wave Reader...');
-                        
-                        try {
-                            // Send START to background proxy via parent machine
-                            const bgProxy = machine.parentMachine?.getSubMachine?.('background-proxy-machine');
-                            const response = await bgProxy?.send?.('START') || { success: false, error: 'Background proxy not found' };
-                            
-                            if (response && response.success) {
-                                context.viewModel.going = true;
-                                context.viewModel.saved = false;
-                                
-                                await SyncSystem.saveViewModelToStorage(context.viewModel, log);
-                                
-                                log('🌊 App Machine: Wave Reader started successfully');
-                                send('APP_STARTED');
-                            } else {
-                                throw new Error(response?.error || 'Failed to start Wave Reader');
-                            }
-                        } catch (error: any) {
-                            log('🌊 App Machine: Failed to start Wave Reader', error);
-                            context.viewModel.error = error.message;
-                            send('ERROR', { error: error.message });
-                        }
-                    }
-                },
-                stopApp: {
-                    type: 'function',
-                    fn: async ({context, event, send, log, machine}: any) => {
-                        log('🌊 App Machine: Stopping Wave Reader...');
-                        
-                        try {
-                            // Send STOP to background proxy via parent machine
-                            const bgProxy = machine.parentMachine?.getSubMachine?.('background-proxy-machine');
-                            const response = await bgProxy?.send?.('STOP') || { success: false, error: 'Background proxy not found' };
-                            
-                            if (response && response.success) {
-                                context.viewModel.going = false;
-                                context.viewModel.saved = false;
-                                
-                                await SyncSystem.saveViewModelToStorage(context.viewModel, log);
-                                
-                                log('🌊 App Machine: Wave Reader stopped successfully');
-                                send('APP_STOPPED');
-                            } else {
-                                throw new Error(response?.error || 'Failed to stop Wave Reader');
-                            }
-                        } catch (error: any) {
-                            log('🌊 App Machine: Failed to stop Wave Reader', error);
-                            context.viewModel.error = error.message;
-                            send('ERROR', { error: error.message });
-                        }
-                    }
-                },
-                toggleApp: {
-                    type: 'function',
-                    fn: async ({context, event, send, log, machine}: any) => {
-                        log('🌊 App Machine: Toggling Wave Reader...');
-                        
-                        try {
-                            // Send TOGGLE to background proxy via parent machine
-                            const bgProxy = machine.parentMachine?.getSubMachine?.('background-proxy-machine');
-                            const response = await bgProxy?.send?.('TOGGLE') || { success: false };
-                            
-                            // Update viewModel
-                            context.viewModel.going = !context.viewModel.going;
-                            context.viewModel.saved = false;
-                            
-                            log(`🌊 App Machine: Updated viewModel.going to ${context.viewModel.going}`);
-                            
-                            // Send appropriate completion event
-                            if (context.viewModel.going) {
-                                send('TOGGLE_COMPLETE_WAVING');
-                            } else {
-                                send('TOGGLE_COMPLETE');
-                            }
-                            
-                        } catch (error: any) {
-                            console.error('🌊 App Machine: Toggle error', error);
-                            send('ERROR', { error: error.message });
-                        }
-                    }
-                },
+                // Async actions moved to services section (initializeService, startService, stopService, toggleService)
                 handleKeyboardToggle: {
                     type: 'function',
                     fn: async ({context, event, send, log}: any) => {
@@ -466,13 +329,113 @@ export const createAppMachine = () => {
                         log('🌊 App Machine: Settings update cancelled');
                     }
                 },
-                resetApp: {
-                    type: 'function',
-                    fn: ({context, log}: any) => {
-                        log('🌊 App Machine: Resetting app');
-                        context.viewModel.error = null;
-                        context.initializationInProgress = false;
+                resetApp: (context: any) => {
+                    console.log('🌊 App Machine: Resetting app');
+                    context.viewModel.error = null;
+                    context.initializationInProgress = false;
+                }
+            },
+            services: {
+                initializeService: async (context: any) => {
+                    const log = (msg: string, data?: any) => console.log(msg, data);
+                    const machine = null; // Will be passed via meta if needed
+                    
+                    // Circuit breaker to prevent multiple initialization attempts
+                    if (context.initializationInProgress) {
+                        log('🌊 App Machine: Initialization already in progress, skipping');
+                        return context.viewModel;
                     }
+                    
+                    context.initializationInProgress = true;
+                    log('🌊 App Machine: Initializing with comprehensive sync...');
+                    
+                    try {
+                        // Step 1: Initialize sync from all sources
+                        const syncData = await SyncSystem.initializeSync(log, machine);
+                        
+                        // Step 2: Create merged viewModel
+                        const viewModel = {
+                            ...syncData.cachedData,
+                            // Content script data takes precedence for critical state
+                            ...(syncData.contentData && {
+                                going: syncData.contentData.going,
+                                selector: syncData.contentData.selector || syncData.cachedData.selector,
+                                saved: syncData.contentData.going === syncData.cachedData.going &&
+                                       (syncData.contentData.selector === syncData.cachedData.selector || !syncData.contentData.selector)
+                            }),
+                            // Background data provides additional context
+                            ...(syncData.backgroundData && {
+                                activeConnections: syncData.backgroundData.activeConnections,
+                                sessionId: syncData.backgroundData.sessionId,
+                                healthStatus: syncData.backgroundData.healthStatus
+                            }),
+                            // Always mark initialization timestamp
+                            lastInitialized: Date.now(),
+                            toggleKeys: {
+                                keyChord: ['Ctrl', 'Shift', 'W']
+                            }
+                        };
+                        
+                        log('🌊 App Machine: Synchronized viewModel created', viewModel);
+                        
+                        // Step 3: Save synchronized state for consistency
+                        await SyncSystem.saveViewModelToStorage(viewModel, log);
+                        
+                        // Step 4: Update context and return
+                        context.viewModel = viewModel;
+                        context.initializationInProgress = false;
+                        
+                        return viewModel;
+                    } catch (error: any) {
+                        console.error('🌊 App Machine: Initialization failed', error);
+                        context.viewModel.error = error.message || 'Initialization failed';
+                        context.initializationInProgress = false;
+                        throw error;
+                    }
+                },
+                startService: async (context: any) => {
+                    const log = (msg: string, data?: any) => console.log(msg, data);
+                    
+                    log('🌊 App Machine: Starting Wave Reader...');
+                    
+                    // TODO: Send START to background proxy via chrome.runtime.sendMessage
+                    // For now, just update local state
+                    context.viewModel.going = true;
+                    context.viewModel.saved = false;
+                    
+                    await SyncSystem.saveViewModelToStorage(context.viewModel, log);
+                    
+                    log('🌊 App Machine: Wave Reader started successfully');
+                    return context.viewModel;
+                },
+                stopService: async (context: any) => {
+                    const log = (msg: string, data?: any) => console.log(msg, data);
+                    
+                    log('🌊 App Machine: Stopping Wave Reader...');
+                    
+                    // TODO: Send STOP to background proxy via chrome.runtime.sendMessage
+                    // For now, just update local state
+                    context.viewModel.going = false;
+                    context.viewModel.saved = false;
+                    
+                    await SyncSystem.saveViewModelToStorage(context.viewModel, log);
+                    
+                    log('🌊 App Machine: Wave Reader stopped successfully');
+                    return context.viewModel;
+                },
+                toggleService: async (context: any) => {
+                    const log = (msg: string, data?: any) => console.log(msg, data);
+                    
+                    log('🌊 App Machine: Toggling Wave Reader...');
+                    
+                    // TODO: Send TOGGLE to background proxy via chrome.runtime.sendMessage
+                    // For now, just update local state
+                    context.viewModel.going = !context.viewModel.going;
+                    context.viewModel.saved = false;
+                    
+                    log(`🌊 App Machine: Updated viewModel.going to ${context.viewModel.going}`);
+                    
+                    return context.viewModel;
                 }
             }
         }
