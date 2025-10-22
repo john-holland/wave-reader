@@ -272,6 +272,11 @@ export class LogViewBackgroundSystem {
         
         try {
             switch (messageName) {
+                case 'initialize':
+                    console.log("BACKGROUND->POPUP: Processing initialize message");
+                    this.handleInitialize(message, sender, sendResponse);
+                    break;
+                    
                 case 'selection-made':
                     this.handleSelectionMade(message, sender, sendResponse);
                     break;
@@ -331,6 +336,30 @@ export class LogViewBackgroundSystem {
             this.logMessage('runtime-message-error', `Error processing ${messageName}: ${error?.message || 'Unknown error'}`);
             sendResponse({ success: false, error: error?.message || 'Unknown error' });
         }
+    }
+
+    private handleInitialize(message: any, sender: any, sendResponse: any) {
+        console.log("🌊 Log-View-Machine: Handling initialize message from popup");
+        this.logMessage('initialize', 'Initialize request received from popup');
+        
+        // Increment active connections
+        this.healthStatus.activeConnections++;
+        
+        // Send initialization response with session info
+        sendResponse({
+            success: true,
+            sessionId: this.sessionId,
+            extensionState: this.extensionState,
+            healthStatus: {
+                status: this.healthStatus.status,
+                uptime: Date.now() - this.healthStatus.uptime,
+                messageCount: this.healthStatus.messageCount,
+                activeConnections: this.healthStatus.activeConnections
+            },
+            timestamp: Date.now()
+        });
+        
+        console.log("🌊 Log-View-Machine: Initialize response sent, active connections:", this.healthStatus.activeConnections);
     }
 
     private handleSelectionMade(message: any, sender: any, sendResponse: any) {

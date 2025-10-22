@@ -60,6 +60,9 @@ export const createAppMachine = (router?: MachineRouter) => {
                         START: { target: 'starting' },
                         STOP: { target: 'stopping' },
                         TOGGLE: { target: 'toggling' },
+                        WAVE_STARTED: { target: 'waving', actions: ['updateWaveState'] },
+                        WAVE_STOPPED: { target: 'ready', actions: ['updateWaveState'] },
+                        WAVE_TOGGLED: { target: 'ready', actions: ['toggleWaveState'] },
                         KEYBOARD_TOGGLE: { target: 'keyboardToggling', actions: ['handleKeyboardToggle'] },
                         SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
                         SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
@@ -80,6 +83,9 @@ export const createAppMachine = (router?: MachineRouter) => {
                         START: { target: 'starting' },
                         STOP: { target: 'stopping' },
                         TOGGLE: { target: 'toggling' },
+                        WAVE_STARTED: { target: 'waving', actions: ['updateWaveState'] },
+                        WAVE_STOPPED: { target: 'ready', actions: ['updateWaveState'] },
+                        WAVE_TOGGLED: { target: 'ready', actions: ['toggleWaveState'] },
                         KEYBOARD_TOGGLE: { target: 'keyboardToggling', actions: ['handleKeyboardToggle'] },
                         SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
                         SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
@@ -155,6 +161,22 @@ export const createAppMachine = (router?: MachineRouter) => {
             },
             actions: {
                 // Async actions moved to services section (initializeService, startService, stopService, toggleService)
+                updateWaveState: {
+                    type: 'function',
+                    fn: async ({context, event, send, log}: any) => {
+                        log('🌊 App Machine: Updating wave state from Chrome API', event);
+                        // The wave state is already updated in the AppTome, just log it
+                        log('🌊 App Machine: Wave state updated to', context.viewModel.going);
+                    }
+                },
+                toggleWaveState: {
+                    type: 'function',
+                    fn: async ({context, event, send, log}: any) => {
+                        log('🌊 App Machine: Toggling wave state from Chrome API', event);
+                        // The wave state is already toggled in the AppTome, just log it
+                        log('🌊 App Machine: Wave state toggled to', context.viewModel.going);
+                    }
+                },
                 handleKeyboardToggle: {
                     type: 'function',
                     fn: async ({context, event, send, log}: any) => {

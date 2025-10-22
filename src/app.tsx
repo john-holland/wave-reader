@@ -2987,23 +2987,20 @@ const renderKeySubscribers: Set<(key: number) => void> = new Set();
 };
 
 // Main render function - returns composed view from ViewStateMachine
+// Note: Using AppTome's render method instead of overriding it
 (AppTome as any).render = () => {
-    const state = AppMachine.getState();
-    const context = AppMachine.getContext();
+    console.log('🌊 App: AppTome render called');
+    const rendered = AppTome.render();
+    console.log('🌊 App: AppTome render result:', rendered);
     
-    // Get composed view stack from ViewStateMachine
-    const viewStack = (AppMachineRaw as any).getViewStack?.();
-    
-    if (!viewStack || viewStack.length === 0) {
-        return undefined; // Return undefined if view stack is empty
+    if (!rendered) {
+        return <div>Loading...</div>;
     }
     
-    // Return the composed view wrapped in ErrorBoundary
+    // Return the rendered view wrapped in ErrorBoundary
     return (
         <ErrorBoundary key={renderKey}>
-            {viewStack.map((view: any, idx: number) => (
-                <React.Fragment key={idx}>{view}</React.Fragment>
-            ))}
+            {rendered}
         </ErrorBoundary>
     );
 };

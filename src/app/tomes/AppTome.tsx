@@ -1,19 +1,19 @@
 import React from 'react';
 import { TomeBase } from 'log-view-machine';
-import { ProxyMachineAdapter } from '../../adapters/machine-adapters';
 import { createAppMachine } from '../machines/app-machine';
-import { createBackgroundProxyMachine } from '../machines/background-proxy-machine';
+import { createChromeApiMachine } from '../machines/chrome-api-machine';
 
 /**
  * AppTome
  * 
  * Main orchestrator for the Wave Reader application
  * Manages the app state machine and coordinates with sub-tomes
+ * Uses routed send pattern for Chrome API communication
  * Implements the observable pattern for React integration
  */
 class AppTomeClass extends TomeBase {
     private appMachine: any;
-    private backgroundProxyMachine: any;
+    private chromeApiMachine: any;
     private isInitialized: boolean = false;
 
     constructor() {
@@ -33,18 +33,26 @@ class AppTomeClass extends TomeBase {
         console.log('🌊 AppTome: Initializing...');
 
         try {
-            // Create Background Proxy Machine
-            const bgProxyMachineRaw = createBackgroundProxyMachine();
-            this.backgroundProxyMachine = new ProxyMachineAdapter(bgProxyMachineRaw);
+            // Create Chrome API Machine (replaces ProxyRobotCopyStateMachine)
+            this.chromeApiMachine = createChromeApiMachine(this.router);
+            
+            // Set parent machine for relative routing (..)
+            this.chromeApiMachine.parentMachine = this;
             
             // Register with router
-            this.router.register('BackgroundProxyMachine', this.backgroundProxyMachine);
+            this.router.register('ChromeApiMachine', this.chromeApiMachine);
+            
+            // Start Chrome API machine
+            await this.chromeApiMachine.start?.();
             
             // Create App Machine with router support
             const appMachineRaw = createAppMachine(this.router);
             
             // Attach view rendering using withState pattern
             this.appMachine = this.attachViewRendering(appMachineRaw);
+            
+            // Set parent machine for relative routing
+            this.appMachine.parentMachine = this;
             
             // Register machine with router
             this.router.register('AppMachine', this.appMachine);
@@ -57,6 +65,9 @@ class AppTomeClass extends TomeBase {
             
             // Send initialize event (will invoke initializeService)
             this.appMachine.send('INITIALIZE');
+            
+            // Initialize Chrome API connection
+            this.chromeApiMachine.send('INITIALIZE');
             
             this.isInitialized = true;
             this.updateViewKey('initialized');
@@ -93,12 +104,14 @@ class AppTomeClass extends TomeBase {
                 this.updateViewKey(`initializing-${Date.now()}`);
             })
             .withState('ready', async ({context, event, view, clear}: any) => {
+                console.log('🌊 AppTome: withState ready called', context);
                 clear();
                 this.viewStack.clear();
                 const rendered = this.renderReadyView(context);
                 this.viewStack.append('ready', rendered);
                 view(rendered);
                 this.updateViewKey(`ready-${Date.now()}`);
+                console.log('🌊 AppTome: ready view rendered, viewStack size:', this.viewStack.getStackSize());
             })
             .withState('starting', async ({context, event, view, clear}: any) => {
                 clear();
@@ -109,12 +122,14 @@ class AppTomeClass extends TomeBase {
                 this.updateViewKey(`starting-${Date.now()}`);
             })
             .withState('waving', async ({context, event, view, clear}: any) => {
+                console.log('🌊 AppTome: withState waving called', context);
                 clear();
                 this.viewStack.clear();
                 const rendered = this.renderWavingView(context);
                 this.viewStack.append('waving', rendered);
                 view(rendered);
                 this.updateViewKey(`waving-${Date.now()}`);
+                console.log('🌊 AppTome: waving view rendered, viewStack size:', this.viewStack.getStackSize());
             })
             .withState('stopping', async ({context, event, view, clear}: any) => {
                 clear();
@@ -170,20 +185,29 @@ class AppTomeClass extends TomeBase {
      * Setup machine event listeners for reactive updates
      */
     private setupMachineListeners(): void {
-        // Listen for state changes
+        // Listen for app machine state changes
         this.appMachine.subscribe?.((state: any) => {
             console.log('🌊 AppTome: App machine state changed', state);
             this.updateViewKey(`${state.value}-${Date.now()}`);
         });
 
-        // Listen for background proxy events
-        this.backgroundProxyMachine.on('started', (data: any) => {
-            console.log('🌊 AppTome: Background proxy started', data);
+        // Listen for Chrome API machine state changes
+        this.chromeApiMachine.subscribe?.((state: any) => {
+            console.log('🌊 AppTome: Chrome API machine state changed', state);
+            
+            // Handle specific states if needed
+            if (state.value === 'error') {
+                console.error('🌊 AppTome: Chrome API error', state.context.error);
+            }
         });
 
-        this.backgroundProxyMachine.on('error', (data: any) => {
-            console.error('🌊 AppTome: Background proxy error', data);
-        });
+        // Listen for routed send events from Chrome API machine via state changes
+        // The Chrome API machine will send events via routed send, which will be handled by the router
+        // We'll monitor the Chrome API machine's state changes to detect when operations complete
+        
+        // The routed send events from Chrome API machine will be handled by the router
+        // We'll monitor the Chrome API machine's state changes to detect when operations complete
+        // and update the app machine accordingly
     }
 
     /**
@@ -397,6 +421,18 @@ class AppTomeClass extends TomeBase {
     }
 
     /**
+     * Get the current context from the app machine
+     */
+    getContext(): any {
+        if (!this.appMachine) {
+            return { viewModel: { going: false } };
+        }
+        
+        const state = this.appMachine.getState?.();
+        return state?.context || { viewModel: { going: false } };
+    }
+
+    /**
      * Render the current view from the machine
      * Overrides base class to use ViewStateMachine's render method
      */
@@ -405,13 +441,42 @@ class AppTomeClass extends TomeBase {
             return <div>Initializing...</div>;
         }
         
-        // Use the ViewStateMachine's render method
+        // Check if the ViewStateMachine has its own render method
         if (typeof this.appMachine.render === 'function') {
-            return this.appMachine.render();
+            try {
+                // Try to get the viewStack from the ViewStateMachine
+                const viewStack = (this.appMachine as any).getViewStack?.();
+                if (viewStack && viewStack.length > 0) {
+                    return this.viewStack.compose();
+                }
+            } catch (error) {
+                console.log('🌊 AppTome: ViewStateMachine render failed, falling back to viewStack', error);
+            }
         }
         
-        // Fallback to view stack composition
-        return this.viewStack.compose();
+        // Fallback to our own viewStack composition
+        const composed = this.viewStack.compose();
+        if (composed) {
+            return composed;
+        }
+        
+        // If viewStack is empty, try to render based on current state
+        const state = this.appMachine.getState?.();
+        const context = state?.context || {};
+        
+        // Render appropriate view based on current state
+        switch (state?.value) {
+            case 'ready':
+                return this.renderReadyView(context);
+            case 'waving':
+                return this.renderWavingView(context);
+            case 'initializing':
+                return this.renderInitializingView(context);
+            case 'error':
+                return this.renderErrorView(context);
+            default:
+                return this.renderIdleView(context);
+        }
     }
 
     /**
@@ -424,8 +489,8 @@ class AppTomeClass extends TomeBase {
             this.appMachine.stop?.();
         }
         
-        if (this.backgroundProxyMachine) {
-            this.backgroundProxyMachine.stop?.();
+        if (this.chromeApiMachine) {
+            this.chromeApiMachine.stop?.();
         }
         
         super.cleanup();

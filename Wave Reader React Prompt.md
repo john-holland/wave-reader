@@ -68,7 +68,23 @@ Data:
 
 ### Sync Service adapters
 
+Operating in popup and client scripts, these adapters implement FIFO messaging, using the `acceptedMessages` list to provide endpoint definitions.
+
+If using graphql, you may be able to swap these out for Apollo connectors.
+
+Data:
+ - syncLocation: string // ["content", "popup"]
+ - acceptedMessages: string[] // messages handled by this client happily
+ - messagesToSend: Message[] // queue
+ - messagesReceived: Message[] // queue
+
 ### Settings Service
+
+ - CSS
+ - timing or mouse
+ - wave speed
+ - wave angle
+ - 
 
 ### UI Selector service
 

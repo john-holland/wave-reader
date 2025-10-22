@@ -37,6 +37,14 @@ export class PongMessage extends Message<PongMessage> {
     }
 }
 
+export class InitializeMessage extends Message<InitializeMessage> {
+    sessionId?: string;
+    
+    constructor(attributes: Partial<InitializeMessage> = {}) {
+        super('initialize', 'popup', attributes);
+    }
+}
+
 export class SelectionMadeMessage extends Message<SelectionMadeMessage> {
     selector?: string;
     
@@ -67,18 +75,20 @@ export class MessageFactory {
                 return new PingMessage(data);
             case 'pong':
                 return new PongMessage(data);
+            case 'initialize':
+                return new InitializeMessage(data);
             case 'selection-made':
                 return new SelectionMadeMessage(data);
             case 'ml-recommendation':
                 return new MLRecommendationMessage(data);
-                    default:
-            // Create a generic message for unknown types
-            const genericMessage = new (class extends Message<any> {
-                constructor(name: string, from: string, data: any) {
-                    super(name, from, data);
-                }
-            })(name, from, data);
-            return genericMessage;
+            default:
+                // Create a generic message for unknown types
+                const genericMessage = new (class extends Message<any> {
+                    constructor(name: string, from: string, data: any) {
+                        super(name, from, data);
+                    }
+                })(name, from, data);
+                return genericMessage;
         }
     }
 }

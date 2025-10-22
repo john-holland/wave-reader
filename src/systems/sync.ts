@@ -78,6 +78,12 @@ export const SyncSystem = {
     
     async getContentScriptData(log: any, machine: any) {
         try {
+            // Check if parentMachine is available
+            if (!machine?.parentMachine) {
+                log('🌊 Sync System: No parentMachine available for content script data');
+                return null;
+            }
+            
             const statusResponse = await machine.parentMachine.getSubMachine('background-proxy')?.send({
                 from: 'popup',
                 name: 'get-status',
@@ -105,6 +111,12 @@ export const SyncSystem = {
     
     async getBackgroundScriptData(log: any, machine: any) {
         try {
+            // Check if parentMachine is available
+            if (!machine?.parentMachine) {
+                log('🌊 Sync System: No parentMachine available for background script data');
+                return null;
+            }
+            
             const healthResponse = await machine.parentMachine.getSubMachine('background-proxy')?.send({
                 from: 'popup',
                 name: 'health-check',
