@@ -68,6 +68,8 @@ export const createAppMachine = (router?: MachineRouter) => {
                         SETTINGS_UPDATE: { target: 'settingsUpdating', actions: ['updateSettings'] },
                         TAB_CHANGE: { target: 'idle', actions: ['changeTab'] },
                         TOGGLE_COLLAPSE: { target: 'idle', actions: ['toggleCollapse'] },
+                        SELECTION_MADE: { target: 'idle', actions: ['handleSelectionMade'] },
+                        TAB_ACTIVATED: { target: 'idle', actions: ['handleTabActivated'] },
                         ERROR: { target: 'error', actions: ['handleError'] }
                     }
                 },
@@ -94,6 +96,8 @@ export const createAppMachine = (router?: MachineRouter) => {
                         REFRESH_STATE: { target: 'ready', actions: ['refreshStateFromContentScript'] },
                         STATE_REFRESHED: { target: 'ready', actions: ['logStateRefresh'] },
                         STATE_REFRESH_FAILED: { target: 'ready', actions: ['logStateRefreshError'] },
+                        SELECTION_MADE: { target: 'ready', actions: ['handleSelectionMade'] },
+                        TAB_ACTIVATED: { target: 'ready', actions: ['handleTabActivated'] },
                         ERROR: { target: 'error', actions: ['handleError'] }
                     }
                 },
@@ -221,6 +225,36 @@ export const createAppMachine = (router?: MachineRouter) => {
                         log('🌊 App Machine: Change tab', event);
                         if (event.tab) {
                             context.currentTab = event.tab;
+                        }
+                    }
+                },
+                handleSelectionMade: {
+                    type: 'function',
+                    fn: ({context, event, log, send}: any) => {
+                        log('🌊 App Machine: Selection made', event);
+                        
+                        const selector = event.selector;
+                        if (selector && selector !== context.viewModel.selector) {
+                            context.viewModel.selector = selector;
+                            log('🌊 App Machine: Selector updated from selection:', selector);
+                            
+                            // Trigger selector update to sync with content script
+                            send('SELECTOR_UPDATE', { selector });
+                        } else {
+                            log('🌊 App Machine: Selection made but selector unchanged or missing');
+                        }
+                    }
+                },
+                handleTabActivated: {
+                    type: 'function',
+                    fn: ({context, event, log}: any) => {
+                        log('🌊 App Machine: Tab activated', event);
+                        
+                        const tabId = event.tabId;
+                        if (tabId) {
+                            log('🌊 App Machine: Tab activated with ID:', tabId);
+                            // You could store the active tab ID in context if needed
+                            // context.activeTabId = tabId;
                         }
                     }
                 },

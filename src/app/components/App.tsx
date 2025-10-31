@@ -1,6 +1,7 @@
 import React, { FunctionComponent, useEffect, useState } from 'react';
 import { ErrorBoundary } from '../../components/error-boundary';
 import { AppTome } from '../tomes/AppTome';
+import { MACHINE_NAMES } from '../machines/machine-names';
 import {
   ModalContainer,
   ModalHeader,
@@ -221,14 +222,14 @@ const AppComponent: FunctionComponent = () => {
               return going ? (
                 <StopWaveButton onClick={() => {
                   console.log('🌊 App Component: Stop button clicked');
-                  AppTome.send('AppMachine', 'STOP');
+                  AppTome.send(MACHINE_NAMES.APP, 'STOP');
                 }}>
                   Stop
                 </StopWaveButton>
               ) : (
                 <StartWaveButton onClick={() => {
                   console.log('🌊 App Component: Start button clicked');
-                  AppTome.send('AppMachine', 'START');
+                  AppTome.send(MACHINE_NAMES.APP, 'START');
                 }}>
                   Start
                 </StartWaveButton>

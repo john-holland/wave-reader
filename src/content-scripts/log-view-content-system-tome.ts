@@ -1,5 +1,6 @@
 import { createViewStateMachine } from 'log-view-machine';
 import { createComponentTomeWithMetadata, ComponentTomeMetadata } from '../types/tome-metadata';
+import { initializeKeyChordService, cleanupKeyChordService, setToggleCallback } from '../services/keychord-content-integration';
 
 /**
  * Log View Content System Tome

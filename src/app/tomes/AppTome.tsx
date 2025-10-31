@@ -2,6 +2,7 @@ import React from 'react';
 import { TomeBase } from 'log-view-machine';
 import { createAppMachine } from '../machines/app-machine';
 import { createChromeApiMachine } from '../machines/chrome-api-machine';
+import { MACHINE_NAMES } from '../machines/machine-names';
 
 /**
  * AppTome
@@ -15,6 +16,7 @@ class AppTomeClass extends TomeBase {
     private appMachine: any;
     private chromeApiMachine: any;
     private isInitialized: boolean = false;
+    private messageListener: ((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => boolean) | null = null;
 
     constructor() {
         super();
@@ -40,10 +42,13 @@ class AppTomeClass extends TomeBase {
             this.chromeApiMachine.parentMachine = this;
             
             // Register with router
-            this.router.register('ChromeApiMachine', this.chromeApiMachine);
+            this.router.register(MACHINE_NAMES.CHROME_API, this.chromeApiMachine);
             
             // Start Chrome API machine
             await this.chromeApiMachine.start?.();
+            
+            // Set up message listener after ChromeApiMachine is ready
+            this.setupMessageListener();
             
             // Create App Machine with router support
             const appMachineRaw = createAppMachine(this.router);
@@ -55,7 +60,7 @@ class AppTomeClass extends TomeBase {
             this.appMachine.parentMachine = this;
             
             // Register machine with router
-            this.router.register('AppMachine', this.appMachine);
+            this.router.register(MACHINE_NAMES.APP, this.appMachine);
             
             // Set up machine event listeners
             this.setupMachineListeners();
@@ -179,6 +184,58 @@ class AppTomeClass extends TomeBase {
                 view(rendered);
                 this.updateViewKey(`error-${Date.now()}`);
             });
+    }
+
+    /**
+     * Setup Chrome runtime message listener
+     * Routes incoming messages to ChromeApiMachine via router
+     */
+    private setupMessageListener(): void {
+        if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.onMessage) {
+            console.warn('🌊 AppTome: Chrome runtime not available, message listener not set up');
+            return;
+        }
+
+        console.log('🌊 AppTome: Setting up message listener');
+        
+        this.messageListener = (message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
+            console.log('🌊 AppTome: Received message:', message);
+            
+            try {
+                // Only handle messages from background script
+                if (message.from === 'background-script' || message.source === 'background') {
+                    console.log('🌊 AppTome: Routing message to ChromeApiMachine:', message.name || message.type);
+                    
+                    // Route message to ChromeApiMachine using router
+                    this.router.send(MACHINE_NAMES.CHROME_API, 'INCOMING_MESSAGE', { message })
+                        .then((result) => {
+                            console.log('🌊 AppTome: Message routed successfully', result);
+                            if (sendResponse) {
+                                sendResponse({ success: true, received: true });
+                            }
+                        })
+                        .catch((error) => {
+                            console.error('🌊 AppTome: Error routing message:', error);
+                            if (sendResponse) {
+                                sendResponse({ success: false, error: error.message });
+                            }
+                        });
+                    
+                    return true; // Keep message channel open for async response
+                }
+                
+                // Not a background message, ignore
+                return false;
+            } catch (error: any) {
+                console.error('🌊 AppTome: Error handling message:', error);
+                if (sendResponse) {
+                    sendResponse({ success: false, error: error.message });
+                }
+                return false;
+            }
+        };
+
+        chrome.runtime.onMessage.addListener(this.messageListener);
     }
 
     /**
@@ -484,6 +541,12 @@ class AppTomeClass extends TomeBase {
      */
     cleanup(): void {
         console.log('🌊 AppTome: Cleaning up...');
+        
+        // Remove message listener
+        if (this.messageListener && typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+            chrome.runtime.onMessage.removeListener(this.messageListener);
+            this.messageListener = null;
+        }
         
         if (this.appMachine) {
             this.appMachine.stop?.();

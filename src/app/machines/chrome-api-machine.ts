@@ -46,7 +46,8 @@ export const createChromeApiMachine = (router?: MachineRouter) => {
                         TOGGLE: { target: 'toggling' },
                         GET_STATUS: { target: 'idle', actions: ['respondWithStatus'] },
                         HEALTH_CHECK: { target: 'idle', actions: ['respondWithHealth'] },
-                        PING: { target: 'idle', actions: ['respondWithPong'] }
+                        PING: { target: 'idle', actions: ['respondWithPong'] },
+                        INCOMING_MESSAGE: { target: 'idle', actions: ['handleIncomingMessage'] }
                     }
                 },
                 initializing: {
@@ -253,6 +254,58 @@ export const createChromeApiMachine = (router?: MachineRouter) => {
                     context.activeConnections = 0;
                     context.lastMessage = null;
                     context.error = null;
+                },
+                handleIncomingMessage: async (context: any, event: any, meta: ServiceMeta) => {
+                    console.log('🔌 ChromeApi: Handling incoming message', event);
+                    
+                    const message = event.data?.message || event.message;
+                    if (!message) {
+                        console.warn('🔌 ChromeApi: No message data in incoming message event');
+                        return;
+                    }
+
+                    // Store last message
+                    context.lastMessage = message;
+                    
+                    // Route message to appropriate target based on message type
+                    try {
+                        let eventType: string;
+                        let messageData: any = {};
+
+                        if (message.name === 'selection-made') {
+                            eventType = 'SELECTION_MADE';
+                            messageData = {
+                                selector: message.selector,
+                                sessionId: message.sessionId,
+                                timestamp: message.timestamp || Date.now()
+                            };
+                        } else if (message.type === 'TAB_ACTIVATED') {
+                            eventType = 'TAB_ACTIVATED';
+                            messageData = {
+                                tabId: message.data?.tabId || message.tabId,
+                                timestamp: message.timestamp || Date.now()
+                            };
+                        } else {
+                            // For other message types, route with original message name/type
+                            eventType = message.name || message.type || 'UNKNOWN_MESSAGE';
+                            messageData = {
+                                ...message,
+                                timestamp: message.timestamp || Date.now()
+                            };
+                            console.log('🔌 ChromeApi: Routing unknown message type:', eventType);
+                        }
+
+                        // Use relative path to route to parent (AppMachine)
+                        if (meta.routedSend) {
+                            console.log('🔌 ChromeApi: Routing to parent machine:', eventType, messageData);
+                            await meta.routedSend('..', eventType, messageData);
+                        } else {
+                            console.warn('🔌 ChromeApi: routedSend not available in meta');
+                        }
+                    } catch (error: any) {
+                        console.error('🔌 ChromeApi: Error routing incoming message:', error);
+                        context.error = error.message;
+                    }
                 }
             }
         }

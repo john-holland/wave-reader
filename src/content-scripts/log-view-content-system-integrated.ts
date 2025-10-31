@@ -6,6 +6,7 @@ import { MLSettingsService } from '../services/ml-settings-service';
 import { SelectorHierarchy } from '../services/selector-hierarchy';
 import { SimpleColorServiceAdapter } from '../services/simple-color-service';
 import Options from '../models/options';
+import { initializeKeyChordService, cleanupKeyChordService, setToggleCallback } from '../services/keychord-content-integration';
 
 /**
  * Integrated Content System with Proxy State Machine
@@ -71,8 +72,23 @@ export class LogViewContentSystemIntegrated {
     // Set up message routing
     this.setupMessageRouting();
     
+    // Initialize keyboard shortcut service
+    this.setupKeyboardShortcuts();
+    
     // Log system initialization
     this.logMessage('system-init', 'Integrated content system initialized successfully');
+  }
+
+  private async setupKeyboardShortcuts() {
+    console.log('⌨️ Integrated System: Setting up keyboard shortcuts');
+    
+    // Initialize KeyChordService with toggle callback that sends TOGGLE to content tome
+    await initializeKeyChordService(() => {
+      console.log('⌨️ Integrated System: Keyboard shortcut triggered, sending TOGGLE');
+      if (this.contentTome) {
+        this.contentTome.send('TOGGLE');
+      }
+    });
   }
 
   private setupMessageRouting() {
@@ -426,6 +442,9 @@ export class LogViewContentSystemIntegrated {
 
   public destroy() {
     console.log("🌊 Integrated System: Destroying system...");
+    
+    // Clean up keyboard shortcuts
+    cleanupKeyChordService();
     
     // Clean up Tomes
     if (this.contentTome) {
