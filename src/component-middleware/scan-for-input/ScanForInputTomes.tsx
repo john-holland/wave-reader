@@ -1,6 +1,9 @@
 import React, { FunctionComponent, useEffect, useState, useCallback, useRef } from 'react';
 import styled from 'styled-components';
 import { ScanForInputMessageHandler } from './robotcopy-pact-config';
+import { MachineRouter } from 'log-view-machine';
+import EditorWrapper from '../../app/components/EditorWrapper';
+import { AppTome } from '../../app/tomes/AppTome';
 
 // Styled components for the Tomes-based scan for input
 const ScanForInputContainer = styled.div`
@@ -346,6 +349,7 @@ const ScanForInputTomes: FunctionComponent<ScanForInputTomesProps> = ({
   const [messageHandler, setMessageHandler] = useState<ScanForInputMessageHandler | null>(null);
   const [isExtension, setIsExtension] = useState(false);
   const [keyboardListener, setKeyboardListener] = useState<((event: KeyboardEvent) => void) | null>(null);
+  const [router, setRouter] = useState<MachineRouter | null>(null);
 
   // Refs
   const keyboardListenerRef = useRef<((event: KeyboardEvent) => void) | null>(null);
@@ -353,6 +357,10 @@ const ScanForInputTomes: FunctionComponent<ScanForInputTomesProps> = ({
   // Initialize component
   useEffect(() => {
     const initializeComponent = async () => {
+      // Get router from AppTome
+      const appTomeRouter = AppTome.getRouter();
+      setRouter(appTomeRouter);
+      
       // Check if we're running in a Chrome extension context
       const extensionContext = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id;
       setIsExtension(Boolean(extensionContext));
@@ -579,7 +587,15 @@ const ScanForInputTomes: FunctionComponent<ScanForInputTomesProps> = ({
   // Render scanning state
   if (isScanning) {
     return (
-      <ScanForInputContainer className={className}>
+      <EditorWrapper
+        title="Keyboard Shortcut Scanner"
+        description="Scan keyboard input for shortcut configuration"
+        componentId="scan-for-input-component"
+        useTomeArchitecture={true}
+        router={router || undefined}
+        onError={(error) => console.error('ScanForInput Editor Error:', error)}
+      >
+        <ScanForInputContainer className={className}>
         <ScanForInputHeader>
           <h2>🎯 Scanning for Keys</h2>
           <p>Press keys for: {actionType}</p>
@@ -634,12 +650,21 @@ const ScanForInputTomes: FunctionComponent<ScanForInputTomesProps> = ({
           </ScanningInstructions>
         </ScanForInputContent>
       </ScanForInputContainer>
+      </EditorWrapper>
     );
   }
 
   // Render idle state
   return (
-    <ScanForInputContainer className={className}>
+    <EditorWrapper
+      title="Keyboard Shortcut Scanner"
+      description="Scan keyboard input for shortcut configuration"
+      componentId="scan-for-input-component"
+      useTomeArchitecture={true}
+      router={router || undefined}
+      onError={(error) => console.error('ScanForInput Editor Error:', error)}
+    >
+      <ScanForInputContainer className={className}>
       <ScanForInputHeader>
         <h2>⌨️ Keyboard Shortcut Scanner</h2>
         <p>Configure keyboard shortcuts for: {actionType}</p>
@@ -676,6 +701,7 @@ const ScanForInputTomes: FunctionComponent<ScanForInputTomesProps> = ({
         </ShortcutInfo>
       </ScanForInputContent>
     </ScanForInputContainer>
+    </EditorWrapper>
   );
 };
 

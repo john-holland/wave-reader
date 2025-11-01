@@ -1,5 +1,9 @@
 import React, { FunctionComponent, useEffect, useState } from 'react';
 import styled from 'styled-components';
+import { MachineRouter } from 'log-view-machine';
+import EditorWrapper from '../../app/components/EditorWrapper';
+import { AppTome } from '../../app/tomes/AppTome';
+
 // Simple message handler for selector input
 class SelectorInputMessageHandler {
     private handlers: Map<string, Function>;
@@ -204,10 +208,15 @@ const SelectorInputTomes: FunctionComponent<SelectorInputTomesProps> = ({
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [messageHandler, setMessageHandler] = useState<SelectorInputMessageHandler | null>(null);
   const [isExtension, setIsExtension] = useState(false);
+  const [router, setRouter] = useState<MachineRouter | null>(null);
 
   // Initialize component
   useEffect(() => {
     const initializeComponent = async () => {
+      // Get router from AppTome
+      const appTomeRouter = AppTome.getRouter();
+      setRouter(appTomeRouter);
+      
       // Check if we're running in a Chrome extension context
       const extensionContext = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id;
       setIsExtension(Boolean(extensionContext));
@@ -493,7 +502,15 @@ const SelectorInputTomes: FunctionComponent<SelectorInputTomesProps> = ({
   // Render editing state
   if (isEditing) {
     return (
-      <SelectorInputContainer className={className}>
+      <EditorWrapper
+        title="Selector Input"
+        description="Input field for CSS selector specification"
+        componentId="selector-input-component"
+        useTomeArchitecture={true}
+        router={router || undefined}
+        onError={(error) => console.error('SelectorInput Editor Error:', error)}
+      >
+        <SelectorInputContainer className={className}>
         <SelectorInputHeader>
           <h2>🎯 Edit Selector</h2>
           <p>Modify your CSS selector</p>
@@ -583,12 +600,21 @@ const SelectorInputTomes: FunctionComponent<SelectorInputTomesProps> = ({
           </div>
         </SelectorInputContent>
       </SelectorInputContainer>
+      </EditorWrapper>
     );
   }
 
   // Render idle state
   return (
-    <SelectorInputContainer className={className}>
+    <EditorWrapper
+      title="Selector Input"
+      description="Input field for CSS selector specification"
+      componentId="selector-input-component"
+      useTomeArchitecture={true}
+      router={router || undefined}
+      onError={(error) => console.error('SelectorInput Editor Error:', error)}
+    >
+      <SelectorInputContainer className={className}>
       <SelectorInputHeader>
         <h2>🎯 Selector Input</h2>
         <p>Manage your CSS selectors</p>
@@ -639,6 +665,7 @@ const SelectorInputTomes: FunctionComponent<SelectorInputTomesProps> = ({
         </SavedSelectors>
       </SelectorInputContent>
     </SelectorInputContainer>
+    </EditorWrapper>
   );
 };
 

@@ -1,4 +1,5 @@
 import { KeyChordService } from './keychord-service';
+import { KeyChord } from '../components/util/user-input';
 
 /**
  * KeyChord Content Integration

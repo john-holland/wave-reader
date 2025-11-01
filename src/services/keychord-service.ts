@@ -11,7 +11,7 @@ import { FollowKeyChordObserver } from '../components/util/user-input';
  */
 export class KeyChordService {
     private subscription: Subscription | null = null;
-    private listener: ((listener: (event: KeyboardEvent) => void) => void) | null = null;
+    private listener: ((event: KeyboardEvent) => void) | null = null;
     private currentKeyChord: KeyChord = [];
     private isActive: boolean = false;
     private onToggle: (() => void) | null = null;
@@ -39,9 +39,12 @@ export class KeyChordService {
         let keysSubscription: Subscription | null = null;
         
         // Create keyboard observer
+        // WindowKeyDownKey returns an Observable and calls listenerReturn with the listener
+        // WindowKeyDownKey already adds the listener to window, so we just store it for cleanup
         const keysObservable = WindowKeyDownKey(
-            (listener: (event: KeyboardEvent) => void) => {
-                this.listener = listener;
+            (listenerFn: (event: KeyboardEvent) => void) => {
+                // Store the listener so we can remove it later
+                this.listener = listenerFn;
             },
             true // preventDefault
         );

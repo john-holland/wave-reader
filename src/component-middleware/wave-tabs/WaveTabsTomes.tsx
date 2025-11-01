@@ -2,6 +2,9 @@ import React, { FunctionComponent, useEffect, useState, useCallback, useRef } fr
 import styled from 'styled-components';
 import { WaveTabsMessageHandler } from './robotcopy-pact-config';
 import Tab from '../../models/tab';
+import { MachineRouter } from 'log-view-machine';
+import EditorWrapper from '../../app/components/EditorWrapper';
+import { AppTome } from '../../app/tomes/AppTome';
 
 // Styled components for the Tomes-based wave tabs
 const WaveTabsContainer = styled.div`
@@ -355,6 +358,7 @@ const WaveTabsTomes: FunctionComponent<WaveTabsTomesProps> = ({
   const [messageHandler, setMessageHandler] = useState<WaveTabsMessageHandler | null>(null);
   const [isExtension, setIsExtension] = useState(false);
   const [isEnableTabManagement, setIsEnableTabManagement] = useState(enableTabManagement);
+  const [router, setRouter] = useState<MachineRouter | null>(null);
 
   // Refs
   const tabHistoryRef = useRef<number[]>([]);
@@ -362,6 +366,10 @@ const WaveTabsTomes: FunctionComponent<WaveTabsTomesProps> = ({
   // Initialize component
   useEffect(() => {
     const initializeComponent = async () => {
+      // Get router from AppTome
+      const appTomeRouter = AppTome.getRouter();
+      setRouter(appTomeRouter);
+      
       // Check if we're running in a Chrome extension context
       const extensionContext = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id;
       setIsExtension(Boolean(extensionContext));
@@ -619,7 +627,15 @@ const WaveTabsTomes: FunctionComponent<WaveTabsTomesProps> = ({
   // Render management view
   if (currentView === 'management') {
     return (
-      <WaveTabsContainer className={className}>
+      <EditorWrapper
+        title="Wave Tabs"
+        description="Tabbed interface for managing multiple views and content"
+        componentId="wave-tabs-component"
+        useTomeArchitecture={true}
+        router={router || undefined}
+        onError={(error) => console.error('WaveTabs Editor Error:', error)}
+      >
+        <WaveTabsContainer className={className}>
         <WaveTabsHeader>
           <h2>⚙️ Tab Management</h2>
           <p>Manage your tabs and content</p>
@@ -696,13 +712,22 @@ const WaveTabsTomes: FunctionComponent<WaveTabsTomesProps> = ({
           </TabManagementView>
         </WaveTabsContent>
       </WaveTabsContainer>
+      </EditorWrapper>
     );
   }
 
   // Render configuration view
   if (currentView === 'configuration') {
     return (
-      <WaveTabsContainer className={className}>
+      <EditorWrapper
+        title="Wave Tabs"
+        description="Tabbed interface for managing multiple views and content"
+        componentId="wave-tabs-component"
+        useTomeArchitecture={true}
+        router={router || undefined}
+        onError={(error) => console.error('WaveTabs Editor Error:', error)}
+      >
+        <WaveTabsContainer className={className}>
         <WaveTabsHeader>
           <h2>🔧 Tab Configuration</h2>
           <p>Configure tab settings and preferences</p>
@@ -772,12 +797,21 @@ const WaveTabsTomes: FunctionComponent<WaveTabsTomesProps> = ({
           </TabConfigurationView>
         </WaveTabsContent>
       </WaveTabsContainer>
+      </EditorWrapper>
     );
   }
 
   // Render main tab view
   return (
-    <WaveTabsContainer className={className}>
+    <EditorWrapper
+      title="Wave Tabs"
+      description="Tabbed interface for managing multiple views and content"
+      componentId="wave-tabs-component"
+      useTomeArchitecture={true}
+      router={router || undefined}
+      onError={(error) => console.error('WaveTabs Editor Error:', error)}
+    >
+      <WaveTabsContainer className={className}>
       <WaveTabsHeader>
         <h2>📑 Wave Tabs</h2>
         <p>Manage your content with tabs</p>
@@ -863,6 +897,7 @@ const WaveTabsTomes: FunctionComponent<WaveTabsTomesProps> = ({
         )}
       </WaveTabsContent>
     </WaveTabsContainer>
+    </EditorWrapper>
   );
 };
 

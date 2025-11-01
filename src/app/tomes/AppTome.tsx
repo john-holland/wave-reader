@@ -490,6 +490,14 @@ class AppTomeClass extends TomeBase {
     }
 
     /**
+     * Get the router for component middleware integration
+     * Allows components to register themselves and use routed send
+     */
+    getRouter(): any {
+        return this.router;
+    }
+
+    /**
      * Render the current view from the machine
      * Overrides base class to use ViewStateMachine's render method
      */

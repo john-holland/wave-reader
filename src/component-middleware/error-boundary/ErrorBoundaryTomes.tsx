@@ -7,6 +7,9 @@
 
 import React, { Component, ReactNode, ErrorInfo } from 'react';
 import ErrorBoundaryComponentTemplate from './templates/error-boundary-component';
+import { MachineRouter } from 'log-view-machine';
+import EditorWrapper from '../../app/components/EditorWrapper';
+import { AppTome } from '../../app/tomes/AppTome';
 
 // Check if we're in development mode
 const isDevelopment = typeof window !== 'undefined' && window.location && 
@@ -47,6 +50,7 @@ interface ErrorBoundaryState {
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   private errorBoundaryId: string;
   private template: any;
+  private router: MachineRouter | null = null;
 
   constructor(props: ErrorBoundaryProps) {
     super(props);
@@ -61,6 +65,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       isDevelopment: props.enableDevelopmentMode !== false && isDevelopment
     };
 
+    // Get router from AppTome
+    this.router = AppTome.getRouter();
+
     // Initialize the component-middleware template
     this.template = ErrorBoundaryComponentTemplate.create({
       xstateConfig: {
@@ -72,6 +79,19 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         }
       }
     });
+
+    // Register template with router if available
+    if (this.router && this.template && this.template.setRouter) {
+      this.template.setRouter(this.router);
+      this.router.register('ErrorBoundaryMachine', this.template);
+    }
+  }
+
+  componentWillUnmount() {
+    // Unregister from router on unmount
+    if (this.router && this.template) {
+      this.router.unregister('ErrorBoundaryMachine');
+    }
   }
 
   static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
@@ -168,9 +188,17 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   render() {
     if (this.state.hasError) {
-      // Use our modern generic editor style with component-middleware integration
+      // Use EditorWrapper for error display with mod compatibility
       return this.props.fallback || (
-        <div className="generic-editor error-editor">
+        <EditorWrapper
+          title="Wave Reader Error"
+          description={`Error in ${this.props.componentName || 'component'}`}
+          componentId="error-boundary-component"
+          useTomeArchitecture={true}
+          router={this.router || undefined}
+          onError={(error) => console.error('ErrorBoundary Editor Error:', error)}
+        >
+          <div className="generic-editor error-editor">
           <header className="editor-header error-header">
             <h1 className="editor-title">🌊 Wave Reader Error</h1>
             <p className="editor-description">
@@ -290,6 +318,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             <p>🔗 Wave Reader Error Boundary - Keeping your app stable</p>
           </footer>
         </div>
+        </EditorWrapper>
       );
     }
 

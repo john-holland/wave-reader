@@ -1,6 +1,8 @@
-import React from 'react';
-import { createViewStateMachine } from 'log-view-machine';
+import React, { FunctionComponent, useEffect, useState } from 'react';
+import { createViewStateMachine, MachineRouter } from 'log-view-machine';
 import { createComponentTomeWithMetadata } from '../../types/tome-metadata';
+import EditorWrapper from '../../app/components/EditorWrapper';
+import { AppTome } from '../../app/tomes/AppTome';
 
 /**
  * Go Button Tome
@@ -295,4 +297,91 @@ export const GoButtonTomes = createComponentTomeWithMetadata(
   createTome
 );
 
-export default GoButtonTomes;
+// React wrapper component for EditorWrapper integration
+interface GoButtonTomeWrapperProps {
+  initialModel?: Partial<GoButtonModel>;
+  className?: string;
+}
+
+const GoButtonTomeWrapper: FunctionComponent<GoButtonTomeWrapperProps> = ({
+  initialModel = {},
+  className
+}) => {
+  const [router, setRouter] = useState<MachineRouter | null>(null);
+  const [machine, setMachine] = useState<any>(null);
+  const [renderKey, setRenderKey] = useState(-1);
+
+  useEffect(() => {
+    // Get router from AppTome
+    const appTomeRouter = AppTome.getRouter();
+    setRouter(appTomeRouter);
+
+    // Create machine instance using GoButtonTomes.create
+    // Note: create() returns a ViewStateMachine instance
+    const goButtonMachine = GoButtonTomes.create(initialModel) as any;
+    
+    // Set router and register machine if available
+    if (appTomeRouter && goButtonMachine) {
+      if (typeof goButtonMachine.setRouter === 'function') {
+        goButtonMachine.setRouter(appTomeRouter);
+      }
+      if (appTomeRouter.register) {
+        appTomeRouter.register('GoButtonMachine', goButtonMachine);
+      }
+    }
+    
+    // Start the machine if it has a start method
+    if (goButtonMachine && typeof goButtonMachine.start === 'function') {
+      goButtonMachine.start();
+    }
+    
+    setMachine(goButtonMachine);
+    const unsubscribe = goButtonMachine.observeViewKey(setRenderKey);
+    // Cleanup
+    return () => {
+      unsubscribe();
+      if (appTomeRouter && goButtonMachine) {
+        if (appTomeRouter.unregister) {
+          appTomeRouter.unregister('GoButtonMachine');
+        }
+        if (goButtonMachine && typeof goButtonMachine.stop === 'function') {
+          goButtonMachine.stop();
+        }
+      }
+    };
+  }, [initialModel]);
+
+  if (!machine) {
+    return (
+      <EditorWrapper
+        title="Go Button"
+        description="Button component for starting wave animations"
+        componentId="go-button-component"
+        useTomeArchitecture={true}
+        key={renderKey}
+        router={router || undefined}
+        onError={(error) => console.error('GoButton Editor Error:', error)}
+      >
+        <div>Loading...</div>
+      </EditorWrapper>
+    );
+  }
+
+  return (
+    <EditorWrapper
+      title="Go Button"
+      description="Button component for starting wave animations"
+      componentId="go-button-component"
+      useTomeArchitecture={true}
+      key={renderKey}
+      router={router || undefined}
+      onError={(error) => console.error('GoButton Editor Error:', error)}
+    >
+      <div className={className}>
+        {machine.render ? machine.render() : <div>Go Button Machine</div>}
+      </div>
+    </EditorWrapper>
+  );
+};
+
+export default GoButtonTomeWrapper;

@@ -1,5 +1,9 @@
 import React, { FunctionComponent, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import styled from 'styled-components';
+import { MachineRouter } from 'log-view-machine';
+import EditorWrapper from '../../app/components/EditorWrapper';
+import { AppTome } from '../../app/tomes/AppTome';
+
 // Simple message handler for selector hierarchy
 class SelectorHierarchyMessageHandler {
     private handlers: Map<string, Function>;
@@ -277,6 +281,7 @@ const SelectorHierarchyTomes: FunctionComponent<SelectorHierarchyTomesProps> = (
   const [panelSize, setPanelSize] = useState<'small' | 'medium' | 'large'>('medium');
   const [autoConfirm, setAutoConfirm] = useState(false);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
+  const [router, setRouter] = useState<MachineRouter | null>(null);
   
   // Refs
   const messageHandlerRef = useRef<SelectorHierarchyMessageHandler | null>(null);
@@ -286,6 +291,10 @@ const SelectorHierarchyTomes: FunctionComponent<SelectorHierarchyTomesProps> = (
   useEffect(() => {
     const initializeComponent = async () => {
       try {
+        // Get router from AppTome
+        const appTomeRouter = AppTome.getRouter();
+        setRouter(appTomeRouter);
+        
         // Check if we're running in a Chrome extension context
         const extensionContext = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id;
         isExtensionRef.current = Boolean(extensionContext);
@@ -635,7 +644,15 @@ const SelectorHierarchyTomes: FunctionComponent<SelectorHierarchyTomesProps> = (
 
   // Render main hierarchy interface
   return (
-    <SelectorHierarchyContainer className={className}>
+    <EditorWrapper
+      title="Selector Hierarchy"
+      description="Hierarchical view of CSS selectors and their relationships"
+      componentId="selector-hierarchy-component"
+      useTomeArchitecture={true}
+      router={router || undefined}
+      onError={(error) => console.error('SelectorHierarchy Editor Error:', error)}
+    >
+      <SelectorHierarchyContainer className={className}>
       {/* Refresh buttons at corners */}
       <RefreshButton style={{ top: 10, left: 10 }} onClick={handleRefresh}>⟳</RefreshButton>
       <RefreshButton style={{ top: 10, right: 10 }} onClick={handleRefresh}>⟳</RefreshButton>
@@ -692,6 +709,7 @@ const SelectorHierarchyTomes: FunctionComponent<SelectorHierarchyTomesProps> = (
         </ControlActions>
       </ControlPanel>
     </SelectorHierarchyContainer>
+    </EditorWrapper>
   );
 };
 

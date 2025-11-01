@@ -3,6 +3,9 @@ import styled from 'styled-components';
 import { SettingsMessageHandler } from './robotcopy-pact-config';
 import Wave, { defaultCssTemplate, defaultCssMouseTemplate } from '../../models/wave';
 import Text from '../../models/text';
+import { MachineRouter } from 'log-view-machine';
+import EditorWrapper from '../../app/components/EditorWrapper';
+import { AppTome } from '../../app/tomes/AppTome';
 
 // Styled components for the Tomes-based settings
 const SettingsContainer = styled.div`
@@ -449,6 +452,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
   const [messageHandler, setMessageHandler] = useState<SettingsMessageHandler | null>(null);
   const [isExtension, setIsExtension] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [router, setRouter] = useState<MachineRouter | null>(null);
 
   // Refs
   const settingsRef = useRef<Settings>(settings);
@@ -456,6 +460,10 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
   // Initialize component
   useEffect(() => {
     const initializeComponent = async () => {
+      // Get router from AppTome
+      const appTomeRouter = AppTome.getRouter();
+      setRouter(appTomeRouter);
+      
       // Check if we're running in a Chrome extension context
       const extensionContext = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id;
       setIsExtension(Boolean(extensionContext));
@@ -733,7 +741,15 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
   // Render different views based on currentView
   if (currentView === 'saving') {
     return (
-      <SettingsContainer className={className}>
+      <EditorWrapper
+        title="Wave Reader Settings"
+        description="Configure Wave Reader preferences and options"
+        componentId="settings-component"
+        useTomeArchitecture={true}
+        router={router || undefined}
+        onError={(error) => console.error('Settings Editor Error:', error)}
+      >
+        <SettingsContainer className={className}>
         <SettingsHeader>
           <SettingsTitle>💾 Saving Settings</SettingsTitle>
         </SettingsHeader>
@@ -752,12 +768,21 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
           </ProgressView>
         </SettingsContent>
       </SettingsContainer>
+      </EditorWrapper>
     );
   }
 
   if (currentView === 'loading') {
     return (
-      <SettingsContainer className={className}>
+      <EditorWrapper
+        title="Wave Reader Settings"
+        description="Configure Wave Reader preferences and options"
+        componentId="settings-component"
+        useTomeArchitecture={true}
+        router={router || undefined}
+        onError={(error) => console.error('Settings Editor Error:', error)}
+      >
+        <SettingsContainer className={className}>
         <SettingsHeader>
           <SettingsTitle>📥 Loading Settings</SettingsTitle>
         </SettingsHeader>
@@ -770,12 +795,21 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
           </ProgressView>
         </SettingsContent>
       </SettingsContainer>
+      </EditorWrapper>
     );
   }
 
   if (currentView === 'error') {
     return (
-      <SettingsContainer className={className}>
+      <EditorWrapper
+        title="Wave Reader Settings"
+        description="Configure Wave Reader preferences and options"
+        componentId="settings-component"
+        useTomeArchitecture={true}
+        router={router || undefined}
+        onError={(error) => console.error('Settings Editor Error:', error)}
+      >
+        <SettingsContainer className={className}>
         <SettingsHeader>
           <SettingsTitle>❌ Error</SettingsTitle>
         </SettingsHeader>
@@ -798,12 +832,21 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
           </ErrorView>
         </SettingsContent>
       </SettingsContainer>
+      </EditorWrapper>
     );
   }
 
   // Render main settings view
   return (
-    <SettingsContainer className={className}>
+    <EditorWrapper
+      title="Wave Reader Settings"
+      description="Configure Wave Reader preferences and options"
+      componentId="settings-component"
+      useTomeArchitecture={true}
+      router={router || undefined}
+      onError={(error) => console.error('Settings Editor Error:', error)}
+    >
+      <SettingsContainer className={className}>
       <SettingsHeader>
         <SettingsTitle>⚙️ Settings</SettingsTitle>
         <SaveIndicator>
@@ -1195,6 +1238,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
         )}
       </SettingsContent>
     </SettingsContainer>
+    </EditorWrapper>
   );
 };
 

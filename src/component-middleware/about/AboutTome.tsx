@@ -1,6 +1,8 @@
 import React, { FunctionComponent, useEffect, useState, useCallback, useRef } from 'react';
 import styled from 'styled-components';
-import { createViewStateMachine } from 'log-view-machine';
+import { createViewStateMachine, MachineRouter } from 'log-view-machine';
+import EditorWrapper from '../../app/components/EditorWrapper';
+import { AppTome } from '../../app/tomes/AppTome';
 
 // Styled components for the Tomes-based about page
 const AboutView = styled.div`
@@ -363,6 +365,9 @@ const AboutPageComponent = createViewStateMachine({
       donated: false,
       hasEasterEggs: false,
       donors: [
+        // we may want to remove this, as hopefully the list will grow to millions or billions
+        // that said, it's a nice way to show support and encourage others to donate
+        // so perhaps we'll do a `top(10) sort by Date_Donated ASC` or something
         { name: "Anonymous Supporter", amount: "0.1 ETH", crypto: "ETH" },
         { name: "Beta Tester", amount: "0.05 BTC", crypto: "BTC" },
         { name: "Reading Enthusiast", amount: "0.2 ETH", crypto: "ETH" }
@@ -515,21 +520,75 @@ const AboutTome: FunctionComponent<AboutTomeProps> = ({
 }) => {
   // State management using withState pattern
   const [aboutPageComponent, setAboutPageComponent] = useState<any>(null);
+  const [router, setRouter] = useState<MachineRouter | null>(null);
+  const [renderKey, setRenderKey] = useState(-1);
  
   useEffect(() => {
+    // Get router from AppTome
+    const appTomeRouter = AppTome.getRouter();
+    setRouter(appTomeRouter);
+
+    // Create machine instance
     const component = AboutPageComponent;
+    
+    // Set router on machine if available
+    if (appTomeRouter && component.setRouter) {
+      component.setRouter(appTomeRouter);
+      // Register machine with router
+      appTomeRouter.register('AboutMachine', component);
+    }
+    
     setAboutPageComponent(component);
     component.start();
     component.send({ type: 'INITIALIZE' });
+
+    // Observe view key changes to trigger re-renders (if method exists)
+    let unsubscribe: (() => void) | null = null;
+    const componentAny = component as any;
+    if (componentAny && typeof componentAny.observeViewKey === 'function') {
+      unsubscribe = componentAny.observeViewKey(setRenderKey);
+    }
+
+    // Cleanup: unregister on unmount
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+      if (appTomeRouter && component) {
+        appTomeRouter.unregister('AboutMachine');
+      }
+    };
   }, []);
 
   if (!aboutPageComponent) {
-    return <div>Loading...</div>;
-  }
+    return (
+        <EditorWrapper
+          title="About Wave Reader"
+          description="Information about Wave Reader and its features"
+          componentId="about-component"
+          useTomeArchitecture={true}
+          router={router || undefined}
+          key={renderKey}
+          onError={(error) => console.error('About Editor Error:', error)}
+        >
+          <div>Loading...</div>
+        </EditorWrapper>
+      );
+    }
 
-  return (
-    aboutPageComponent.render()
-  );
+    return (
+      <EditorWrapper
+        title="About Wave Reader"
+        description="Information about Wave Reader and its features"
+        componentId="about-component"
+        useTomeArchitecture={true}
+        router={router || undefined}
+        key={renderKey}
+        onError={(error) => console.error('About Editor Error:', error)}
+      >
+        {aboutPageComponent.render()}
+      </EditorWrapper>
+    );
 };
 
 export default AboutTome;
