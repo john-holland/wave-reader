@@ -120,22 +120,23 @@ const AppComponent: FunctionComponent = () => {
           componentId="about-component"
           onError={(error: Error) => console.error('About Editor Error:', error)}
         >
-          <div style={{ padding: '20px' }}>
-            <h2>About Wave Reader</h2>
+          <div style={{ padding: '20px', color: '#333' }}>
+            <h2 style={{ color: '#2c3e50', marginTop: 0 }}>About Wave Reader</h2>
             
             <div style={{
               backgroundColor: '#e8f5e8',
               padding: '20px',
               borderRadius: '8px',
               border: '1px solid #c8e6c9',
-              marginBottom: '20px'
+              marginBottom: '20px',
+              color: '#2c3e50'
             }}>
-              <h3>Wave Reader v1.0</h3>
-              <p>Wave Reader is a Chrome extension that brings beautiful wave animations to web pages. Select elements and watch them come alive with smooth, flowing animations.</p>
+              <h3 style={{ color: '#2c3e50', marginTop: 0 }}>Wave Reader v1.0</h3>
+              <p style={{ color: '#495057', marginBottom: 0 }}>Wave Reader is a Chrome extension that brings beautiful wave animations to web pages. Select elements and watch them come alive with smooth, flowing animations.</p>
             </div>
             
-            <h3>Features</h3>
-            <ul>
+            <h3 style={{ color: '#2c3e50' }}>Features</h3>
+            <ul style={{ color: '#495057' }}>
               <li><strong>CSS Selector Support:</strong> Target any element using CSS selectors</li>
               <li><strong>Keyboard Shortcuts:</strong> Quick access with customizable hotkeys</li>
               <li><strong>Smooth Animations:</strong> Beautiful wave effects that enhance user experience</li>
@@ -148,12 +149,13 @@ const AppComponent: FunctionComponent = () => {
               padding: '15px',
               borderRadius: '8px',
               border: '1px solid #b3d9ff',
-              marginTop: '20px'
+              marginTop: '20px',
+              color: '#2c3e50'
             }}>
-              <h4>Technical Details</h4>
-              <p><strong>Architecture:</strong> Tome-based state management with XState machines</p>
-              <p><strong>Rendering:</strong> React with ViewStateMachine integration</p>
-              <p><strong>Communication:</strong> Chrome Extension APIs with background scripts</p>
+              <h4 style={{ color: '#2c3e50', marginTop: 0 }}>Technical Details</h4>
+              <p style={{ color: '#495057', marginBottom: '8px' }}><strong>Architecture:</strong> Tome-based state management with XState machines</p>
+              <p style={{ color: '#495057', marginBottom: '8px' }}><strong>Rendering:</strong> React with ViewStateMachine integration</p>
+              <p style={{ color: '#495057', marginBottom: 0 }}><strong>Communication:</strong> Chrome Extension APIs with background scripts</p>
             </div>
           </div>
         </EditorWrapper>

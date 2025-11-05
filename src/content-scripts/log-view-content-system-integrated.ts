@@ -82,12 +82,16 @@ export class LogViewContentSystemIntegrated {
   private async setupKeyboardShortcuts() {
     console.log('⌨️ Integrated System: Setting up keyboard shortcuts');
     
-    // Initialize KeyChordService with toggle callback that sends TOGGLE to content tome
+    // Initialize KeyChordService with toggle callback that uses integrated system's handleToggle
     await initializeKeyChordService(() => {
-      console.log('⌨️ Integrated System: Keyboard shortcut triggered, sending TOGGLE');
-      if (this.contentTome) {
-        this.contentTome.send('TOGGLE');
-      }
+      console.log('⌨️ Integrated System: Keyboard shortcut triggered, calling handleToggle');
+      // Use the integrated system's toggle handler which properly routes to start/stop
+      this.handleToggle({
+        name: 'toggle',
+        from: 'keyboard-shortcut',
+        timestamp: Date.now(),
+        options: this.latestOptions // Include current options if available
+      });
     });
   }
 
