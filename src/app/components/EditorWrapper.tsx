@@ -1,16 +1,14 @@
 import React, { ErrorInfo } from 'react';
 import type { MachineRouter } from 'log-view-machine';
-// GenericEditor is not exported from main package due to CSS dependencies
-// Import directly from source - this works in monorepo setup
-// @ts-expect-error - GenericEditor not in package exports, but available in monorepo
-import GenericEditor from 'log-view-machine/src/components/GenericEditor';
+// Use extracted ErrorBoundary directly - no ace-editor dependency
+// @ts-expect-error - ErrorBoundary available in monorepo, or use package export: import { ErrorBoundary } from 'log-view-machine'
+import { ErrorBoundary } from 'log-view-machine/src/components/ErrorBoundary';
 
 interface EditorWrapperProps {
   title: string;
   description: string;
   children: React.ReactNode;
   componentId?: string;
-  useTomeArchitecture?: boolean;
   onError?: (error: Error, errorInfo?: ErrorInfo) => void;
   router?: MachineRouter;
 }
@@ -18,39 +16,19 @@ interface EditorWrapperProps {
 /**
  * EditorWrapper Component
  * 
- * Enhanced wrapper that uses GenericEditor from log-view-machine
- * for mod compatibility and provides router integration for routed send support.
+ * Lightweight wrapper with ErrorBoundary - always uses tome architecture.
+ * For editor UI features, use LazyEditor component instead.
  * 
- * This wrapper maintains backward compatibility while adding:
- * - Mod compatibility via GenericEditor
- * - Router integration for inter-machine communication
- * - Tome architecture support
+ * This wrapper has zero ace-editor dependency and is tree-shakeable.
  */
 const EditorWrapper: React.FC<EditorWrapperProps> = ({
   title,
   description,
   children,
   componentId,
-  useTomeArchitecture = false,
   onError,
   router
 }) => {
-  // Use GenericEditor when tome architecture is enabled for full mod compatibility
-  if (useTomeArchitecture) {
-    return (
-      <GenericEditor
-        title={title}
-        description={description}
-        componentId={componentId}
-        useTomeArchitecture={true}
-        onError={onError}
-      >
-        {children}
-      </GenericEditor>
-    );
-  }
-
-  // Fallback to simple wrapper for non-tome mode (backward compatibility)
   return (
     <div className="generic-editor" data-state="ready">
       <header className="editor-header" style={{
@@ -79,7 +57,7 @@ const EditorWrapper: React.FC<EditorWrapperProps> = ({
           opacity: 0.7,
           color: '#007bff'
         }}>
-          📝 Standard Mode
+          📝 Tome Architecture
           {componentId && ` | Component: ${componentId}`}
           {router && ' | Router: Available'}
         </div>
@@ -89,9 +67,11 @@ const EditorWrapper: React.FC<EditorWrapperProps> = ({
         padding: '0',
         backgroundColor: 'white'
       }}>
-        <div className="editor-content">
-          {children}
-        </div>
+        <ErrorBoundary onError={onError}>
+          <div className="editor-content">
+            {children}
+          </div>
+        </ErrorBoundary>
       </main>
       
       <footer className="editor-footer" style={{
@@ -103,7 +83,7 @@ const EditorWrapper: React.FC<EditorWrapperProps> = ({
         color: '#666'
       }}>
         <p style={{ margin: 0 }}>
-          🔗 Wave Reader Editor | State: Ready | Standard Mode
+          🔗 Wave Reader | Tome Architecture Enabled | {router && 'Router: Available'}
         </p>
       </footer>
     </div>

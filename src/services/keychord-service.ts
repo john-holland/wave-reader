@@ -1,6 +1,12 @@
 import { Observable, Subscription } from 'rxjs';
-import { KeyChord, WindowKeyDownKey } from '../components/util/user-input';
-import { FollowKeyChordObserver } from '../components/util/user-input';
+import { 
+    KeyChord, 
+    WindowKeyDownKey,
+    FollowKeyChordObserver,
+    normalizeKey,
+    sortKeyChord,
+    compareKeyChords
+} from '../components/util/user-input';
 
 /**
  * KeyChord Service
@@ -20,7 +26,8 @@ export class KeyChordService {
         initialKeyChord: KeyChord = ['Ctrl', 'Shift', 'W'],
         onToggleCallback?: () => void
     ) {
-        this.currentKeyChord = initialKeyChord;
+        // Normalize the keychord when setting it
+        this.currentKeyChord = sortKeyChord(initialKeyChord);
         this.onToggle = onToggleCallback || null;
     }
 
@@ -37,38 +44,81 @@ export class KeyChordService {
         
         this.isActive = true;
         let keysSubscription: Subscription | null = null;
+        let typedKeys: KeyChord = [];
         
         // Create keyboard observer
         // WindowKeyDownKey returns an Observable and calls listenerReturn with the listener
         // WindowKeyDownKey already adds the listener to window, so we just store it for cleanup
+        // Use preventDefault = false here, we'll handle it manually when keychord matches
+        let currentEvent: KeyboardEvent | null = null;
         const keysObservable = WindowKeyDownKey(
             (listenerFn: (event: KeyboardEvent) => void) => {
                 // Store the listener so we can remove it later
-                this.listener = listenerFn;
+                // Wrap it to capture events for synchronous keychord checking
+                this.listener = (event: KeyboardEvent) => {
+                    // WindowKeyDownKey already handles input-selector fields (emits key but doesn't prevent default)
+                    // We capture the event here to check keychord completion synchronously
+                    currentEvent = event;
+                    listenerFn(event);
+                };
             },
-            true // preventDefault
+            false // Don't prevent default here - we handle it manually when keychord matches
         );
 
-        // Store keys subscription for cleanup
+        // Store keys subscription for cleanup - track keys and check keychord completion
         keysSubscription = keysObservable.subscribe({
+            next: (key: string) => {
+                // Normalize and filter the incoming key
+                const normalizedKey = normalizeKey(key);
+                
+                // Skip invalid keys (like "Dead", "Unidentified")
+                if (!normalizedKey) {
+                    return;
+                }
+                
+                // Filter out Meta if it's not part of the target keychord
+                // (Some browsers emit Meta unexpectedly when only modifier keys are pressed)
+                if (normalizedKey === 'Meta' && !this.currentKeyChord.includes('Meta')) {
+                    return;
+                }
+                
+                // Track typed keys for keychord matching (only valid, normalized keys)
+                typedKeys = [normalizedKey].concat(typedKeys).slice(0, this.currentKeyChord.length);
+                
+                // Check if keychord is completed using normalized, sorted comparison
+                const isCompleted = compareKeyChords(typedKeys, this.currentKeyChord);
+                
+                // Only prevent default if keychord is completed AND not in input-selector field
+                if (isCompleted && currentEvent && !this.isInputSelectorField(currentEvent)) {
+                    // Prevent default synchronously when keychord matches
+                    currentEvent.preventDefault();
+                    console.log('⌨️ KeyChordService: Shortcut matched!', this.currentKeyChord.join(' + '));
+                    this.handleToggle();
+                    typedKeys = []; // Reset after match
+                }
+                // If keychord not completed OR in input-selector field, don't prevent default
+                // This allows normal typing
+            },
             error: (error: any) => {
                 console.error('⌨️ KeyChordService: Error in keys observable:', error);
             }
         });
 
-        // Create key chord follower
+        // Create key chord follower for backup/secondary matching
         const keyChordObserver = FollowKeyChordObserver(
             this.currentKeyChord,
             keysObservable,
             () => !this.isActive // stop condition
         );
 
-        // Subscribe to key chord matches
+        // Subscribe to key chord matches (secondary check - primary is handled above)
         this.subscription = keyChordObserver.subscribe({
             next: (matched: boolean) => {
-                if (matched) {
-                    console.log('⌨️ KeyChordService: Shortcut matched!', this.currentKeyChord.join(' + '));
-                    this.handleToggle();
+                // Primary matching and preventDefault is handled in the keysSubscription above
+                // This is a fallback/secondary check
+                if (matched && currentEvent && !this.isInputSelectorField(currentEvent)) {
+                    // Already handled above, but ensure toggle is called
+                    typedKeys = [];
                 }
             },
             error: (error: any) => {
@@ -82,6 +132,49 @@ export class KeyChordService {
                 }
             }
         });
+    }
+
+    /**
+     * Check if the event target is within an input-selector field or is an editable element
+     * @param event - The keyboard event to check
+     * @returns true if target is an input-selector field or editable element
+     */
+    private isInputSelectorField(event: KeyboardEvent): boolean {
+        const target = event.target as HTMLElement;
+        if (!target) return false;
+
+        // Check if target is an input or textarea element
+        const tagName = target.tagName?.toLowerCase();
+        if (tagName === 'input' || tagName === 'textarea') {
+            return true;
+        }
+
+        // Check if target has contenteditable attribute
+        if (target.hasAttribute?.('contenteditable') && target.getAttribute('contenteditable') !== 'false') {
+            return true;
+        }
+
+        // Check for input-selector specific IDs
+        if (target.id === 'selectorInput' || target.id === 'selector-text-input') {
+            return true;
+        }
+
+        // Check for input-selector specific classes
+        if (target.classList?.contains('selector-text-input')) {
+            return true;
+        }
+
+        // Check if target is within an element with selector-input classes
+        let current: HTMLElement | null = target;
+        while (current) {
+            if (current.classList?.contains('selector-input-editing') || 
+                current.classList?.contains('selector-input-section')) {
+                return true;
+            }
+            current = current.parentElement;
+        }
+
+        return false;
     }
 
     /**
@@ -120,7 +213,8 @@ export class KeyChordService {
             this.stop();
         }
         
-        this.currentKeyChord = newKeyChord;
+        // Normalize the keychord when updating it
+        this.currentKeyChord = sortKeyChord(newKeyChord);
         
         if (wasActive) {
             this.start();

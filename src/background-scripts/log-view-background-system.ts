@@ -250,14 +250,28 @@ export class LogViewBackgroundSystem {
 
     private handleRuntimeMessage(message: any, sender: any, sendResponse: any) {
         console.log("BACKGROUND->RUNTIME: Received runtime message:", message);
-        this.logMessage('runtime-message', `Received ${message.name} from ${message.from}`);
+        
+        // Coalesce nested message objects - check if message has an embedded message property
+        let normalizedMessage = message;
+        if (message && typeof message === 'object' && message.message && typeof message.message === 'object') {
+            // Extract the inner message and merge with outer properties (like source)
+            normalizedMessage = {
+                ...message.message,
+                // Preserve outer properties like source if they exist and aren't in inner message
+                source: message.source || message.message.source,
+                from: message.from || message.message.from || message.source
+            };
+            console.log("BACKGROUND->RUNTIME: Coalesced nested message:", normalizedMessage);
+        }
+        
+        this.logMessage('runtime-message', `Received ${normalizedMessage.name} from ${normalizedMessage.from}`);
         
         // Create a proper message using our factory
-        const properMessage = MessageFactory.createMessage(message.name, message.from, message);
+        const properMessage = MessageFactory.createMessage(normalizedMessage.name, normalizedMessage.from, normalizedMessage);
         
         // Route the message through our message system
         const route = MessageUtility.routeMessage(
-            message.from, 
+            normalizedMessage.from, 
             'background-script', 
             properMessage, 
             this.sessionId
@@ -268,7 +282,7 @@ export class LogViewBackgroundSystem {
     }
 
     private processRuntimeMessage(message: any, route: any, sender: any, sendResponse: any) {
-        const messageName = message.name;
+        const messageName = message?.name || message?.message?.name;
         
         try {
             switch (messageName) {
@@ -841,23 +855,18 @@ export class LogViewBackgroundSystem {
     }
 
     private async injectMessageToContentScript(tabId: number, messageData: any) {
-        if (typeof chrome === 'undefined' || !chrome.scripting) {
-            throw new Error('Chrome scripting API not available');
+        // Use chrome.tabs.sendMessage directly from background script context
+        // This is the correct way to send messages from background to content script
+        try {
+            await chrome.tabs.sendMessage(tabId, {
+                source: 'wave-reader-extension',
+                message: messageData
+            });
+        } catch (error: any) {
+            // Tab might not have content script loaded, which is normal
+            console.log('🌊 Background: Could not send message to tab:', tabId, error.message);
+            throw error;
         }
-        
-        return chrome.scripting.executeScript({
-            target: { tabId },
-            func: (messageData) => {
-                console.log("BACKGROUND->CONTENT: Injecting message to content script:", messageData);
-                // Note: In service worker context, we use chrome.tabs.sendMessage instead of window.postMessage
-                // This is handled by injectMessageToContentScript method
-                chrome.tabs.sendMessage(tabId, {
-                    source: 'wave-reader-extension',
-                    message: messageData
-                });
-            },
-            args: [messageData]
-        });
     }
 
     // Public methods for external access

@@ -506,7 +506,6 @@ const SelectorInputTomes: FunctionComponent<SelectorInputTomesProps> = ({
         title="Selector Input"
         description="Input field for CSS selector specification"
         componentId="selector-input-component"
-        useTomeArchitecture={true}
         router={router || undefined}
         onError={(error) => console.error('SelectorInput Editor Error:', error)}
       >
@@ -610,7 +609,6 @@ const SelectorInputTomes: FunctionComponent<SelectorInputTomesProps> = ({
       title="Selector Input"
       description="Input field for CSS selector specification"
       componentId="selector-input-component"
-      useTomeArchitecture={true}
       router={router || undefined}
       onError={(error) => console.error('SelectorInput Editor Error:', error)}
     >

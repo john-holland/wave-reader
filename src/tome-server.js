@@ -3,6 +3,7 @@ import { createMachine, interpret } from 'xstate';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -402,11 +403,125 @@ class WaveReaderTomeServer {
     `;
   }
 
+  /**
+   * Check if a port is in use and show process information
+   * @param {number} port - Port number to check
+   * @returns {Object|null} Process information or null if port is free
+   */
+  checkPort(port) {
+    try {
+      // Use lsof to get PID for the port
+      const lsofOutput = execSync(`lsof -ti :${port}`, { encoding: 'utf8', stdio: 'pipe' }).trim();
+      
+      if (!lsofOutput) {
+        return null;
+      }
+
+      // Get PID from lsof output (first line)
+      const pid = lsofOutput.split('\n')[0].trim();
+      
+      if (!pid || isNaN(pid)) {
+        return null;
+      }
+
+      // Get detailed process information using ps
+      try {
+        // Get command name (comm)
+        const commOutput = execSync(`ps -p ${pid} -o comm=`, { encoding: 'utf8', stdio: 'pipe' }).trim();
+        const comm = commOutput || 'unknown';
+        
+        // Get full command with arguments
+        const argsOutput = execSync(`ps -p ${pid} -o args=`, { encoding: 'utf8', stdio: 'pipe' }).trim();
+        const args = argsOutput || 'unknown';
+        
+        // Extract executable path from args (first word)
+        const executablePath = args.split(' ')[0] || comm;
+        
+        // Try to get the full path
+        let fullPath = executablePath;
+        
+        // If the path doesn't start with /, try to resolve it
+        if (!executablePath.startsWith('/')) {
+          try {
+            // Try which first
+            const whichOutput = execSync(`which ${executablePath}`, { encoding: 'utf8', stdio: 'pipe' }).trim();
+            if (whichOutput) {
+              fullPath = whichOutput;
+            }
+          } catch {
+            // If which fails, try to resolve relative paths
+            try {
+              // On macOS, try to get the real path using readlink (if available)
+              const readlinkOutput = execSync(`readlink -f ${executablePath} 2>/dev/null || echo ${executablePath}`, { 
+                encoding: 'utf8', 
+                stdio: 'pipe',
+                shell: true 
+              }).trim();
+              if (readlinkOutput && readlinkOutput !== executablePath) {
+                fullPath = readlinkOutput;
+              }
+            } catch {
+              // Keep the original path
+              fullPath = executablePath;
+            }
+          }
+        } else {
+          // If it's already an absolute path, try to resolve symlinks
+          try {
+            const realpathOutput = execSync(`realpath ${executablePath} 2>/dev/null || echo ${executablePath}`, {
+              encoding: 'utf8',
+              stdio: 'pipe',
+              shell: true
+            }).trim();
+            if (realpathOutput && realpathOutput !== executablePath) {
+              fullPath = realpathOutput;
+            }
+          } catch {
+            fullPath = executablePath;
+          }
+        }
+
+        return {
+          pid: pid,
+          command: comm,
+          fullPath: fullPath,
+          args: args
+        };
+      } catch (error) {
+        // Fallback to just PID if ps fails
+        return {
+          pid: pid,
+          command: 'unknown',
+          fullPath: 'unknown',
+          args: 'unknown'
+        };
+      }
+    } catch (error) {
+      // Port is not in use or lsof failed
+      return null;
+    }
+  }
+
   start(port = 3003) {
+    // Check if port is already in use
+    const processInfo = this.checkPort(port);
+    
+    if (processInfo) {
+      console.error(`❌ Port ${port} is already in use!`);
+      console.error(`📋 Process Information:`);
+      console.error(`   PID: ${processInfo.pid}`);
+      console.error(`   Command: ${processInfo.command}`);
+      console.error(`   Path: ${processInfo.fullPath}`);
+      console.error(`   Args: ${processInfo.args}`);
+      console.error(`\n💡 To stop the process, run: kill ${processInfo.pid}`);
+      console.error(`   Or use: npm run stop:servers`);
+      process.exit(1);
+    }
+
     this.app.listen(port, () => {
-      console.log(`Wave Reader Tome Server running on port ${port}`);
-      console.log('Wave Reader page: http://localhost:3003/wave-reader (SSR)');
-      console.log('Wave Reader client: http://localhost:3003/wave-reader-client (Client-side)');
+      console.log(`✅ Wave Reader Tome Server running on port ${port}`);
+      console.log('🌐 Wave Reader page: http://localhost:3003/wave-reader (SSR)');
+      console.log('🌐 Wave Reader client: http://localhost:3003/wave-reader-client (Client-side)');
     });
   }
 }

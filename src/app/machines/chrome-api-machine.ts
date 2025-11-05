@@ -1,4 +1,5 @@
 import { createViewStateMachine, MachineRouter } from 'log-view-machine';
+import Options from '../../models/options';
 
 // ServiceMeta type for routed send
 // This provides the routedSend function in services
@@ -121,11 +122,32 @@ export const createChromeApiMachine = (router?: MachineRouter) => {
                 startService: async (context: any, event: any, meta: ServiceMeta) => {
                     console.log('🔌 ChromeApi: Starting wave reader');
                     
+                    // Extract options from event (routedSend spreads payload into event object)
+                    // event will be { type: 'START', options: ..., selector: ... }
+                    let options = event?.options || null;
+                    
+                    // If no options provided, use defaults (safety net)
+                    if (!options) {
+                        console.warn('🔌 ChromeApi: No options in event, using defaults');
+                        options = Options.getDefaultOptions();
+                    }
+                    
+                    // Serialize options to plain object for message passing
+                    const optionsPlain = options && typeof options === 'object' 
+                        ? (options.toJSON ? options.toJSON() : JSON.parse(JSON.stringify(options)))
+                        : options;
+                    
+                    const selector = event?.selector || 'p';
+                    
+                    console.log('🔌 ChromeApi: Start request with options:', { options: optionsPlain, selector });
+                    
                     if (typeof chrome !== 'undefined' && chrome.runtime) {
                         const response: any = await chrome.runtime.sendMessage({
                             name: 'start',
                             from: 'popup',
-                            timestamp: Date.now()
+                            timestamp: Date.now(),
+                            options: optionsPlain,
+                            selector: selector
                         });
                         
                         // Notify parent via routed send

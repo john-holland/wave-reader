@@ -566,7 +566,6 @@ const AboutTome: FunctionComponent<AboutTomeProps> = ({
           title="About Wave Reader"
           description="Information about Wave Reader and its features"
           componentId="about-component"
-          useTomeArchitecture={true}
           router={router || undefined}
           key={renderKey}
           onError={(error) => console.error('About Editor Error:', error)}
@@ -581,7 +580,6 @@ const AboutTome: FunctionComponent<AboutTomeProps> = ({
         title="About Wave Reader"
         description="Information about Wave Reader and its features"
         componentId="about-component"
-        useTomeArchitecture={true}
         router={router || undefined}
         key={renderKey}
         onError={(error) => console.error('About Editor Error:', error)}

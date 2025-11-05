@@ -357,7 +357,6 @@ const GoButtonTomeWrapper: FunctionComponent<GoButtonTomeWrapperProps> = ({
         title="Go Button"
         description="Button component for starting wave animations"
         componentId="go-button-component"
-        useTomeArchitecture={true}
         key={renderKey}
         router={router || undefined}
         onError={(error) => console.error('GoButton Editor Error:', error)}
@@ -372,7 +371,6 @@ const GoButtonTomeWrapper: FunctionComponent<GoButtonTomeWrapperProps> = ({
       title="Go Button"
       description="Button component for starting wave animations"
       componentId="go-button-component"
-      useTomeArchitecture={true}
       key={renderKey}
       router={router || undefined}
       onError={(error) => console.error('GoButton Editor Error:', error)}

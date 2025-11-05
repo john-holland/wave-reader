@@ -124,31 +124,48 @@ export class LogViewContentSystemIntegrated {
   private handleRuntimeMessage(message: any, sender: any, sendResponse: any) {
     console.log("🌊 Integrated System: Handling runtime message", message);
     
+    // Coalesce nested message objects - check if message has an embedded message property
+    let normalizedMessage = message;
+    if (message && typeof message === 'object' && message.message && typeof message.message === 'object') {
+      // Extract the inner message and merge with outer properties (like source)
+      normalizedMessage = {
+        ...message.message,
+        // Preserve outer properties like source if they exist and aren't in inner message
+        source: message.source || message.message.source,
+        from: message.from || message.message.from || message.source
+      };
+      console.log("🌊 Integrated System: Coalesced nested message:", normalizedMessage);
+    }
+    
     try {
-      switch (message.name) {
+      switch (normalizedMessage.name) {
         case 'start':
-          this.handleStart(message);
-          sendResponse({ success: true, state: this.proxyState });
+          this.handleStart(normalizedMessage).then(() => {
+            sendResponse({ success: true, state: this.proxyState });
+          }).catch((error: any) => {
+            console.error("🌊 Integrated System: Error in handleStart", error);
+            sendResponse({ success: false, error: error.message });
+          });
           break;
         case 'stop':
-          this.handleStop(message);
+          this.handleStop(normalizedMessage);
           sendResponse({ success: true, state: this.proxyState });
           break;
         case 'toggle':
         case 'toggle-wave-reader':
-          this.handleToggle(message);
+          this.handleToggle(normalizedMessage);
           sendResponse({ success: true, state: this.proxyState });
           break;
         case 'ping':
-          this.handlePing(message);
+          this.handlePing(normalizedMessage);
           sendResponse({ success: true, state: this.proxyState });
           break;
         case 'get-status':
-          this.handleGetStatus(message);
+          this.handleGetStatus(normalizedMessage);
           sendResponse({ success: true, status: this.getCurrentState() });
           break;
         default:
-          console.log("🌊 Integrated System: Unknown runtime message type:", message.name);
+          console.log("🌊 Integrated System: Unknown runtime message type:", normalizedMessage.name);
           sendResponse({ success: false, error: 'Unknown message type' });
       }
     } catch (error: any) {
@@ -160,30 +177,45 @@ export class LogViewContentSystemIntegrated {
   private handleWindowMessage(message: any) {
     console.log("🌊 Integrated System: Handling window message", message);
     
+    // Coalesce nested message objects - check if message has an embedded message property
+    let normalizedMessage = message;
+    if (message && typeof message === 'object' && message.message && typeof message.message === 'object') {
+      // Extract the inner message and merge with outer properties (like source)
+      normalizedMessage = {
+        ...message.message,
+        // Preserve outer properties like source if they exist and aren't in inner message
+        source: message.source || message.message.source,
+        from: message.from || message.message.from || message.source
+      };
+      console.log("🌊 Integrated System: Coalesced nested window message:", normalizedMessage);
+    }
+    
     try {
-      switch (message.name) {
+      switch (normalizedMessage.name) {
         case 'start':
-          this.handleStart(message);
+          this.handleStart(normalizedMessage).catch((error: any) => {
+            console.error("🌊 Integrated System: Error in handleStart (window)", error);
+          });
           break;
         case 'stop':
-          this.handleStop(message);
+          this.handleStop(normalizedMessage);
           break;
         case 'toggle':
         case 'toggle-wave-reader':
-          this.handleToggle(message);
+          this.handleToggle(normalizedMessage);
           break;
         case 'ping':
-          this.handlePing(message);
+          this.handlePing(normalizedMessage);
           break;
         default:
-          console.log("🌊 Integrated System: Unknown window message type:", message.name);
+          console.log("🌊 Integrated System: Unknown window message type:", normalizedMessage.name);
       }
     } catch (error: any) {
       console.error("🌊 Integrated System: Error handling window message:", error);
     }
   }
 
-  private handleStart(message: any) {
+  private async handleStart(message: any) {
     console.log("🌊 Integrated System: Handling start message", { 
       message, 
       hasOptions: !!message.options 
@@ -199,8 +231,29 @@ export class LogViewContentSystemIntegrated {
         hasWave: !!this.latestOptions?.wave 
       });
     } else {
-      console.warn("🌊 Integrated System: No options found in start message");
-      this.messageService.logMessage('start-warning', 'No options in start message');
+      console.warn("🌊 Integrated System: No options found in start message, loading defaults");
+      this.messageService.logMessage('start-warning', 'No options in start message, using defaults');
+      
+      // Load default options if none provided
+      try {
+        const Options = (await import('../models/options')).default;
+        this.latestOptions = Options.getDefaultOptions();
+        console.log("🌊 Integrated System: Using default options", this.latestOptions);
+      } catch (error: any) {
+        console.error("🌊 Integrated System: Failed to load default options", error);
+        // Try to load from Chrome storage as fallback
+        if (typeof chrome !== 'undefined' && chrome.storage) {
+          try {
+            const result = await chrome.storage.local.get(['waveReaderSettings']);
+            if (result.waveReaderSettings) {
+              this.latestOptions = result.waveReaderSettings;
+              console.log("🌊 Integrated System: Loaded options from Chrome storage", this.latestOptions);
+            }
+          } catch (storageError) {
+            console.error("🌊 Integrated System: Failed to load from storage", storageError);
+          }
+        }
+      }
     }
     
     // Route message to both Tomes

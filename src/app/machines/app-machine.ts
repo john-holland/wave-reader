@@ -1,5 +1,6 @@
 import { createViewStateMachine, MachineRouter } from 'log-view-machine';
 import { SyncSystem } from '../../systems/sync';
+import { MACHINE_NAMES } from './machine-names';
 
 // ServiceMeta type (from log-view-machine but defined locally due to webpack alias)
 interface ServiceMeta {
@@ -465,13 +466,63 @@ export const createAppMachine = (router?: MachineRouter) => {
                     
                     log('🌊 App Machine: Starting Wave Reader...');
                     
+                    // Load settings to include as options
+                    let options = null;
+                    try {
+                        // First try to get settings from context
+                        if (context.viewModel.settings) {
+                            options = context.viewModel.settings;
+                            log('🌊 App Machine: Using settings from context', options);
+                        } else {
+                            // Load from Chrome storage
+                            if (typeof chrome !== 'undefined' && chrome.storage) {
+                                const storageResult = await chrome.storage.local.get(['waveReaderSettings']);
+                                if (storageResult.waveReaderSettings) {
+                                    options = storageResult.waveReaderSettings;
+                                    log('🌊 App Machine: Loaded settings from Chrome storage', options);
+                                    // Store in context for future use
+                                    context.viewModel.settings = options;
+                                }
+                            }
+                        }
+                        
+                        // If still no settings, try sync storage
+                        if (!options && typeof chrome !== 'undefined' && chrome.storage) {
+                            const syncResult = await chrome.storage.sync.get(['waveReaderSettings']);
+                            if (syncResult.waveReaderSettings) {
+                                options = syncResult.waveReaderSettings;
+                                log('🌊 App Machine: Loaded settings from Chrome sync storage', options);
+                                context.viewModel.settings = options;
+                            }
+                        }
+                        
+                        // If still no settings, use defaults
+                        if (!options) {
+                            const Options = (await import('../../models/options')).default;
+                            options = Options.getDefaultOptions();
+                            log('🌊 App Machine: Using default options', options);
+                        }
+                    } catch (error: any) {
+                        log('🌊 App Machine: Failed to load settings, using defaults', error.message);
+                        const Options = (await import('../../models/options')).default;
+                        options = Options.getDefaultOptions();
+                    }
+                    
                     if (meta.routedSend) {
                         try {
-                            // Send START to background proxy via router
-                            const response = await meta.routedSend('BackgroundProxyMachine', 'START');
-                            log('🌊 App Machine: Background proxy response', response);
+                            // Convert Options to plain object for serialization
+                            const optionsPlain = options && typeof options === 'object' 
+                                ? (options.toJSON ? options.toJSON() : JSON.parse(JSON.stringify(options)))
+                                : options;
+                            
+                            // Send START to ChromeApiMachine via router with options
+                            const response = await meta.routedSend(MACHINE_NAMES.CHROME_API, 'START', {
+                                options: optionsPlain,
+                                selector: context.viewModel.selector || 'p'
+                            });
+                            log('🌊 App Machine: ChromeApiMachine response', response);
                         } catch (error: any) {
-                            log('🌊 App Machine: Background proxy not available, updating local state only', error.message);
+                            log('🌊 App Machine: ChromeApiMachine not available, updating local state only', error.message);
                         }
                     }
                     
@@ -491,11 +542,11 @@ export const createAppMachine = (router?: MachineRouter) => {
                     
                     if (meta.routedSend) {
                         try {
-                            // Send STOP to background proxy via router
-                            const response = await meta.routedSend('BackgroundProxyMachine', 'STOP');
-                            log('🌊 App Machine: Background proxy response', response);
+                            // Send STOP to ChromeApiMachine via router
+                            const response = await meta.routedSend(MACHINE_NAMES.CHROME_API, 'STOP');
+                            log('🌊 App Machine: ChromeApiMachine response', response);
                         } catch (error: any) {
-                            log('🌊 App Machine: Background proxy not available, updating local state only', error.message);
+                            log('🌊 App Machine: ChromeApiMachine not available, updating local state only', error.message);
                         }
                     }
                     
@@ -515,11 +566,11 @@ export const createAppMachine = (router?: MachineRouter) => {
                     
                     if (meta.routedSend) {
                         try {
-                            // Send TOGGLE to background proxy via router
-                            const response = await meta.routedSend('BackgroundProxyMachine', 'TOGGLE');
-                            log('🌊 App Machine: Background proxy response', response);
+                            // Send TOGGLE to ChromeApiMachine via router
+                            const response = await meta.routedSend(MACHINE_NAMES.CHROME_API, 'TOGGLE');
+                            log('🌊 App Machine: ChromeApiMachine response', response);
                         } catch (error: any) {
-                            log('🌊 App Machine: Background proxy not available, updating local state only', error.message);
+                            log('🌊 App Machine: ChromeApiMachine not available, updating local state only', error.message);
                         }
                     }
                     

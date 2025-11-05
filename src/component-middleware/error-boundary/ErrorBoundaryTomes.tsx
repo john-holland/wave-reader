@@ -194,7 +194,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           title="Wave Reader Error"
           description={`Error in ${this.props.componentName || 'component'}`}
           componentId="error-boundary-component"
-          useTomeArchitecture={true}
           router={this.router || undefined}
           onError={(error) => console.error('ErrorBoundary Editor Error:', error)}
         >

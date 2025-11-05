@@ -591,7 +591,6 @@ const ScanForInputTomes: FunctionComponent<ScanForInputTomesProps> = ({
         title="Keyboard Shortcut Scanner"
         description="Scan keyboard input for shortcut configuration"
         componentId="scan-for-input-component"
-        useTomeArchitecture={true}
         router={router || undefined}
         onError={(error) => console.error('ScanForInput Editor Error:', error)}
       >
@@ -660,7 +659,6 @@ const ScanForInputTomes: FunctionComponent<ScanForInputTomesProps> = ({
       title="Keyboard Shortcut Scanner"
       description="Scan keyboard input for shortcut configuration"
       componentId="scan-for-input-component"
-      useTomeArchitecture={true}
       router={router || undefined}
       onError={(error) => console.error('ScanForInput Editor Error:', error)}
     >

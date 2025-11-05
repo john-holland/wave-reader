@@ -631,7 +631,6 @@ const WaveTabsTomes: FunctionComponent<WaveTabsTomesProps> = ({
         title="Wave Tabs"
         description="Tabbed interface for managing multiple views and content"
         componentId="wave-tabs-component"
-        useTomeArchitecture={true}
         router={router || undefined}
         onError={(error) => console.error('WaveTabs Editor Error:', error)}
       >
@@ -723,7 +722,6 @@ const WaveTabsTomes: FunctionComponent<WaveTabsTomesProps> = ({
         title="Wave Tabs"
         description="Tabbed interface for managing multiple views and content"
         componentId="wave-tabs-component"
-        useTomeArchitecture={true}
         router={router || undefined}
         onError={(error) => console.error('WaveTabs Editor Error:', error)}
       >
@@ -807,7 +805,6 @@ const WaveTabsTomes: FunctionComponent<WaveTabsTomesProps> = ({
       title="Wave Tabs"
       description="Tabbed interface for managing multiple views and content"
       componentId="wave-tabs-component"
-      useTomeArchitecture={true}
       router={router || undefined}
       onError={(error) => console.error('WaveTabs Editor Error:', error)}
     >

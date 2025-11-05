@@ -745,7 +745,6 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
         title="Wave Reader Settings"
         description="Configure Wave Reader preferences and options"
         componentId="settings-component"
-        useTomeArchitecture={true}
         router={router || undefined}
         onError={(error) => console.error('Settings Editor Error:', error)}
       >
@@ -778,7 +777,6 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
         title="Wave Reader Settings"
         description="Configure Wave Reader preferences and options"
         componentId="settings-component"
-        useTomeArchitecture={true}
         router={router || undefined}
         onError={(error) => console.error('Settings Editor Error:', error)}
       >
@@ -805,7 +803,6 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
         title="Wave Reader Settings"
         description="Configure Wave Reader preferences and options"
         componentId="settings-component"
-        useTomeArchitecture={true}
         router={router || undefined}
         onError={(error) => console.error('Settings Editor Error:', error)}
       >
@@ -842,7 +839,6 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
       title="Wave Reader Settings"
       description="Configure Wave Reader preferences and options"
       componentId="settings-component"
-      useTomeArchitecture={true}
       router={router || undefined}
       onError={(error) => console.error('Settings Editor Error:', error)}
     >
