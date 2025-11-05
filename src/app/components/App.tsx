@@ -13,6 +13,7 @@ import {
 } from '../../components/styled/AppStyles';
 import SimpleTabs from './SimpleTabs';
 import EditorWrapper from './EditorWrapper';
+import SettingsTomes from '../../component-middleware/settings/SettingsTomes';
 
 /**
  * App Component
@@ -67,7 +68,6 @@ const AppComponent: FunctionComponent = () => {
           title="How to Use Wave Reader"
           description="Learn how to use Wave Reader to animate web pages"
           componentId="how-to-component"
-          useTomeArchitecture={true}
           onError={(error: Error) => console.error('HowTo Editor Error:', error)}
         >
           <div style={{ padding: '20px' }}>
@@ -101,52 +101,12 @@ const AppComponent: FunctionComponent = () => {
       id: 'settings',
       name: 'Settings',
       content: (
-        <EditorWrapper
-          title="Wave Reader Settings"
-          description="Configure Wave Reader preferences and options"
-          componentId="settings-component"
-          useTomeArchitecture={true}
-          onError={(error: Error) => console.error('Settings Editor Error:', error)}
-        >
-          <div style={{ padding: '20px' }}>
-            <h2>Settings</h2>
-            <p>Configure your Wave Reader experience:</p>
-            
-            <div style={{ marginBottom: '20px' }}>
-              <h3>Element Selector</h3>
-              <input
-                type="text"
-                placeholder="e.g., p, .highlight, #main-content"
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  fontSize: '14px'
-                }}
-              />
-            </div>
-            
-            <div style={{ marginBottom: '20px' }}>
-              <h3>Animation Settings</h3>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <input type="checkbox" defaultChecked />
-                <span>Enable notifications</span>
-              </label>
-            </div>
-            
-            <button style={{
-              padding: '10px 20px',
-              backgroundColor: '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}>
-              Save Settings
-            </button>
-          </div>
-        </EditorWrapper>
+        <SettingsTomes
+          onUpdateSettings={(settings) => {
+            console.log('🌊 App Component: Settings updated:', settings);
+            // Settings are automatically saved to Chrome storage by SettingsTomes
+          }}
+        />
       ),
       state: { type: 'settings' }
     },
@@ -158,7 +118,6 @@ const AppComponent: FunctionComponent = () => {
           title="About Wave Reader"
           description="Information about Wave Reader and its features"
           componentId="about-component"
-          useTomeArchitecture={true}
           onError={(error: Error) => console.error('About Editor Error:', error)}
         >
           <div style={{ padding: '20px' }}>
