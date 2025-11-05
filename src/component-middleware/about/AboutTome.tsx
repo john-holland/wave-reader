@@ -11,6 +11,7 @@ const AboutView = styled.div`
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   padding: 24px;
   line-height: 1.6;
+  color: #333;
 `;
 
 const AboutHeader = styled.div`
@@ -30,6 +31,7 @@ const AboutTitle = styled.h3`
 const AboutContent = styled.div`
   padding: 24px;
   min-height: 200px;
+  color: #333;
 `;
 
 const Section = styled.div`

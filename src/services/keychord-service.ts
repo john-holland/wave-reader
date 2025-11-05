@@ -2,7 +2,6 @@ import { Observable, Subscription } from 'rxjs';
 import { 
     KeyChord, 
     WindowKeyDownKey,
-    FollowKeyChordObserver,
     normalizeKey,
     sortKeyChord,
     compareKeyChords
@@ -47,91 +46,94 @@ export class KeyChordService {
         let typedKeys: KeyChord = [];
         
         // Create keyboard observer
-        // WindowKeyDownKey returns an Observable and calls listenerReturn with the listener
-        // WindowKeyDownKey already adds the listener to window, so we just store it for cleanup
-        // Use preventDefault = false here, we'll handle it manually when keychord matches
-        let currentEvent: KeyboardEvent | null = null;
+        // WindowKeyDownKey attaches its own listener, but we need to intercept events first
+        // So we'll attach our listener directly and manually call WindowKeyDownKey's listener when needed
+        let internalListener: ((event: KeyboardEvent) => void) | null = null;
+        
+        // Create our wrapper listener that handles keychord matching synchronously
+        // This will be attached directly to window
+        this.listener = (event: KeyboardEvent) => {
+            // Skip if event is already prevented
+            if (event.defaultPrevented) {
+                if (internalListener) internalListener(event);
+                return;
+            }
+            
+            // Skip if in input-selector field
+            if (this.isInputSelectorField(event)) {
+                if (internalListener) internalListener(event);
+                return;
+            }
+            
+            // Normalize and filter the incoming key
+            const normalizedKey = normalizeKey(event.key);
+            
+            // Skip invalid keys (like "Dead", "Unidentified")
+            if (!normalizedKey) {
+                if (internalListener) internalListener(event);
+                return;
+            }
+            
+            // Filter out Meta if it's not part of the target keychord
+            // (Some browsers emit Meta unexpectedly when only modifier keys are pressed)
+            if (normalizedKey === 'Meta' && !this.currentKeyChord.includes('Meta')) {
+                if (internalListener) internalListener(event);
+                return;
+            }
+            
+            // Track typed keys for keychord matching (only valid, normalized keys)
+            typedKeys = [normalizedKey].concat(typedKeys).slice(0, this.currentKeyChord.length);
+            
+            // Check if keychord is completed using normalized, sorted comparison
+            const isCompleted = compareKeyChords(typedKeys, this.currentKeyChord);
+            
+            // Handle keychord match synchronously on keydown
+            if (isCompleted) {
+                // Prevent default synchronously when keychord matches
+                event.preventDefault();
+                event.stopPropagation();
+                console.log('⌨️ KeyChordService: Shortcut matched!', this.currentKeyChord.join(' + '));
+                this.handleToggle();
+                typedKeys = []; // Reset after match
+                // Don't call internalListener for matched shortcuts to avoid emitting the key
+                return;
+            }
+            
+            // If keychord not completed, emit the key normally through the internal listener
+            if (internalListener) internalListener(event);
+        };
+        
+        // Attach our listener directly to window (capture phase, runs first)
+        window.addEventListener('keydown', this.listener, true);
+        
+        // Create the observable - it will create and attach its own listener
+        // Our listener runs first (capture phase), so we intercept events before WindowKeyDownKey's listener
         const keysObservable = WindowKeyDownKey(
             (listenerFn: (event: KeyboardEvent) => void) => {
-                // Store the listener so we can remove it later
-                // Wrap it to capture events for synchronous keychord checking
-                this.listener = (event: KeyboardEvent) => {
-                    // WindowKeyDownKey already handles input-selector fields (emits key but doesn't prevent default)
-                    // We capture the event here to check keychord completion synchronously
-                    currentEvent = event;
-                    listenerFn(event);
-                };
+                // Store the internal listener that WindowKeyDownKey creates
+                // We'll call it from our listener when the keychord doesn't match
+                internalListener = listenerFn;
             },
             false // Don't prevent default here - we handle it manually when keychord matches
         );
 
-        // Store keys subscription for cleanup - track keys and check keychord completion
+        // Store keys subscription for cleanup - we track keys in the listener above
+        // The observable subscription is needed to keep the listener active
         keysSubscription = keysObservable.subscribe({
             next: (key: string) => {
-                // Normalize and filter the incoming key
-                const normalizedKey = normalizeKey(key);
-                
-                // Skip invalid keys (like "Dead", "Unidentified")
-                if (!normalizedKey) {
-                    return;
-                }
-                
-                // Filter out Meta if it's not part of the target keychord
-                // (Some browsers emit Meta unexpectedly when only modifier keys are pressed)
-                if (normalizedKey === 'Meta' && !this.currentKeyChord.includes('Meta')) {
-                    return;
-                }
-                
-                // Track typed keys for keychord matching (only valid, normalized keys)
-                typedKeys = [normalizedKey].concat(typedKeys).slice(0, this.currentKeyChord.length);
-                
-                // Check if keychord is completed using normalized, sorted comparison
-                const isCompleted = compareKeyChords(typedKeys, this.currentKeyChord);
-                
-                // Only prevent default if keychord is completed AND not in input-selector field
-                if (isCompleted && currentEvent && !this.isInputSelectorField(currentEvent)) {
-                    // Prevent default synchronously when keychord matches
-                    currentEvent.preventDefault();
-                    console.log('⌨️ KeyChordService: Shortcut matched!', this.currentKeyChord.join(' + '));
-                    this.handleToggle();
-                    typedKeys = []; // Reset after match
-                }
-                // If keychord not completed OR in input-selector field, don't prevent default
-                // This allows normal typing
+                // Keys are processed synchronously in the listener above
+                // This subscription keeps the observable active
             },
             error: (error: any) => {
                 console.error('⌨️ KeyChordService: Error in keys observable:', error);
-            }
-        });
-
-        // Create key chord follower for backup/secondary matching
-        const keyChordObserver = FollowKeyChordObserver(
-            this.currentKeyChord,
-            keysObservable,
-            () => !this.isActive // stop condition
-        );
-
-        // Subscribe to key chord matches (secondary check - primary is handled above)
-        this.subscription = keyChordObserver.subscribe({
-            next: (matched: boolean) => {
-                // Primary matching and preventDefault is handled in the keysSubscription above
-                // This is a fallback/secondary check
-                if (matched && currentEvent && !this.isInputSelectorField(currentEvent)) {
-                    // Already handled above, but ensure toggle is called
-                    typedKeys = [];
-                }
-            },
-            error: (error: any) => {
-                console.error('⌨️ KeyChordService: Error in key chord observer:', error);
             },
             complete: () => {
-                console.log('⌨️ KeyChordService: Key chord observer completed');
-                // Clean up keys subscription when observer completes
-                if (keysSubscription) {
-                    keysSubscription.unsubscribe();
-                }
+                console.log('⌨️ KeyChordService: Keys observable completed');
             }
         });
+
+        // Store the keys subscription as the main subscription for cleanup
+        this.subscription = keysSubscription;
     }
 
     /**
