@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wave Reader Extension Manual Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+            line-height: 1.6;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .test-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .test-content {
+            padding: 20px;
+        }
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+        }
+        .test-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #5a6fd8;
+        }
+        .test-status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status-success { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .status-info { background: #d1ecf1; color: #0c5460; }
+        .status-warning { background: #fff3cd; color: #856404; }
+        
+        .test-content-area {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 6px;
+            border: 2px dashed #dee2e6;
+        }
+        .test-content-area h1, .test-content-area h2, .test-content-area h3 {
+            color: #495057;
+        }
+        .test-content-area p {
+            color: #6c757d;
+        }
+        
+        .extension-popup {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 350px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            border: 1px solid #e0e0e0;
+            z-index: 1000;
+        }
+        .popup-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px;
+            border-radius: 8px 8px 0 0;
+        }
+        .popup-content {
+            padding: 15px;
+        }
+        .popup-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        .popup-button:hover {
+            background: #5a6fd8;
+        }
+        .popup-button.success {
+            background: #28a745;
+        }
+        .popup-button.success:hover {
+            background: #218838;
+        }
+        .popup-button.secondary {
+            background: #6c757d;
+        }
+        .popup-button.secondary:hover {
+            background: #5a6268;
+        }
+        .popup-button.danger {
+            background: #dc3545;
+        }
+        .popup-button.danger:hover {
+            background: #c82333;
+        }
+        
+        .settings-panel {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+        }
+        .settings-panel.show {
+            display: block;
+        }
+        .setting-item {
+            margin-bottom: 15px;
+        }
+        .setting-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #495057;
+        }
+        .setting-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .setting-range {
+            width: 100%;
+        }
+        .setting-checkbox {
+            margin-right: 8px;
+        }
+        
+        .selector-panel {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+        }
+        .selector-panel.show {
+            display: block;
+        }
+        
+        .log-area {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🌊 Wave Reader Extension</h1>
+            <p>Manual Functionality Test</p>
+        </div>
+        
+        <div class="test-content">
+            <div class="test-section">
+                <h3>🧪 Test Instructions</h3>
+                <p>This page simulates the extension's functionality. Use the popup on the right to test:</p>
+                <ol>
+                    <li><strong>Go Button</strong> - Start/stop wave animation</li>
+                    <li><strong>Settings</strong> - Configure wave parameters</li>
+                    <li><strong>Selector UI</strong> - Manage CSS selectors</li>
+                    <li><strong>Popup State</strong> - View switching and state management</li>
+                </ol>
+            </div>
+            
+            <div class="test-section">
+                <h3>📝 Test Content</h3>
+                <p>This content area contains various elements that can be targeted by the wave animation:</p>
+                
+                <div class="test-content-area">
+                    <h1>Main Heading</h1>
+                    <p>This is a paragraph that can be animated with the wave effect. The wave animation will make this text move in a gentle, flowing motion.</p>
+                    
+                    <h2>Secondary Heading</h2>
+                    <p>Another paragraph for testing. You can select different elements and see how the wave animation affects them.</p>
+                    
+                    <h3>Tertiary Heading</h3>
+                    <p>More content to test with. The extension should be able to target these elements using CSS selectors.</p>
+                    
+                    <div class="content">
+                        <p>This is content within a div with class "content". It demonstrates how the extension can target specific CSS classes.</p>
+                    </div>
+                    
+                    <article class="article">
+                        <p>This is an article element. It shows how the extension can work with semantic HTML elements.</p>
+                    </article>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h3>📊 Test Results</h3>
+                <div id="test-results">
+                    <div class="test-status status-info">Ready to test extension functionality...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Extension Popup Simulation -->
+    <div class="extension-popup" id="extension-popup">
+        <div class="popup-header">
+            <h3 style="margin: 0; font-size: 1.2rem;">🌊 Wave Reader</h3>
+        </div>
+        
+        <div class="popup-content">
+            <!-- Main View -->
+            <div id="main-view">
+                <div style="text-align: center; margin-bottom: 15px;">
+                    <button class="popup-button success" id="go-button" onclick="toggleWave()">
+                        🚀 Start Wave
+                    </button>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <button class="popup-button secondary" onclick="showSettings()">
+                        ⚙️ Settings
+                    </button>
+                    <button class="popup-button secondary" onclick="showSelector()">
+                        🎯 Selector
+                    </button>
+                </div>
+                
+                <div style="font-size: 12px; color: #6c757d; text-align: center;">
+                    <p>Current Selector: <span id="current-selector">p, h1, h2, h3</span></p>
+                    <p>Status: <span id="wave-status">Ready</span></p>
+                </div>
+            </div>
+            
+            <!-- Settings Panel -->
+            <div class="settings-panel" id="settings-panel">
+                <h4 style="margin-top: 0;">⚙️ Wave Settings</h4>
+                
+                <div class="setting-item">
+                    <label class="setting-label">
+                        <input type="checkbox" class="setting-checkbox" id="show-notifications" checked>
+                        Show Notifications
+                    </label>
+                </div>
+                
+                <div class="setting-item">
+                    <label class="setting-label">Wave Speed: <span id="speed-value">4</span>s</label>
+                    <input type="range" class="setting-range" id="wave-speed" min="1" max="10" step="0.5" value="4">
+                </div>
+                
+                <div class="setting-item">
+                    <label class="setting-label">Animation Control:</label>
+                    <div>
+                        <label><input type="radio" name="wave-control" value="CSS" checked> CSS</label>
+                        <label><input type="radio" name="wave-control" value="MOUSE"> Mouse</label>
+                    </div>
+                </div>
+                
+                <div class="setting-item">
+                    <label class="setting-label">X Translation: <span id="x-translation">-1 to 1</span></label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="number" class="setting-input" id="x-min" value="-1" style="width: 45%;">
+                        <input type="number" class="setting-input" id="x-max" value="1" style="width: 45%;">
+                    </div>
+                </div>
+                
+                <div class="setting-item">
+                    <label class="setting-label">Y Rotation: <span id="y-rotation">-2 to 2</span>°</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="number" class="setting-input" id="y-min" value="-2" style="width: 45%;">
+                        <input type="number" class="setting-input" id="y-max" value="2" style="width: 45%;">
+                    </div>
+                </div>
+                
+                <div class="setting-item">
+                    <label class="setting-label">Mouse Follow Interval: <span id="mouse-interval">100</span>ms</label>
+                    <input type="range" class="setting-range" id="mouse-interval-range" min="50" max="200" step="10" value="100">
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <button class="popup-button success" onclick="saveSettings()">💾 Save Settings</button>
+                    <button class="popup-button secondary" onclick="resetSettings()">🔄 Reset</button>
+                    <button class="popup-button secondary" onclick="hideSettings()">← Back</button>
+                </div>
+            </div>
+            
+            <!-- Selector Panel -->
+            <div class="selector-panel" id="selector-panel">
+                <h4 style="margin-top: 0;">🎯 Selector Management</h4>
+                
+                <div class="setting-item">
+                    <label class="setting-label">Current Selector:</label>
+                    <input type="text" class="setting-input" id="selector-input" value="p, h1, h2, h3">
+                </div>
+                
+                <div class="setting-item">
+                    <label class="setting-label">Saved Selectors:</label>
+                    <div id="saved-selectors">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <span style="font-family: monospace;">p</span>
+                            <div>
+                                <button class="popup-button secondary" style="padding: 4px 8px; font-size: 12px;" onclick="useSelector('p')">Use</button>
+                                <button class="popup-button danger" style="padding: 4px 8px; font-size: 12px;" onclick="removeSelector('p')">Remove</button>
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <span style="font-family: monospace;">h1, h2, h3</span>
+                            <div>
+                                <button class="popup-button secondary" style="padding: 4px 8px; font-size: 12px;" onclick="useSelector('h1, h2, h3')">Use</button>
+                                <button class="popup-button danger" style="padding: 4px 8px; font-size: 12px;" onclick="removeSelector('h1, h2, h3')">Remove</button>
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <span style="font-family: monospace;">.content</span>
+                            <div>
+                                <button class="popup-button secondary" style="padding: 4px 8px; font-size: 12px;" onclick="useSelector('.content')">Use</button>
+                                <button class="popup-button danger" style="padding: 4px 8px; font-size: 12px;" onclick="removeSelector('.content')">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <button class="popup-button success" onclick="addSelector()">➕ Add Selector</button>
+                    <button class="popup-button secondary" onclick="hideSelector()">← Back</button>
+                </div>
+            </div>
+            
+            <!-- Log Area -->
+            <div class="log-area" id="log-area">
+                Extension log will appear here...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Extension state
+        let extensionState = {
+            isWaving: false,
+            currentView: 'main',
+            settings: {
+                showNotifications: true,
+                waveSpeed: 4,
+                waveAnimationControl: 'CSS',
+                wave: {
+                    axisTranslateAmountXMin: -1,
+                    axisTranslateAmountXMax: 1,
+                    axisRotationAmountYMin: -2,
+                    axisRotationAmountYMax: 2,
+                    mouseFollowInterval: 100
+                }
+            },
+            currentSelector: 'p, h1, h2, h3',
+            savedSelectors: ['p', 'h1, h2, h3', '.content', '.article']
+        };
+        
+        // Logging function
+        function log(message) {
+            const logArea = document.getElementById('log-area');
+            const timestamp = new Date().toLocaleTimeString();
+            logArea.innerHTML += `[${timestamp}] ${message}\n`;
+            logArea.scrollTop = logArea.scrollHeight;
+            console.log(`[Wave Reader] ${message}`);
+        }
+        
+        // Update status display
+        function updateStatus() {
+            document.getElementById('wave-status').textContent = extensionState.isWaving ? 'Waving' : 'Ready';
+            document.getElementById('current-selector').textContent = extensionState.currentSelector;
+        }
+        
+        // Toggle wave animation
+        function toggleWave() {
+            extensionState.isWaving = !extensionState.isWaving;
+            const goButton = document.getElementById('go-button');
+            
+            if (extensionState.isWaving) {
+                goButton.textContent = '🛑 Stop Wave';
+                goButton.className = 'popup-button danger';
+                log('🚀 Wave animation started');
+                
+                // Simulate wave effect on content
+                const elements = document.querySelectorAll(extensionState.currentSelector);
+                elements.forEach(el => {
+                    el.style.transition = `transform ${extensionState.settings.waveSpeed}s ease-in-out`;
+                    el.style.transform = 'translateX(5px) rotateY(2deg)';
+                });
+                
+                // Reset after animation
+                setTimeout(() => {
+                    elements.forEach(el => {
+                        el.style.transform = 'translateX(0) rotateY(0deg)';
+                    });
+                }, extensionState.settings.waveSpeed * 1000);
+                
+            } else {
+                goButton.textContent = '🚀 Start Wave';
+                goButton.className = 'popup-button success';
+                log('🛑 Wave animation stopped');
+                
+                // Reset all elements
+                const elements = document.querySelectorAll(extensionState.currentSelector);
+                elements.forEach(el => {
+                    el.style.transform = 'translateX(0) rotateY(0deg)';
+                });
+            }
+            
+            updateStatus();
+        }
+        
+        // Show settings panel
+        function showSettings() {
+            document.getElementById('main-view').style.display = 'none';
+            document.getElementById('settings-panel').classList.add('show');
+            document.getElementById('selector-panel').classList.remove('show');
+            extensionState.currentView = 'settings';
+            log('⚙️ Settings panel opened');
+        }
+        
+        // Hide settings panel
+        function hideSettings() {
+            document.getElementById('main-view').style.display = 'block';
+            document.getElementById('settings-panel').classList.remove('show');
+            extensionState.currentView = 'main';
+            log('← Returned to main view');
+        }
+        
+        // Show selector panel
+        function showSelector() {
+            document.getElementById('main-view').style.display = 'none';
+            document.getElementById('selector-panel').classList.add('show');
+            document.getElementById('settings-panel').classList.remove('show');
+            extensionState.currentView = 'selector';
+            log('🎯 Selector panel opened');
+        }
+        
+        // Hide selector panel
+        function hideSelector() {
+            document.getElementById('main-view').style.display = 'block';
+            document.getElementById('selector-panel').classList.remove('show');
+            extensionState.currentView = 'main';
+            log('← Returned to main view');
+        }
+        
+        // Save settings
+        function saveSettings() {
+            // Update settings from form values
+            extensionState.settings.showNotifications = document.getElementById('show-notifications').checked;
+            extensionState.settings.waveSpeed = parseFloat(document.getElementById('wave-speed').value);
+            extensionState.settings.waveAnimationControl = document.querySelector('input[name="wave-control"]:checked').value;
+            extensionState.settings.wave.axisTranslateAmountXMin = parseFloat(document.getElementById('x-min').value);
+            extensionState.settings.wave.axisTranslateAmountXMax = parseFloat(document.getElementById('x-max').value);
+            extensionState.settings.wave.axisRotationAmountYMin = parseFloat(document.getElementById('y-min').value);
+            extensionState.settings.wave.axisRotationAmountYMax = parseFloat(document.getElementById('y-max').value);
+            extensionState.settings.wave.mouseFollowInterval = parseInt(document.getElementById('mouse-interval-range').value);
+            
+            log('💾 Settings saved successfully');
+            updateSettingsDisplay();
+        }
+        
+        // Reset settings to defaults
+        function resetSettings() {
+            if (confirm('Are you sure you want to reset to default settings?')) {
+                extensionState.settings = {
+                    showNotifications: true,
+                    waveSpeed: 4,
+                    waveAnimationControl: 'CSS',
+                    wave: {
+                        axisTranslateAmountXMin: -1,
+                        axisTranslateAmountXMax: 1,
+                        axisRotationAmountYMin: -2,
+                        axisRotationAmountYMax: 2,
+                        mouseFollowInterval: 100
+                    }
+                };
+                
+                updateSettingsDisplay();
+                log('🔄 Settings reset to defaults');
+            }
+        }
+        
+        // Update settings display
+        function updateSettingsDisplay() {
+            document.getElementById('show-notifications').checked = extensionState.settings.showNotifications;
+            document.getElementById('wave-speed').value = extensionState.settings.waveSpeed;
+            document.getElementById('speed-value').textContent = extensionState.settings.waveSpeed;
+            
+            const cssRadio = document.querySelector('input[name="wave-control"][value="CSS"]');
+            const mouseRadio = document.querySelector('input[name="wave-control"][value="MOUSE"]');
+            if (extensionState.settings.waveAnimationControl === 'CSS') {
+                cssRadio.checked = true;
+            } else {
+                mouseRadio.checked = true;
+            }
+            
+            document.getElementById('x-min').value = extensionState.settings.wave.axisTranslateAmountXMin;
+            document.getElementById('x-max').value = extensionState.settings.wave.axisTranslateAmountXMax;
+            document.getElementById('x-translation').textContent = `${extensionState.settings.wave.axisTranslateAmountXMin} to ${extensionState.settings.wave.axisTranslateAmountXMax}`;
+            
+            document.getElementById('y-min').value = extensionState.settings.wave.axisRotationAmountYMin;
+            document.getElementById('y-max').value = extensionState.settings.wave.axisRotationAmountYMax;
+            document.getElementById('y-rotation').textContent = `${extensionState.settings.wave.axisRotationAmountYMin} to ${extensionState.settings.wave.axisRotationAmountYMax}`;
+            
+            document.getElementById('mouse-interval-range').value = extensionState.settings.wave.mouseFollowInterval;
+            document.getElementById('mouse-interval').textContent = extensionState.settings.wave.mouseFollowInterval;
+        }
+        
+        // Use a selector
+        function useSelector(selector) {
+            extensionState.currentSelector = selector;
+            document.getElementById('selector-input').value = selector;
+            updateStatus();
+            log(`🎯 Using selector: ${selector}`);
+        }
+        
+        // Remove a selector
+        function removeSelector(selector) {
+            const index = extensionState.savedSelectors.indexOf(selector);
+            if (index > -1) {
+                extensionState.savedSelectors.splice(index, 1);
+                updateSavedSelectorsDisplay();
+                log(`🗑️ Removed selector: ${selector}`);
+            }
+        }
+        
+        // Add a new selector
+        function addSelector() {
+            const input = document.getElementById('selector-input');
+            const newSelector = input.value.trim();
+            
+            if (newSelector && !extensionState.savedSelectors.includes(newSelector)) {
+                extensionState.savedSelectors.push(newSelector);
+                updateSavedSelectorsDisplay();
+                log(`➕ Added selector: ${newSelector}`);
+            }
+        }
+        
+        // Update saved selectors display
+        function updateSavedSelectorsDisplay() {
+            const container = document.getElementById('saved-selectors');
+            container.innerHTML = '';
+            
+            extensionState.savedSelectors.forEach(selector => {
+                const div = document.createElement('div');
+                div.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;';
+                div.innerHTML = `
+                    <span style="font-family: monospace;">${selector}</span>
+                    <div>
+                        <button class="popup-button secondary" style="padding: 4px 8px; font-size: 12px;" onclick="useSelector('${selector}')">Use</button>
+                        <button class="popup-button danger" style="padding: 4px 8px; font-size: 12px;" onclick="removeSelector('${selector}')">Remove</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+        
+        // Initialize extension
+        function initializeExtension() {
+            updateStatus();
+            updateSettingsDisplay();
+            updateSavedSelectorsDisplay();
+            log('🚀 Wave Reader Extension initialized');
+            log('✅ All functionality ready for testing');
+        }
+        
+        // Event listeners for real-time updates
+        document.getElementById('wave-speed').addEventListener('input', function() {
+            document.getElementById('speed-value').textContent = this.value;
+        });
+        
+        document.getElementById('x-min').addEventListener('input', function() {
+            document.getElementById('x-translation').textContent = `${this.value} to ${document.getElementById('x-max').value}`;
+        });
+        
+        document.getElementById('x-max').addEventListener('input', function() {
+            document.getElementById('x-translation').textContent = `${document.getElementById('x-min').value} to ${this.value}`;
+        });
+        
+        document.getElementById('y-min').addEventListener('input', function() {
+            document.getElementById('y-rotation').textContent = `${this.value} to ${document.getElementById('y-max').value}`;
+        });
+        
+        document.getElementById('y-max').addEventListener('input', function() {
+            document.getElementById('y-rotation').textContent = `${document.getElementById('y-min').value} to ${this.value}`;
+        });
+        
+        document.getElementById('mouse-interval-range').addEventListener('input', function() {
+            document.getElementById('mouse-interval').textContent = this.value;
+        });
+        
+        // Initialize when page loads
+        window.addEventListener('load', initializeExtension);
+    </script>
+</body>
+</html>

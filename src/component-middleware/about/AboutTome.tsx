@@ -1,8 +1,11 @@
-import React, { FunctionComponent, useEffect, useState, useCallback, useRef } from 'react';
+import React, { FunctionComponent, useEffect, useState, useCallback } from 'react';
 import styled from 'styled-components';
 import { createViewStateMachine, MachineRouter } from 'log-view-machine';
 import EditorWrapper from '../../app/components/EditorWrapper';
 import { AppTome } from '../../app/tomes/AppTome';
+import { safeGraphQLRequest } from '../../utils/backend-api-wrapper';
+import PuppyTome from '../puppies/PuppyTome';
+import { FeatureToggleService, FEATURE_TOGGLES } from '../../config/feature-toggles';
 
 // Styled components for the Tomes-based about page
 const AboutView = styled.div`
@@ -149,6 +152,38 @@ const DonorAmount = styled.span`
   opacity: 0.8;
   display: block;
   margin-top: 4px;
+`;
+
+const ReportEpilepticButton = styled.button`
+  padding: 12px 20px;
+  margin: 16px 0;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+  color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+`;
+
+const ReportHelpText = styled.p`
+  font-size: 12px;
+  color: #6c757d;
+  margin-top: 8px;
+  text-align: center;
+  line-height: 1.5;
 `;
 
 const AboutReadingDisabilityView = () => {
@@ -334,16 +369,6 @@ const DONATION_STATUS_QUERY = `
   }
 `;
 
-const DONATION_REPORT_MUTATION = `
-  mutation ReportEpilepticAnimation($report: EpilepticReportInput!) {
-    reportEpilepticAnimation(report: $report) {
-      success
-      reportId
-      message
-    }
-  }
-`;
-
 const DONATION_STATUS_SUBSCRIPTION = `
   subscription DonationStatusUpdates($userId: String!) {
     donationStatusUpdated(userId: $userId) {
@@ -382,8 +407,7 @@ const AboutPageComponent = createViewStateMachine({
     states: {
       idle: {
         on: {
-          LOAD_DONATION_STATUS: 'loading',
-          REPORT_EPILEPTIC: 'reporting'
+          LOAD_DONATION_STATUS: 'loading'
         }
       },
       loading: {
@@ -396,12 +420,6 @@ const AboutPageComponent = createViewStateMachine({
         on: {
           RETRY: 'loading',
           CLEAR_ERROR: 'idle'
-        }
-      },
-      reporting: {
-        on: {
-          REPORT_SUBMITTED: 'idle',
-          REPORT_ERROR: 'error'
         }
       }
     }
@@ -418,13 +436,18 @@ const AboutPageComponent = createViewStateMachine({
   try {
     await log('Fetching donation status from GraphQL...');
     
-    // Execute GraphQL query
-    const result = await graphql.query(DONATION_STATUS_QUERY, {
-      userId: context.userId
+    // Execute GraphQL query via centralized backend service
+    const { data, backendDisabled } = await safeGraphQLRequest({
+      endpoint: '/api/graphql/donations',
+      query: DONATION_STATUS_QUERY,
+      variables: { userId: context.userId },
+      mockKey: 'graphql/donation-status',
+      context: { userId: context.userId }
     });
-    
-    if (result.data && result.data.donationStatus) {
-      const donationData = result.data.donationStatus;
+
+    const donationData = data?.donationStatus;
+
+    if (donationData) {
       
       // Update context with GraphQL data
       context.donated = donationData.donated || false;
@@ -432,7 +455,7 @@ const AboutPageComponent = createViewStateMachine({
       context.donors = donationData.donors || context.donors;
       context.isLoading = false;
       
-      await log('Donation status loaded successfully', donationData);
+      await log('Donation status loaded successfully', { donationData, backendDisabled });
       
       // Start subscription for real-time updates
       if (!context.subscription) {
@@ -475,38 +498,6 @@ const AboutPageComponent = createViewStateMachine({
   return view(AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error));
 }).withState('error', ({ context, event, send, log, transition, machine, view }: any) => {
   return view(AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error));
-}).withState('reporting', async ({ context, event, send, log, transition, machine, view, graphql }: any) => {
-  try {
-    await log('Reporting epileptic animation...');
-    
-    const reportData = {
-      userId: context.userId,
-      timestamp: new Date().toISOString(),
-      description: event.description || 'Epileptic animation reported',
-      severity: event.severity || 'medium',
-      url: window.location.href
-    };
-    
-    // Execute GraphQL mutation
-    const result = await graphql.mutation(DONATION_REPORT_MUTATION, {
-      report: reportData
-    });
-    
-    if (result.data && result.data.reportEpilepticAnimation) {
-      const reportResult = result.data.reportEpilepticAnimation;
-      await log('Epileptic animation reported successfully', reportResult);
-      context.error = null;
-      send({ type: 'REPORT_SUBMITTED', payload: reportResult });
-    } else {
-      throw new Error('Invalid mutation response');
-    }
-  } catch (error) {
-    await log('Failed to report epileptic animation', error);
-    context.error = error instanceof Error ? error.message : 'Unknown error occurred';
-    send({ type: 'REPORT_ERROR', payload: error });
-  }
-  
-  return view(AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error));
 });
 
 // Main component using withState pattern
@@ -524,11 +515,43 @@ const AboutTome: FunctionComponent<AboutTomeProps> = ({
   const [aboutPageComponent, setAboutPageComponent] = useState<any>(null);
   const [router, setRouter] = useState<MachineRouter | null>(null);
   const [renderKey, setRenderKey] = useState(-1);
+  const [showPuppies, setShowPuppies] = useState(false);
+  
+  // Handler for epileptic animation report
+  const handleReportEpileptic = useCallback(() => {
+    const subject = encodeURIComponent('Epileptic Animation Report - Wave Reader');
+    const body = encodeURIComponent(
+      `I am reporting an animation that may trigger epileptic symptoms.\n\n` +
+      `URL: ${window.location.href}\n` +
+      `Timestamp: ${new Date().toISOString()}\n\n` +
+      `Additional details:\n`
+    );
+    const mailtoLink = `mailto:john.gebhard.holland+epileptic@gmail.com?subject=${subject}&body=${body}`;
+    window.location.href = mailtoLink;
+  }, []);
  
   useEffect(() => {
     // Get router from AppTome
     const appTomeRouter = AppTome.getRouter();
     setRouter(appTomeRouter);
+
+    // Check feature toggle for puppies
+    const checkPuppiesToggle = async () => {
+      try {
+        // Try to get RobotCopy instance from background proxy machine
+        const bgProxyMachine = appTomeRouter?.resolve('BackgroundProxyMachine');
+        const robotCopy = bgProxyMachine?.robotCopy || null;
+        
+        const toggleService = new FeatureToggleService(robotCopy);
+        const enabled = await toggleService.isEnabled('ENABLE_PUPPIES');
+        setShowPuppies(enabled);
+      } catch (error) {
+        console.warn('Failed to check puppies feature toggle, defaulting to disabled', error);
+        setShowPuppies(false);
+      }
+    };
+
+    checkPuppiesToggle();
 
     // Create machine instance
     const component = AboutPageComponent;
@@ -587,6 +610,25 @@ const AboutTome: FunctionComponent<AboutTomeProps> = ({
         onError={(error) => console.error('About Editor Error:', error)}
       >
         {aboutPageComponent.render()}
+        {showPuppies && (
+          <div style={{ marginTop: '24px' }}>
+            <PuppyTome skipWrapper={true} />
+          </div>
+        )}
+        <div style={{ marginTop: '24px' }}>
+          <Section>
+            <ReportEpilepticButton
+              onClick={handleReportEpileptic}
+              title="Report epileptic triggering animation"
+            >
+              🚨 Report Epileptic Animation
+            </ReportEpilepticButton>
+            <ReportHelpText>
+              If any animation triggers epileptic symptoms or seizures, please report it immediately. 
+              We prioritize accessibility and will investigate all reports.
+            </ReportHelpText>
+          </Section>
+        </div>
       </EditorWrapper>
     );
 };
