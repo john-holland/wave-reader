@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
+import { safeFetch, setBackendRequestOverride } from './utils/backend-api-wrapper';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,6 +13,12 @@ const __dirname = path.dirname(__filename);
 class WaveReaderTomeServer {
   constructor() {
     this.app = express();
+    this.backendBaseUrl = process.env.WAVE_READER_BACKEND_URL || '';
+    if (!this.backendBaseUrl) {
+      setBackendRequestOverride(false);
+    } else {
+      setBackendRequestOverride(null);
+    }
     this.setupMiddleware();
     this.setupRoutes();
   }
@@ -69,19 +76,23 @@ class WaveReaderTomeServer {
     // API endpoints for wave reader operations
     this.app.post('/api/wave-reader/start', async (req, res) => {
       const { selector, options } = req.body;
-      const { traceId, spanId } = req.traceContext;
+      const { traceId } = req.traceContext;
       
       try {
-        // Simulate wave reader start
-        const result = {
-          success: true,
-          message: 'Wave reader started',
-          selector: selector,
-          options: options,
-          timestamp: new Date().toISOString(),
-          traceId: traceId
-        };
-
+        const endpoint = this.backendBaseUrl
+          ? `${this.backendBaseUrl}/wave-reader/start`
+          : 'mock://wave-reader/start';
+        const response = await safeFetch(
+          endpoint,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ selector, options, traceId })
+          },
+          'wave/start',
+          { payload: { selector, options, traceId } }
+        );
+        const result = await response.json();
         res.json(result);
       } catch (error) {
         res.status(500).json({ error: 'Failed to start wave reader' });
@@ -89,17 +100,23 @@ class WaveReaderTomeServer {
     });
 
     this.app.post('/api/wave-reader/stop', async (req, res) => {
-      const { traceId, spanId } = req.traceContext;
+      const { traceId } = req.traceContext;
       
       try {
-        // Simulate wave reader stop
-        const result = {
-          success: true,
-          message: 'Wave reader stopped',
-          timestamp: new Date().toISOString(),
-          traceId: traceId
-        };
-
+        const endpoint = this.backendBaseUrl
+          ? `${this.backendBaseUrl}/wave-reader/stop`
+          : 'mock://wave-reader/stop';
+        const response = await safeFetch(
+          endpoint,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ traceId })
+          },
+          'wave/stop',
+          { payload: { traceId } }
+        );
+        const result = await response.json();
         res.json(result);
       } catch (error) {
         res.status(500).json({ error: 'Failed to stop wave reader' });
@@ -357,30 +374,42 @@ class WaveReaderTomeServer {
         </div>
 
         <script>
-            function startWaveReader() {
-                const selector = document.getElementById('selector').value;
-                fetch('/api/wave-reader/start', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ selector: selector })
-                }).then(response => response.json())
-                  .then(data => {
-                      if (data.success) {
-                          alert('Wave reader started!');
-                      }
-                  });
+            async function callBackend(endpoint, options = {}) {
+                const response = await fetch(endpoint, {
+                    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+                    ...options
+                });
+
+                const backendDisabled = response.headers.get('X-Backend-Disabled') === 'true';
+                const payload = await response.json();
+
+                if (backendDisabled) {
+                    console.warn('Backend disabled – using mock data for', endpoint);
+                }
+
+                return { backendDisabled, payload };
             }
 
-            function stopWaveReader() {
-                fetch('/api/wave-reader/stop', {
+            async function startWaveReader() {
+                const selector = document.getElementById('selector').value;
+                const { payload, backendDisabled } = await callBackend('/api/wave-reader/start', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                }).then(response => response.json())
-                  .then(data => {
-                      if (data.success) {
-                          alert('Wave reader stopped!');
-                      }
-                  });
+                    body: JSON.stringify({ selector })
+                });
+
+                if (payload?.success) {
+                    alert(`Wave reader started${backendDisabled ? ' (mocked)' : ''}!`);
+                }
+            }
+
+            async function stopWaveReader() {
+                const { payload, backendDisabled } = await callBackend('/api/wave-reader/stop', {
+                    method: 'POST'
+                });
+
+                if (payload?.success) {
+                    alert(`Wave reader stopped${backendDisabled ? ' (mocked)' : ''}!`);
+                }
             }
 
             function addSelector() {

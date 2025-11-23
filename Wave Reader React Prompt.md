@@ -9,6 +9,7 @@ Please select here, whether or not to use XState with graphQL adapters as state 
 - XState with local server facade and graphQL adapters as state machine management
 - Use the existing RobotCopy system
 - A classic POJO state machine management system with actions and reducers
+- A classic POJO class structure with evented or observeable Remote Procedure Calls (classic RPC)
 
 ## Implementation
 
@@ -33,14 +34,25 @@ Please select here, whether or not to use XState with graphQL adapters as state 
 
 ### express server
 
+Consider Next.js for RPC approaches as the file structure is good... for that, as it can mirror a classy file structure nicely and remove the labor of call management. You may still want annotations (for the endpoint connections, or autowiring with apple sauce etc (i'm just a little hungry, there's no library called apple sauce, but that might be a good name if you're going to make one for wiring annotations in typescript, like a fork of retrofit2 for typescript!)).
+
 ### settings service
 
-### settings dao
+Consider using google sync options rather than a backend, as free tier AWS is 1 gb per year, so at the beginning, we might get bitten a little.
 
+### messaging service
+
+Regardless of RPC strategy, you may want to consider hashing and salting messages sent through the chrome api in addition to the already presented encryption strategy. Please see the fish burger example and wave reader code proper for reading material.
+
+### settings dao
+~
 ### settings ML service
+
+Line fitting and clustering algorithms help here, though an LSTM for settings might do quite nicely.
 
 ####    settings tensorflow lite ML expressions for finding the best fit for settings defaults, per website
 
+// research with cursor
 
 ## Frontend Considerations
 
@@ -48,6 +60,22 @@ manifest hash webpack extension
 content and backend permissions
 
 ## Class Structure
+
+// as above
+- background
+    - sync service (loads settings, and consolidates backend requests)
+        - interchange service (intermediate router machine for chromium api messaging RPC (remote procedure call))
+- popup
+    - sync service
+    - go button
+    - tabs
+        - about
+        - how to
+        - settings
+- content
+    - sync service
+    - ui css selector service
+    - animation css injection service
 
 ### Sync Service
 
@@ -92,11 +120,22 @@ Data:
 ---
 ### Go Button
 
+respect state of going from background, reported by active tab
+
 ### Fold Button
+
+respect state of popup
 
 ### Settings UI
 
+respect state of popup, then background settings received as update
+state of popup is loaded in from sync then background where appropriate if api is enabled
+
 ### About
+
+respects state of popup, then background api donation services
+shows puppies and kittens
+has links to reading services and 
 
 ### How to Use
 

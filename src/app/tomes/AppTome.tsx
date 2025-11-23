@@ -2,6 +2,7 @@ import React from 'react';
 import { TomeBase } from 'log-view-machine';
 import { createAppMachine } from '../machines/app-machine';
 import { createChromeApiMachine } from '../machines/chrome-api-machine';
+import { createBackgroundProxyMachine } from '../machines/background-proxy-machine';
 import { MACHINE_NAMES } from '../machines/machine-names';
 
 /**
@@ -15,6 +16,7 @@ import { MACHINE_NAMES } from '../machines/machine-names';
 class AppTomeClass extends TomeBase {
     private appMachine: any;
     private chromeApiMachine: any;
+    private backgroundProxyMachine: any;
     private isInitialized: boolean = false;
     private messageListener: ((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => boolean) | null = null;
 
@@ -35,6 +37,12 @@ class AppTomeClass extends TomeBase {
         console.log('🌊 AppTome: Initializing...');
 
         try {
+            // Create Background Proxy Machine to centralize backend access
+            this.backgroundProxyMachine = createBackgroundProxyMachine();
+            this.backgroundProxyMachine.parentMachine = this;
+            this.router.register(MACHINE_NAMES.BACKGROUND_PROXY, this.backgroundProxyMachine);
+            await this.backgroundProxyMachine.start?.();
+            
             // Create Chrome API Machine (replaces ProxyRobotCopyStateMachine)
             this.chromeApiMachine = createChromeApiMachine(this.router);
             

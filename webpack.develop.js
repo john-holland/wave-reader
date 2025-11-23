@@ -1,8 +1,12 @@
 const { merge } = require('webpack-merge');
-const common = require('./webpack.common.js');
+const createCommonConfig = require('./webpack.common.js');
 const path = require("path");
 
-const config = merge(common, {
+const baseConfig = createCommonConfig({
+    target: process.env.TARGET_BROWSER || process.env.BROWSER
+});
+
+const config = merge(baseConfig, {
     mode: "development",
     devtool: "source-map",
     entry: {

@@ -314,7 +314,7 @@ export const HowToContent = styled.div`
   
   p {
     margin-bottom: 12px;
-    color: #495057;
+    color: #333 !important;
   }
   
   .shortcut {
@@ -340,7 +340,7 @@ export const AboutContent = styled.div`
   
   p {
     margin-bottom: 12px;
-    color: #495057;
+    color: #333 !important;
   }
   
   .donation-section {

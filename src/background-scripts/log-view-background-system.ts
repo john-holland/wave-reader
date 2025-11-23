@@ -1,6 +1,8 @@
 import { MessageUtility } from '../models/messages/simplified-messages';
 import { MessageFactory } from '../models/messages/simplified-messages';
 import { MLSettingsService } from '../services/ml-settings-service';
+import { safeFetch, safeGraphQLRequest, setBackendRequestOverride } from '../utils/backend-api-wrapper';
+import { getDefaultBackendRequestState } from '../config/feature-toggles';
 
 // Log-View-Machine Background System
 export class LogViewBackgroundSystem {
@@ -9,6 +11,7 @@ export class LogViewBackgroundSystem {
     private sessionId: string;
     private activeTabs: Map<number, any> = new Map();
     private extensionState: 'active' | 'inactive' = 'active';
+    private backendRequestsEnabled: boolean;
     
     // Health monitoring for background router
     private healthStatus = {
@@ -26,6 +29,8 @@ export class LogViewBackgroundSystem {
         // Initialize services
         this.mlService = new MLSettingsService();
         this.sessionId = this.generateSessionId();
+        this.backendRequestsEnabled = getDefaultBackendRequestState();
+        setBackendRequestOverride(this.backendRequestsEnabled);
         
         // Initialize the system
         this.init();
@@ -333,6 +338,21 @@ export class LogViewBackgroundSystem {
                 case 'toggle':
                     console.log("BACKGROUND->CONTENT: Processing toggle message");
                     this.handleToggle(message, sender, sendResponse);
+                    break;
+                    
+                case 'set-backend-toggle':
+                    console.log('BACKGROUND->API: Updating backend toggle state');
+                    this.handleBackendToggleUpdate(message, sender, sendResponse);
+                    break;
+                    
+                case 'backend-request':
+                    console.log('BACKGROUND->API: Processing backend request');
+                    this.handleBackendRequest(message, sender, sendResponse);
+                    break;
+                    
+                case 'graphql-request':
+                    console.log('BACKGROUND->API: Processing GraphQL request');
+                    this.handleGraphQLRequest(message, sender, sendResponse);
                     break;
                     
                 case 'LOOP_DETECTION_STATS':
@@ -852,6 +872,68 @@ export class LogViewBackgroundSystem {
             this.logMessage('toggle-error', `Failed to toggle: ${error.message}`);
             sendResponse({ success: false, error: error.message });
         }
+    }
+
+    private async handleBackendRequest(message: any, sender: any, sendResponse: any) {
+        try {
+            const request = message?.request || {};
+            const endpoint = request.endpoint;
+
+            if (!endpoint) {
+                sendResponse({ success: false, error: 'Missing backend endpoint' });
+                return;
+            }
+
+            const response = await safeFetch(
+                endpoint,
+                request.options || {},
+                request.mockKey || 'default',
+                { payload: request.payload }
+            );
+
+            const backendDisabled = response.headers?.get?.('X-Backend-Disabled') === 'true';
+            const data = await response.json();
+
+            sendResponse({ success: true, data, backendDisabled });
+        } catch (error: any) {
+            console.error('🌊 Background API: Backend request failed', error);
+            sendResponse({ success: false, error: error?.message || 'Backend request failed' });
+        }
+    }
+
+    private async handleGraphQLRequest(message: any, sender: any, sendResponse: any) {
+        try {
+            const request = message?.request || {};
+            const endpoint = request.endpoint;
+            const query = request.query;
+
+            if (!endpoint || !query) {
+                sendResponse({ success: false, error: 'Missing GraphQL endpoint or query' });
+                return;
+            }
+
+            const result = await safeGraphQLRequest({
+                endpoint,
+                query,
+                variables: request.variables || {},
+                requestInit: request.options || {},
+                mockKey: request.mockKey || 'graphql',
+                context: request.context || {}
+            });
+
+            sendResponse({ success: true, data: result.data, errors: result.errors, backendDisabled: result.backendDisabled });
+        } catch (error: any) {
+            console.error('🌊 Background API: GraphQL request failed', error);
+            sendResponse({ success: false, error: error?.message || 'GraphQL request failed' });
+        }
+    }
+
+    private handleBackendToggleUpdate(message: any, _sender: any, sendResponse: any) {
+        const enabled = Boolean(message?.enabled);
+        this.backendRequestsEnabled = enabled;
+        setBackendRequestOverride(enabled);
+        this.logMessage('backend-toggle-updated', `Backend requests ${enabled ? 'enabled' : 'disabled'}`);
+        sendResponse({ success: true, enabled });
     }
 
     private async injectMessageToContentScript(tabId: number, messageData: any) {

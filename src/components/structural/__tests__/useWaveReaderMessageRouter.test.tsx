@@ -1,4 +1,11 @@
 // Mock the waveReaderMessageRouter module first
+const mockStructuralSystem = {
+  createMachine: jest.fn(),
+  getMachine: jest.fn(),
+  sendMessage: jest.fn(),
+  isConnected: true
+};
+
 jest.mock('../wave-reader-message-router', () => ({
   waveReaderMessageRouter: {
     sendMessage: jest.fn(),
@@ -9,6 +16,7 @@ jest.mock('../wave-reader-message-router', () => ({
     getQueueStatus: jest.fn(),
     healthCheck: jest.fn(),
     clearMetrics: jest.fn(),
+    getStructuralSystem: jest.fn(() => mockStructuralSystem),
     isConnected: true
   }
 }));
@@ -210,9 +218,13 @@ describe('useWaveReaderMessageRouter', () => {
       
       await waitFor(() => {
         expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith(
-          'TEST_TYPE',
-          'target',
-          { data: 'test' }
+          expect.objectContaining({
+            type: 'TEST_TYPE',
+            target: 'target',
+            source: 'test-component',
+            data: { data: 'test' },
+            priority: 'normal'
+          })
         );
       });
     });
@@ -224,10 +236,13 @@ describe('useWaveReaderMessageRouter', () => {
       
       await waitFor(() => {
         expect(mockMessageRouter.sendMessageWithRetry).toHaveBeenCalledWith(
-          'RETRY_TYPE',
-          'target',
-          { data: 'retry' },
-          'high',
+          expect.objectContaining({
+            type: 'RETRY_TYPE',
+            target: 'target',
+            source: 'test-component',
+            data: { data: 'retry' },
+            priority: 'high'
+          }),
           3
         );
       });
@@ -240,9 +255,13 @@ describe('useWaveReaderMessageRouter', () => {
       
       await waitFor(() => {
         expect(mockMessageRouter.broadcastMessage).toHaveBeenCalledWith(
-          'BROADCAST_TYPE',
-          ['comp1', 'comp2'],
-          { message: 'hello' }
+          expect.objectContaining({
+            type: 'BROADCAST_TYPE',
+            source: 'test-component',
+            data: { message: 'hello' },
+            priority: 'normal'
+          }),
+          ['comp1', 'comp2']
         );
       });
     });
@@ -253,11 +272,14 @@ describe('useWaveReaderMessageRouter', () => {
       fireEvent.click(screen.getByTestId('route-message'));
       
       await waitFor(() => {
-        expect(mockMessageRouter.routeMessage).toHaveBeenCalledWith(
-          'ROUTE_TYPE',
-          'target',
-          { data: 'route' },
-          'normal'
+        expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'ROUTE_TYPE',
+            target: 'target',
+            source: 'test-component',
+            data: { data: 'route' },
+            priority: 'normal'
+          })
         );
       });
     });
@@ -271,9 +293,13 @@ describe('useWaveReaderMessageRouter', () => {
       
       await waitFor(() => {
         expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith(
-          'WAVE_READER_START',
-          'wave-reader',
-          { selector: 'selector' }
+          expect.objectContaining({
+            type: 'WAVE_READER_START',
+            target: 'wave-reader',
+            source: 'test-component',
+            data: { selector: 'selector' },
+            priority: 'high'
+          })
         );
       });
     });
@@ -285,9 +311,13 @@ describe('useWaveReaderMessageRouter', () => {
       
       await waitFor(() => {
         expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith(
-          'WAVE_READER_STOP',
-          'wave-reader',
-          {}
+          expect.objectContaining({
+            type: 'WAVE_READER_STOP',
+            target: 'wave-reader',
+            source: 'test-component',
+            data: {},
+            priority: 'high'
+          })
         );
       });
     });
@@ -299,9 +329,13 @@ describe('useWaveReaderMessageRouter', () => {
       
       await waitFor(() => {
         expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith(
-          'TAB_CHANGE',
-          'wave-tabs',
-          { tabId: 'settings' }
+          expect.objectContaining({
+            type: 'TAB_CHANGE',
+            target: 'wave-tabs',
+            source: 'test-component',
+            data: { tabId: 'settings' },
+            priority: 'normal'
+          })
         );
       });
     });
@@ -313,9 +347,13 @@ describe('useWaveReaderMessageRouter', () => {
       
       await waitFor(() => {
         expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith(
-          'ENABLE_BUTTON',
-          'go-button',
-          {}
+          expect.objectContaining({
+            type: 'ENABLE_BUTTON',
+            target: 'go-button',
+            source: 'test-component',
+            data: {},
+            priority: 'normal'
+          })
         );
       });
     });
@@ -327,9 +365,13 @@ describe('useWaveReaderMessageRouter', () => {
       
       await waitFor(() => {
         expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith(
-          'DISABLE_BUTTON',
-          'go-button',
-          {}
+          expect.objectContaining({
+            type: 'DISABLE_BUTTON',
+            target: 'go-button',
+            source: 'test-component',
+            data: {},
+            priority: 'normal'
+          })
         );
       });
     });
@@ -356,22 +398,30 @@ describe('useWaveReaderMessageRouter', () => {
   });
 
   describe('connection state', () => {
-    it('should reflect connection status changes', () => {
-      // Start with connected
-      mockMessageRouter.isConnected = true;
+    it('should reflect connection status changes', async () => {
+      // Start with connected (structural system available)
+      mockMessageRouter.getStructuralSystem.mockReturnValue(mockStructuralSystem);
       
-      const { rerender } = render(<TestComponent componentName="test-component" />);
-      expect(screen.getByTestId('connection-status')).toHaveTextContent('Connected: Yes');
+      render(<TestComponent componentName="test-component" />);
+      await waitFor(() => {
+        expect(screen.getByTestId('connection-status')).toHaveTextContent('Connected: Yes');
+      });
       
-      // Change to disconnected
-      mockMessageRouter.isConnected = false;
-      rerender(<TestComponent componentName="test-component" />);
-      expect(screen.getByTestId('connection-status')).toHaveTextContent('Connected: No');
+      // Test that connection is established
+      expect(mockMessageRouter.getStructuralSystem).toHaveBeenCalled();
     });
   });
 
   describe('message statistics', () => {
-    it('should display updated message statistics', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+    
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+    
+    it('should display updated message statistics', async () => {
       mockMessageRouter.getMessageStats.mockReturnValue({
         totalMessages: 10,
         successfulMessages: 8,
@@ -381,9 +431,17 @@ describe('useWaveReaderMessageRouter', () => {
         priorityDistribution: { normal: 6, high: 4 }
       });
       
-      render(<TestComponent componentName="test-component" />);
+      render(<TestComponent componentName="test-component" options={{ enableMetrics: true }} />);
       
-      expect(screen.getByTestId('message-stats')).toHaveTextContent('Total: 10');
+      // Fast-forward time to trigger metrics update (they update every 1 second)
+      act(() => {
+        jest.advanceTimersByTime(1100);
+      });
+      
+      await waitFor(() => {
+        expect(screen.getByTestId('message-stats')).toHaveTextContent('Total: 10');
+      });
+      
       expect(screen.getByTestId('message-stats')).toHaveTextContent('Success: 8');
       expect(screen.getByTestId('message-stats')).toHaveTextContent('Rate: 80.0%');
     });
@@ -392,7 +450,14 @@ describe('useWaveReaderMessageRouter', () => {
   describe('error handling', () => {
     it('should handle message sending errors', async () => {
       const onError = jest.fn();
-      mockMessageRouter.sendMessage.mockRejectedValue(new Error('Send failed'));
+      mockMessageRouter.sendMessage.mockResolvedValue({
+        success: false,
+        error: 'Send failed',
+        targetComponent: 'target',
+        processingTime: 0,
+        messageId: 'test-id',
+        timestamp: Date.now()
+      });
       
       render(
         <TestComponent 
@@ -401,16 +466,23 @@ describe('useWaveReaderMessageRouter', () => {
         />
       );
       
+      // Wait for connection to be established
+      await waitFor(() => {
+        expect(screen.getByTestId('connection-status')).toHaveTextContent('Connected: Yes');
+      });
+      
       fireEvent.click(screen.getByTestId('send-message'));
       
       await waitFor(() => {
         expect(mockMessageRouter.sendMessage).toHaveBeenCalled();
+        expect(onError).toHaveBeenCalledWith('Send failed');
       });
     });
 
     it('should handle connection errors', async () => {
       const onError = jest.fn();
-      mockMessageRouter.isConnected = false;
+      // Make getStructuralSystem return null to simulate disconnection
+      mockMessageRouter.getStructuralSystem.mockReturnValue(null);
       
       render(
         <TestComponent 
@@ -419,10 +491,9 @@ describe('useWaveReaderMessageRouter', () => {
         />
       );
       
-      fireEvent.click(screen.getByTestId('send-message'));
-      
       await waitFor(() => {
-        expect(mockMessageRouter.sendMessage).toHaveBeenCalled();
+        expect(screen.getByTestId('connection-status')).toHaveTextContent('Connected: No');
+        expect(onError).toHaveBeenCalled();
       });
     });
   });
@@ -430,6 +501,8 @@ describe('useWaveReaderMessageRouter', () => {
   describe('auto-processing', () => {
     it('should auto-process messages when enabled', async () => {
       const onMessageReceived = jest.fn();
+      mockMessageRouter.getStructuralSystem.mockReturnValue(mockStructuralSystem);
+      mockMessageRouter.processQueuedMessages = jest.fn().mockResolvedValue(undefined);
       
       render(
         <TestComponent 
@@ -441,18 +514,24 @@ describe('useWaveReaderMessageRouter', () => {
         />
       );
       
-      // Simulate message being received
-      act(() => {
-        // This would normally be triggered by the message router
-        // For testing, we'll just verify the option is respected
+      // Wait for connection to be established
+      await waitFor(() => {
+        expect(screen.getByTestId('connection-status')).toHaveTextContent('Connected: Yes');
       });
-      
-      expect(screen.getByTestId('connection-status')).toHaveTextContent('Connected: Yes');
     });
   });
 
   describe('metrics updates', () => {
-    it('should update metrics when enabled', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      mockMessageRouter.getStructuralSystem.mockReturnValue(mockStructuralSystem);
+    });
+    
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+    
+    it('should update metrics when enabled', async () => {
       render(
         <TestComponent 
           componentName="test-component" 
@@ -460,8 +539,19 @@ describe('useWaveReaderMessageRouter', () => {
         />
       );
       
-      // Metrics should be updated periodically
-      expect(mockMessageRouter.getMessageStats).toHaveBeenCalled();
+      // Wait for connection to be established first
+      await waitFor(() => {
+        expect(screen.getByTestId('connection-status')).toHaveTextContent('Connected: Yes');
+      });
+      
+      // Fast-forward time to trigger metrics update (they update every 1 second)
+      act(() => {
+        jest.advanceTimersByTime(1100);
+      });
+      
+      await waitFor(() => {
+        expect(mockMessageRouter.getMessageStats).toHaveBeenCalled();
+      });
     });
 
     it('should not update metrics when disabled', () => {
@@ -505,7 +595,21 @@ describe('useWaveReaderMessageRouter', () => {
     });
 
     it('should call appropriate message router methods for convenience operations', async () => {
+      mockMessageRouter.getStructuralSystem.mockReturnValue(mockStructuralSystem);
+      mockMessageRouter.sendMessage.mockResolvedValue({
+        success: true,
+        targetComponent: 'target',
+        processingTime: 10,
+        messageId: 'test-id',
+        timestamp: Date.now()
+      });
+      
       render(<TestComponent componentName="test-component" />);
+      
+      // Wait for connection to be established
+      await waitFor(() => {
+        expect(screen.getByTestId('connection-status')).toHaveTextContent('Connected: Yes');
+      });
       
       // Test each convenience method
       fireEvent.click(screen.getByTestId('start-wave-reader'));

@@ -14,6 +14,11 @@ import {
 import SimpleTabs from './SimpleTabs';
 import EditorWrapper from './EditorWrapper';
 import SettingsTomes from '../../component-middleware/settings/SettingsTomes';
+import SettingsService from '../../services/settings';
+import Options, { WaveToggleConfig } from '../../models/options';
+
+
+const settingsService = new SettingsService();
 
 /**
  * App Component
@@ -26,11 +31,16 @@ const AppComponent: FunctionComponent = () => {
   const [currentViewKey, setCurrentViewKey] = useState(AppTome.getViewKey());
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentSettings, setCurrentSettings] = useState<Options | null>(null);
   
   // Tab state
   const [activeTab, setActiveTab] = useState<'how-to' | 'settings' | 'about'>('how-to');
   
   useEffect(() => {
+    settingsService.getCurrentSettings().then((settings) => {
+      setCurrentSettings(settings);
+    });
+
     // Subscribe to view key changes
     const unsubscribe = AppTome.observeViewKey(setCurrentViewKey);
     
@@ -56,7 +66,7 @@ const AppComponent: FunctionComponent = () => {
   // Debug log for view key changes
   useEffect(() => {
     console.log('🌊 App Component: View key changed:', currentViewKey);
-  }, [currentViewKey]);
+  }, [currentViewKey, currentSettings]);
 
   // Tab configuration for SimpleTabs using EditorWrapper components
   const tabs = [
@@ -91,7 +101,7 @@ const AppComponent: FunctionComponent = () => {
             </div>
             
             <h3>Keyboard Shortcuts</h3>
-            <p>Toggle Wave Reader: <strong>Ctrl + Shift + W</strong></p>
+            <p>Toggle Wave Reader: <strong>{(currentSettings?.toggleKeys.keyChord.join(' + ')) || WaveToggleConfig.getDefaultConfig().keyChord.join(' + ')}</strong></p>
           </div>
         </EditorWrapper>
       ),

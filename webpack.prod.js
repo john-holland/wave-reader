@@ -1,8 +1,26 @@
 const { merge } = require('webpack-merge');
-const common = require('./webpack.common.js');
+const createCommonConfig = require('./webpack.common.js');
 const path = require("path");
+const TerserPlugin = require('terser-webpack-plugin');
 
-const config = merge(common, {
+// Check if this is a publish build (strip console.log) or just production (keep console.log)
+const isPublishBuild = process.env.PUBLISH === 'true' || process.env.npm_lifecycle_event === 'publish';
+
+const baseConfig = createCommonConfig({
+    target: process.env.TARGET_BROWSER || process.env.BROWSER
+});
+
+const filteredPlugins = (baseConfig.plugins || []).filter(plugin => {
+    if (plugin.constructor?.name === 'NormalModuleReplacementPlugin' &&
+        plugin.resourceRegExp &&
+        plugin.resourceRegExp.toString() === '/log-view-machine/') {
+        console.log('🌊 Production build: Removing mock replacement plugin for log-view-machine');
+        return false;
+    }
+    return true;
+});
+
+const config = merge(baseConfig, {
     mode: "production",
     devtool: undefined,
     // entry: {
@@ -15,19 +33,28 @@ const config = merge(common, {
             // Using npm package now - no alias needed
         }
     },
+    optimization: {
+        minimize: true,
+        minimizer: [
+            new TerserPlugin({
+                terserOptions: {
+                    compress: {
+                        // Only remove console.log, console.info, console.debug, console.trace in publish builds
+                        // but keep console.error and console.warn always
+                        ...(isPublishBuild ? {
+                            pure_funcs: ['console.log', 'console.info', 'console.debug', 'console.trace']
+                        } : {})
+                    },
+                    format: {
+                        comments: false
+                    }
+                },
+                extractComments: false
+            })
+        ]
+    },
     // Override plugins to remove mock replacement in production
-    plugins: [
-        ...common.plugins.filter(plugin => {
-            // Remove the NormalModuleReplacementPlugin for log-view-machine in production
-            if (plugin.constructor.name === 'NormalModuleReplacementPlugin' && 
-                plugin.resourceRegExp && 
-                plugin.resourceRegExp.toString() === '/log-view-machine/') {
-                console.log('🌊 Production build: Removing mock replacement plugin for log-view-machine');
-                return false;
-            }
-            return true;
-        })
-    ]
+    plugins: filteredPlugins
 });
 
 module.exports = config;

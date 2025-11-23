@@ -6,6 +6,7 @@ import Text from '../../models/text';
 import { MachineRouter } from 'log-view-machine';
 import EditorWrapper from '../../app/components/EditorWrapper';
 import { AppTome } from '../../app/tomes/AppTome';
+import { normalizeKey } from '../../components/util/user-input';
 
 // Styled components for the Tomes-based settings
 const SettingsContainer = styled.div`
@@ -315,17 +316,7 @@ const KeyboardInput = styled.div`
   gap: 12px;
   align-items: center;
   margin-top: 8px;
-`;
-
-const KeyboardInputField = styled.input`
-  flex: 1;
-  background: #f8f9fa;
-  cursor: not-allowed;
-  padding: 12px;
-  border: 2px solid #e9ecef;
-  border-radius: 6px;
-  font-size: 14px;
-  font-family: inherit;
+  flex-wrap: wrap;
 `;
 
 const ProgressView = styled.div`
@@ -398,6 +389,136 @@ interface Settings {
   cssGenerationMode: 'template' | 'hardcoded';
 }
 
+const DEFAULT_SETTINGS: Settings = {
+  showNotifications: true,
+  waveAnimationControl: 'CSS',
+  toggleKeys: { keyChord: [] },
+  textColor: 'initial',
+  textSize: 'initial',
+  selector: 'p',
+  cssTemplate: '',
+  cssMouseTemplate: '',
+  waveSpeed: 2.0,
+  axisTranslateAmountXMax: 4,
+  axisTranslateAmountXMin: -4,
+  axisRotationAmountYMax: 2,
+  axisRotationAmountYMin: -2,
+  autoGenerateCss: true,
+  cssGenerationMode: 'template'
+};
+
+type WaveNumericKey =
+  | 'waveSpeed'
+  | 'axisTranslateAmountXMax'
+  | 'axisTranslateAmountXMin'
+  | 'axisRotationAmountYMax'
+  | 'axisRotationAmountYMin';
+
+const MAX_TOGGLE_KEYS = 4;
+const MODIFIER_KEYS = ['Ctrl', 'Shift', 'Alt', 'Meta'];
+const LETTER_KEYS = Array.from({ length: 26 }, (_, index) =>
+  String.fromCharCode(65 + index)
+);
+const NUMBER_KEYS = Array.from({ length: 10 }, (_, index) => `${index}`);
+const FUNCTION_KEYS = Array.from({ length: 12 }, (_, index) => `F${index + 1}`);
+const KEY_OPTIONS = [
+  ...MODIFIER_KEYS,
+  ...LETTER_KEYS,
+  ...NUMBER_KEYS,
+  ...FUNCTION_KEYS
+];
+const KEY_OPTIONS_SET = new Set(KEY_OPTIONS);
+
+const waveParameterKeys: WaveNumericKey[] = [
+  'waveSpeed',
+  'axisTranslateAmountXMax',
+  'axisTranslateAmountXMin',
+  'axisRotationAmountYMax',
+  'axisRotationAmountYMin'
+];
+
+const coerceNumber = (value: unknown, fallback: number): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = parseFloat(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return fallback;
+};
+
+const sanitizeToggleKeys = (value: Settings['toggleKeys'] | undefined): Settings['toggleKeys'] => {
+  if (!value || !Array.isArray(value.keyChord)) {
+    return { keyChord: [] };
+  }
+
+  const sanitizedChord = value.keyChord
+    .map(key => (typeof key === 'string' ? normalizeKey(key) : null))
+    .filter((key): key is string => {
+      if (!key) {
+        return false;
+      }
+      return KEY_OPTIONS_SET.has(key);
+    })
+    .slice(0, MAX_TOGGLE_KEYS);
+
+  return {
+    keyChord: sanitizedChord
+  };
+};
+
+const sanitizeSettings = (overrides: Partial<Settings> = {}): Settings => {
+  const merged = { ...DEFAULT_SETTINGS, ...overrides };
+  return {
+    ...merged,
+    toggleKeys: sanitizeToggleKeys(merged.toggleKeys),
+    waveSpeed: coerceNumber(merged.waveSpeed, DEFAULT_SETTINGS.waveSpeed),
+    axisTranslateAmountXMax: coerceNumber(merged.axisTranslateAmountXMax, DEFAULT_SETTINGS.axisTranslateAmountXMax),
+    axisTranslateAmountXMin: coerceNumber(merged.axisTranslateAmountXMin, DEFAULT_SETTINGS.axisTranslateAmountXMin),
+    axisRotationAmountYMax: coerceNumber(merged.axisRotationAmountYMax, DEFAULT_SETTINGS.axisRotationAmountYMax),
+    axisRotationAmountYMin: coerceNumber(merged.axisRotationAmountYMin, DEFAULT_SETTINGS.axisRotationAmountYMin)
+  };
+};
+
+const generateCssFromSettings = (settings: Settings) => {
+  const numericParams = [
+    settings.waveSpeed,
+    settings.axisTranslateAmountXMax,
+    settings.axisTranslateAmountXMin,
+    settings.axisRotationAmountYMax,
+    settings.axisRotationAmountYMin
+  ];
+
+  if (numericParams.some(param => typeof param !== 'number' || Number.isNaN(param))) {
+    console.warn('⚙️ SettingsTomes: Skipping CSS generation due to invalid numeric parameters');
+    return null;
+  }
+
+  const wave = new Wave({
+    selector: settings.selector,
+    waveSpeed: settings.waveSpeed,
+    axisTranslateAmountXMax: settings.axisTranslateAmountXMax,
+    axisTranslateAmountXMin: settings.axisTranslateAmountXMin,
+    axisRotationAmountYMax: settings.axisRotationAmountYMax,
+    axisRotationAmountYMin: settings.axisRotationAmountYMin,
+    text: new Text({
+      size: settings.textSize,
+      color: settings.textColor
+    })
+  });
+
+  return {
+    cssTemplate: defaultCssTemplate(wave),
+    cssMouseTemplate: defaultCssMouseTemplate(wave)
+  };
+};
+
+
 // Domain paths interface
 interface DomainPaths {
   domain: string;
@@ -427,24 +548,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
 }) => {
   // State management using withState pattern
   const [currentView, setCurrentView] = useState<'general' | 'wave' | 'css' | 'domain' | 'keyboard' | 'advanced' | 'saving' | 'loading' | 'error'>('general');
-  const [settings, setSettings] = useState<Settings>({
-    showNotifications: true,
-    waveAnimationControl: 'CSS',
-    toggleKeys: { keyChord: [] },
-    textColor: 'initial',
-    textSize: 'initial',
-    selector: 'p',
-    cssTemplate: '',
-    cssMouseTemplate: '',
-    waveSpeed: 2.0,
-    axisTranslateAmountXMax: 10,
-    axisTranslateAmountXMin: -10,
-    axisRotationAmountYMax: 5,
-    axisRotationAmountYMin: -5,
-    autoGenerateCss: true,
-    cssGenerationMode: 'template',
-    ...initialSettings
-  });
+  const [settings, setSettings] = useState<Settings>(() => sanitizeSettings(initialSettings));
   const [localDomainPaths, setLocalDomainPaths] = useState<DomainPaths[]>(domainPaths);
   const [localCurrentDomain, setLocalCurrentDomain] = useState(currentDomain);
   const [localCurrentPath, setLocalCurrentPath] = useState(currentPath);
@@ -479,7 +583,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
             const result = await chrome.storage.local.get(['waveReaderSettings', 'waveReaderDomainPaths']);
             
             if (result.waveReaderSettings) {
-              setSettings(prev => ({ ...prev, ...result.waveReaderSettings }));
+              setSettings(prev => sanitizeSettings({ ...prev, ...result.waveReaderSettings }));
               setSaved(true);
             }
             
@@ -505,39 +609,28 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
 
   // Auto-generate CSS templates when settings change and auto-generate is enabled
   useEffect(() => {
-    if (settings.autoGenerateCss) {
-      console.log('⚙️ SettingsTomes: Auto-generating CSS templates');
-      
-      // Create a Wave instance with current settings
-      const wave = new Wave({
-        selector: settings.selector,
-        waveSpeed: settings.waveSpeed,
-        axisTranslateAmountXMax: settings.axisTranslateAmountXMax,
-        axisTranslateAmountXMin: settings.axisTranslateAmountXMin,
-        axisRotationAmountYMax: settings.axisRotationAmountYMax,
-        axisRotationAmountYMin: settings.axisRotationAmountYMin,
-        text: new Text({
-          size: settings.textSize,
-          color: settings.textColor
-        })
-      });
-      
-      // Generate CSS templates
-      const cssTemplate = defaultCssTemplate(wave);
-      const cssMouseTemplate = defaultCssMouseTemplate(wave);
-      
-      // Update settings with generated CSS if they're different
-      setSettings(prev => {
-        if (prev.cssTemplate !== cssTemplate || prev.cssMouseTemplate !== cssMouseTemplate) {
-          return {
-            ...prev,
-            cssTemplate,
-            cssMouseTemplate
-          };
-        }
-        return prev;
-      });
+    if (!settings.autoGenerateCss) {
+      return;
     }
+
+    console.log('⚙️ SettingsTomes: Auto-generating CSS templates');
+
+    const generated = generateCssFromSettings(settings);
+
+    if (!generated) {
+      return;
+    }
+
+    setSettings(prev => {
+      if (prev.cssTemplate !== generated.cssTemplate || prev.cssMouseTemplate !== generated.cssMouseTemplate) {
+        return {
+          ...prev,
+          cssTemplate: generated.cssTemplate,
+          cssMouseTemplate: generated.cssMouseTemplate
+        };
+      }
+      return prev;
+    });
   }, [settings.autoGenerateCss, settings.waveSpeed, settings.axisTranslateAmountXMax, settings.axisTranslateAmountXMin, settings.axisRotationAmountYMax, settings.axisRotationAmountYMin, settings.selector, settings.textSize, settings.textColor]);
 
   // Handle Chrome extension messaging
@@ -568,43 +661,39 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
     setSaved(false);
   }, []);
 
-  const handleWaveSettingChange = useCallback((key: keyof Settings, value: any) => {
-    console.log('⚙️ SettingsTomes: Updating wave setting:', key, value);
-    
-    const newSettings = { ...settings, [key]: value };
-    setSettings(newSettings);
-    setSaved(false);
-    
-    // Auto-generate CSS if enabled
-    if (settings.autoGenerateCss && ['waveSpeed', 'axisTranslateAmountXMax', 'axisTranslateAmountXMin', 'axisRotationAmountYMax', 'axisRotationAmountYMin', 'selector', 'textSize'].includes(key)) {
-      console.log('⚙️ SettingsTomes: Auto-generating CSS from wave parameters');
-      
-      // Create a Wave instance with current settings
-      const wave = new Wave({
-        selector: newSettings.selector,
-        waveSpeed: newSettings.waveSpeed,
-        axisTranslateAmountXMax: newSettings.axisTranslateAmountXMax,
-        axisTranslateAmountXMin: newSettings.axisTranslateAmountXMin,
-        axisRotationAmountYMax: newSettings.axisRotationAmountYMax,
-        axisRotationAmountYMin: newSettings.axisRotationAmountYMin,
-        text: new Text({
-          size: newSettings.textSize,
-          color: newSettings.textColor
-        })
-      });
-      
-      // Generate CSS templates
-      const cssTemplate = defaultCssTemplate(wave);
-      const cssMouseTemplate = defaultCssMouseTemplate(wave);
-      
-      // Update settings with generated CSS
-      setSettings(prev => ({
+  const handleWaveSettingChange = useCallback((key: WaveNumericKey, rawValue: string | number) => {
+    console.log('⚙️ SettingsTomes: Updating wave setting:', key, rawValue);
+
+    setSettings(prev => {
+      const numericValue =
+        typeof rawValue === 'number' ? rawValue : parseFloat(rawValue);
+
+      if (Number.isNaN(numericValue)) {
+        return prev;
+      }
+
+      const next: Settings = {
         ...prev,
-        cssTemplate,
-        cssMouseTemplate
-      }));
-    }
-  }, [settings, setSettings]);
+        [key]: numericValue
+      };
+
+      if (next.autoGenerateCss && waveParameterKeys.includes(key)) {
+        console.log('⚙️ SettingsTomes: Auto-generating CSS from wave parameters');
+        const generated = generateCssFromSettings(next);
+
+        if (generated) {
+          if (next.cssTemplate !== generated.cssTemplate || next.cssMouseTemplate !== generated.cssMouseTemplate) {
+            next.cssTemplate = generated.cssTemplate;
+            next.cssMouseTemplate = generated.cssMouseTemplate;
+          }
+        }
+      }
+
+      return next;
+    });
+
+    setSaved(false);
+  }, []);
 
   const handleCssSettingChange = useCallback((key: keyof Settings, value: any) => {
     console.log('⚙️ SettingsTomes: Updating CSS setting:', key, value);
@@ -641,11 +730,35 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
     setSaved(false);
   }, [localDomainPaths, localCurrentDomain, onDomainPathChange]);
 
-  const handleKeyboardSettingChange = useCallback((key: keyof Settings, value: any) => {
-    console.log('⚙️ SettingsTomes: Updating keyboard setting:', key, value);
-    
-    handleSettingChange(key, value);
-  }, [handleSettingChange]);
+  const handleToggleKeyChange = useCallback((index: number, selectedValue: string) => {
+    console.log('⚙️ SettingsTomes: Updating toggle key:', index, selectedValue);
+
+    const value = selectedValue === 'None' ? '' : selectedValue;
+
+    setSettings(prev => {
+      const padded = Array.from({ length: MAX_TOGGLE_KEYS }, (_, i) => prev.toggleKeys.keyChord[i] ?? '');
+
+      if (value && padded.some((key, i) => key === value && i !== index)) {
+        const duplicateIndex = padded.findIndex((key, i) => key === value && i !== index);
+        if (duplicateIndex >= 0) {
+          padded[duplicateIndex] = '';
+        }
+      }
+
+      padded[index] = value;
+
+      const updatedChord = padded.filter((key): key is string => key !== '');
+
+      return {
+        ...prev,
+        toggleKeys: {
+          keyChord: updatedChord
+        }
+      };
+    });
+
+    setSaved(false);
+  }, []);
 
   const handleSaveSettings = useCallback(async () => {
     console.log('⚙️ SettingsTomes: Saving settings');
@@ -693,25 +806,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
     if (window.confirm('Are you sure you want to reset all settings to defaults?')) {
       try {
         // Reset to default values
-        const defaultSettings: Settings = {
-          showNotifications: true,
-          waveAnimationControl: 'CSS',
-          toggleKeys: { keyChord: [] },
-          textColor: 'initial',
-          textSize: 'initial',
-          selector: 'p',
-          cssTemplate: '',
-          cssMouseTemplate: '',
-          waveSpeed: 2.0,
-          axisTranslateAmountXMax: 10,
-          axisTranslateAmountXMin: -10,
-          axisRotationAmountYMax: 5,
-          axisRotationAmountYMin: -5,
-          autoGenerateCss: true,
-          cssGenerationMode: 'template'
-        };
-        
-        setSettings(defaultSettings);
+        setSettings(() => sanitizeSettings(DEFAULT_SETTINGS));
         setSaved(false);
         
         // Save to storage
@@ -988,7 +1083,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                   min={0.1}
                   max={20}
                   step={0.1}
-                  onChange={(e) => handleWaveSettingChange('waveSpeed', parseFloat(e.target.value))}
+                  onChange={(e) => handleWaveSettingChange('waveSpeed', e.target.value)}
                 />
                 <HelpText>Duration of the wave animation cycle</HelpText>
               </SettingItem>
@@ -999,7 +1094,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                   type="number"
                   className="number"
                   value={settings.axisTranslateAmountXMax}
-                  onChange={(e) => handleWaveSettingChange('axisTranslateAmountXMax', parseFloat(e.target.value))}
+                  onChange={(e) => handleWaveSettingChange('axisTranslateAmountXMax', e.target.value)}
                 />
               </SettingItem>
               
@@ -1009,7 +1104,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                   type="number"
                   className="number"
                   value={settings.axisTranslateAmountXMin}
-                  onChange={(e) => handleWaveSettingChange('axisTranslateAmountXMin', parseFloat(e.target.value))}
+                  onChange={(e) => handleWaveSettingChange('axisTranslateAmountXMin', e.target.value)}
                 />
               </SettingItem>
               
@@ -1019,7 +1114,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                   type="number"
                   className="number"
                   value={settings.axisRotationAmountYMax}
-                  onChange={(e) => handleWaveSettingChange('axisRotationAmountYMax', parseFloat(e.target.value))}
+                  onChange={(e) => handleWaveSettingChange('axisRotationAmountYMax', e.target.value)}
                 />
               </SettingItem>
               
@@ -1029,7 +1124,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                   type="number"
                   className="number"
                   value={settings.axisRotationAmountYMin}
-                  onChange={(e) => handleWaveSettingChange('axisRotationAmountYMin', parseFloat(e.target.value))}
+                  onChange={(e) => handleWaveSettingChange('axisRotationAmountYMin', e.target.value)}
                 />
               </SettingItem>
               
@@ -1167,16 +1262,38 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
               <SettingItem>
                 <SettingLabel>Toggle Keys:</SettingLabel>
                 <KeyboardInput>
-                  <KeyboardInputField
-                    value={settings.toggleKeys.keyChord.join(' + ')}
-                    placeholder="Press keys to set shortcut"
-                    readOnly
-                  />
-                  <Button className="btn btn-secondary">
-                    🔍 Scan for Keys
-                  </Button>
+                  {Array.from({ length: MAX_TOGGLE_KEYS }).map((_, index) => {
+                    const selectedKey = settings.toggleKeys.keyChord[index];
+                    const normalizedValue = selectedKey ? normalizeKey(selectedKey) : null;
+                    const currentValue =
+                      normalizedValue && KEY_OPTIONS_SET.has(normalizedValue)
+                        ? normalizedValue
+                        : 'None';
+                    return (
+                      <SettingSelect
+                        key={`toggle-key-${index}`}
+                        value={currentValue}
+                        onChange={(e) => handleToggleKeyChange(index, e.target.value)}
+                      >
+                        <option value="None">None</option>
+                        {KEY_OPTIONS.map(option => {
+                          const isSelected = option === currentValue;
+                          return option === selectedKey ?
+                            (<option key={`${option}-${index}`} value={option} selected={true}>
+                              {option}
+                            </option>)
+                          : 
+                            (<option key={`${option}-${index}`} value={option}>
+                              {option}
+                            </option>)
+                        })}
+                      </SettingSelect>
+                    );
+                  })}
                 </KeyboardInput>
-                <HelpText>Press up to 4 keys to create your shortcut</HelpText>
+                <HelpText>
+                  Choose up to four keys from left to right. Modifiers (Ctrl, Shift, Alt, Meta) must be combined with at least one non-modifier key.
+                </HelpText>
               </SettingItem>
             </SettingGroup>
             

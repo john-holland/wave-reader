@@ -1,4 +1,6 @@
 import { createProxyRobotCopyStateMachine, createRobotCopy } from 'log-view-machine';
+import { FeatureToggleService, getDefaultBackendRequestState } from '../../config/feature-toggles';
+import { performBackendRequest, registerBackendToggleService, safeGraphQLRequest } from '../../utils/backend-api-wrapper';
 
 /**
  * Background Proxy Machine
@@ -11,7 +13,38 @@ import { createProxyRobotCopyStateMachine, createRobotCopy } from 'log-view-mach
  * - Send to sibling: send('./SiblingMachine', event, data)
  */
 export const createBackgroundProxyMachine = () => {
-    return createProxyRobotCopyStateMachine({
+    const robotCopyInstance = createRobotCopy({
+        enableTracing: false,
+        enableDataDog: false,
+        kotlinBackendUrl: typeof chrome !== 'undefined' && chrome.runtime?.id 
+            ? `chrome-extension://${chrome.runtime.id}` 
+            : 'chrome-extension://wave-reader',
+        nodeBackendUrl: typeof chrome !== 'undefined' && chrome.runtime?.id 
+            ? `chrome-extension://${chrome.runtime.id}` 
+            : 'chrome-extension://wave-reader'
+    });
+
+    const originalIsEnabled = robotCopyInstance.isEnabled?.bind(robotCopyInstance);
+
+    if (originalIsEnabled) {
+        robotCopyInstance.isEnabled = async (toggleName: string, context?: any) => {
+            if (toggleName === 'enable-backend-api-requests') {
+                return false;
+            }
+
+            try {
+                return await originalIsEnabled(toggleName, context);
+            } catch (error) {
+                console.warn('🌊 Background Proxy: Falling back to default toggle state for', toggleName, error);
+                return false;
+            }
+        };
+    }
+
+    const backendToggleService = new FeatureToggleService(robotCopyInstance);
+    registerBackendToggleService(backendToggleService);
+    const initialBackendState = backendToggleService.getCachedBackendRequestState();
+    const machine = createProxyRobotCopyStateMachine({
         machineId: 'background-proxy-machine',
         predictableActionArguments: false,
         xstateConfig: {
@@ -19,7 +52,10 @@ export const createBackgroundProxyMachine = () => {
             context: {
                 message: null,
                 sessionId: null,
-                activeConnections: 0
+                activeConnections: 0,
+                backendRequestsEnabled: initialBackendState,
+                lastBackendResponse: null,
+                lastGraphQLResponse: null
             },
             states: {
                 idle: {
@@ -30,7 +66,11 @@ export const createBackgroundProxyMachine = () => {
                         TOGGLE: { target: 'toggling', actions: ['handleToggle'] },
                         GET_STATUS: { target: 'idle', actions: ['handleGetStatus'] },
                         HEALTH_CHECK: { target: 'idle', actions: ['handleHealthCheck'] },
-                        PING: { target: 'idle', actions: ['handlePing'] }
+                        PING: { target: 'idle', actions: ['handlePing'] },
+                        BACKEND_REQUEST: { target: 'backendRequesting' },
+                        GRAPHQL_REQUEST: { target: 'graphqlRequesting' },
+                        SET_BACKEND_TOGGLE: { target: 'idle', actions: ['setBackendToggleState'] },
+                        GET_BACKEND_TOGGLE: { target: 'backendToggleQuerying' }
                     }
                 },
                 initializing: {
@@ -55,6 +95,27 @@ export const createBackgroundProxyMachine = () => {
                     on: {
                         TOGGLE_COMPLETE: { target: 'idle', actions: ['completeToggle'] },
                         ERROR: { target: 'error', actions: ['handleError'] }
+                    }
+                },
+                backendRequesting: {
+                    invoke: {
+                        src: 'proxyBackendRequestService',
+                        onDone: { target: 'idle', actions: ['completeBackendRequest'] },
+                        onError: { target: 'error', actions: ['handleError'] }
+                    }
+                },
+                graphqlRequesting: {
+                    invoke: {
+                        src: 'proxyGraphQLRequestService',
+                        onDone: { target: 'idle', actions: ['completeGraphQLRequest'] },
+                        onError: { target: 'error', actions: ['handleError'] }
+                    }
+                },
+                backendToggleQuerying: {
+                    invoke: {
+                        src: 'proxyBackendToggleService',
+                        onDone: { target: 'idle', actions: ['completeBackendToggleQuery'] },
+                        onError: { target: 'error', actions: ['handleError'] }
                     }
                 },
                 error: {
@@ -269,6 +330,37 @@ export const createBackgroundProxyMachine = () => {
                         }
                     }
                 },
+                completeBackendRequest: {
+                    type: 'function',
+                    fn: ({ log, event, context }: any) => {
+                        log('🌊 Background Proxy: Backend request complete', event?.data);
+                        context.lastBackendResponse = event?.data || null;
+                    }
+                },
+                completeGraphQLRequest: {
+                    type: 'function',
+                    fn: ({ log, event, context }: any) => {
+                        log('🌊 Background Proxy: GraphQL request complete', event?.data);
+                        context.lastGraphQLResponse = event?.data || null;
+                    }
+                },
+                completeBackendToggleQuery: {
+                    type: 'function',
+                    fn: ({ log, event, context, send }: any) => {
+                        log('🌊 Background Proxy: Backend toggle query result', event?.data);
+                        if (event?.data && typeof event.data.enabled === 'boolean') {
+                            context.backendRequestsEnabled = event.data.enabled;
+                        }
+                    }
+                },
+                setBackendToggleState: {
+                    type: 'function',
+                    fn: ({ context, event, log }: any) => {
+                        const enabled = Boolean(event?.enabled);
+                        context.backendRequestsEnabled = enabled;
+                        log('🌊 Background Proxy: Backend requests state updated', { enabled });
+                    }
+                },
                 handlePing: {
                     type: 'function',
                     fn: async ({context, event, send, log}: any) => {
@@ -330,18 +422,79 @@ export const createBackgroundProxyMachine = () => {
                         context.message = event.error || 'Unknown error';
                     }
                 }
+            },
+            services: {
+                proxyBackendRequestService: async (_context: any, event: any) => {
+                    const request = event?.request || event?.data || {};
+                    const endpoint = request.endpoint;
+
+                    if (!endpoint) {
+                        throw new Error('Missing backend endpoint');
+                    }
+
+                    const result = await performBackendRequest({
+                        endpoint,
+                        options: request.options || {},
+                        mockKey: request.mockKey || 'default',
+                        payload: request.payload,
+                        context: request.context || {}
+                    });
+
+                    return { success: true, data: result.data, backendDisabled: result.backendDisabled };
+                },
+                proxyGraphQLRequestService: async (_context: any, event: any) => {
+                    const request = event?.request || event?.data || {};
+                    const endpoint = request.endpoint;
+                    const query = request.query;
+
+                    if (!endpoint || !query) {
+                        throw new Error('Missing GraphQL endpoint or query');
+                    }
+
+                    const result = await safeGraphQLRequest({
+                        endpoint,
+                        query,
+                        variables: request.variables || {},
+                        requestInit: request.options || {},
+                        mockKey: request.mockKey || 'graphql',
+                        context: request.context || {}
+                    });
+
+                    return { success: true, data: result.data, errors: result.errors, backendDisabled: result.backendDisabled };
+                },
+                proxyBackendToggleService: async () => {
+                    try {
+                        const enabled = await backendToggleService.canMakeBackendRequests();
+                        return { success: true, enabled };
+                    } catch (error) {
+                        console.warn('🌊 Background Proxy: Failed to evaluate backend toggle state on demand', error);
+                        return { success: true, enabled: getDefaultBackendRequestState(), backendDisabled: true };
+                    }
+                }
             }
         },
-        robotCopy: createRobotCopy({
-            enableTracing: false,
-            enableDataDog: false,
-            kotlinBackendUrl: typeof chrome !== 'undefined' && chrome.runtime?.id 
-                ? `chrome-extension://${chrome.runtime.id}` 
-                : 'chrome-extension://wave-reader',
-            nodeBackendUrl: typeof chrome !== 'undefined' && chrome.runtime?.id 
-                ? `chrome-extension://${chrome.runtime.id}` 
-                : 'chrome-extension://wave-reader'
-        })
+        robotCopy: robotCopyInstance
     });
+
+    backendToggleService.canMakeBackendRequests().then((enabled) => {
+        try {
+            machine.send?.({ type: 'SET_BACKEND_TOGGLE', enabled });
+
+            if (typeof chrome !== 'undefined' && chrome.runtime) {
+                chrome.runtime.sendMessage({
+                    name: 'set-backend-toggle',
+                    from: 'popup',
+                    timestamp: Date.now(),
+                    enabled
+                });
+            }
+        } catch (error) {
+            console.warn('🌊 Background Proxy: Unable to notify backend toggle state', error);
+        }
+    }).catch((error) => {
+        console.warn('🌊 Background Proxy: Failed to evaluate backend toggle state', error);
+    });
+
+    return machine;
 };
 

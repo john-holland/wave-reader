@@ -7,7 +7,8 @@
 
 export const MACHINE_NAMES = {
     CHROME_API: 'ChromeApiMachine',
-    APP: 'AppMachine'
+    APP: 'AppMachine',
+    BACKGROUND_PROXY: 'BackgroundProxyMachine'
 } as const;
 
 /**

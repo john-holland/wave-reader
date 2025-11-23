@@ -1,5 +1,6 @@
 import { createViewStateMachine, MachineRouter } from 'log-view-machine';
 import Options from '../../models/options';
+import { MACHINE_NAMES } from './machine-names';
 
 // ServiceMeta type for routed send
 // This provides the routedSend function in services
@@ -48,7 +49,9 @@ export const createChromeApiMachine = (router?: MachineRouter) => {
                         GET_STATUS: { target: 'idle', actions: ['respondWithStatus'] },
                         HEALTH_CHECK: { target: 'idle', actions: ['respondWithHealth'] },
                         PING: { target: 'idle', actions: ['respondWithPong'] },
-                        INCOMING_MESSAGE: { target: 'idle', actions: ['handleIncomingMessage'] }
+                        INCOMING_MESSAGE: { target: 'idle', actions: ['handleIncomingMessage'] },
+                        BACKEND_REQUEST: { target: 'backendRequesting' },
+                        GRAPHQL_REQUEST: { target: 'graphqlRequesting' }
                     }
                 },
                 initializing: {
@@ -76,6 +79,20 @@ export const createChromeApiMachine = (router?: MachineRouter) => {
                     invoke: {
                         src: 'toggleService',
                         onDone: { target: 'idle', actions: ['handleToggleComplete'] },
+                        onError: { target: 'error', actions: ['setError'] }
+                    }
+                },
+                backendRequesting: {
+                    invoke: {
+                        src: 'backendRequestService',
+                        onDone: { target: 'idle', actions: ['handleBackendRequestComplete'] },
+                        onError: { target: 'error', actions: ['setError'] }
+                    }
+                },
+                graphqlRequesting: {
+                    invoke: {
+                        src: 'graphqlRequestService',
+                        onDone: { target: 'idle', actions: ['handleGraphQLRequestComplete'] },
                         onError: { target: 'error', actions: ['setError'] }
                     }
                 },
@@ -228,6 +245,50 @@ export const createChromeApiMachine = (router?: MachineRouter) => {
                     } else {
                         throw new Error('Chrome runtime not available');
                     }
+                },
+                backendRequestService: async (_context: any, event: any, meta: ServiceMeta) => {
+                    const payload = event?.request || event?.data || {};
+
+                    if (meta.routedSend) {
+                        return meta.routedSend(
+                            MACHINE_NAMES.BACKGROUND_PROXY,
+                            'BACKEND_REQUEST',
+                            { request: payload }
+                        );
+                    }
+
+                    if (typeof chrome === 'undefined' || !chrome.runtime) {
+                        throw new Error('Chrome runtime not available');
+                    }
+
+                    return chrome.runtime.sendMessage({
+                        name: 'backend-request',
+                        from: 'popup',
+                        timestamp: Date.now(),
+                        request: payload
+                    });
+                },
+                graphqlRequestService: async (_context: any, event: any, meta: ServiceMeta) => {
+                    const payload = event?.request || event?.data || {};
+
+                    if (meta.routedSend) {
+                        return meta.routedSend(
+                            MACHINE_NAMES.BACKGROUND_PROXY,
+                            'GRAPHQL_REQUEST',
+                            { request: payload }
+                        );
+                    }
+
+                    if (typeof chrome === 'undefined' || !chrome.runtime) {
+                        throw new Error('Chrome runtime not available');
+                    }
+
+                    return chrome.runtime.sendMessage({
+                        name: 'graphql-request',
+                        from: 'popup',
+                        timestamp: Date.now(),
+                        request: payload
+                    });
                 }
             },
             actions: {
@@ -246,6 +307,12 @@ export const createChromeApiMachine = (router?: MachineRouter) => {
                 handleToggleComplete: (context: any, event: any) => {
                     console.log('🔌 ChromeApi: Toggle complete', event.data);
                     // The routed send event is already sent in the service, just log completion
+                },
+                handleBackendRequestComplete: (_context: any, event: any) => {
+                    console.log('🔌 ChromeApi: Backend request complete', event.data);
+                },
+                handleGraphQLRequestComplete: (_context: any, event: any) => {
+                    console.log('🔌 ChromeApi: GraphQL request complete', event.data);
                 },
                 respondWithStatus: (context: any) => {
                     console.log('🔌 ChromeApi: Status requested', {

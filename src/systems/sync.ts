@@ -5,6 +5,8 @@
  * Provides unified data access and state management across the extension
  */
 
+import { MACHINE_NAMES } from '../app/machines/machine-names';
+
 // Sync system helper functions
 export const SyncSystem = {
     // Initialize sync - gather data from all sources
@@ -84,7 +86,7 @@ export const SyncSystem = {
                 return null;
             }
             
-            const statusResponse = await machine.parentMachine.getSubMachine('background-proxy')?.send({
+            const statusResponse = await machine.parentMachine.getSubMachine(MACHINE_NAMES.BACKGROUND_PROXY)?.send({
                 from: 'popup',
                 name: 'get-status',
                 timestamp: Date.now()
@@ -117,7 +119,7 @@ export const SyncSystem = {
                 return null;
             }
             
-            const healthResponse = await machine.parentMachine.getSubMachine('background-proxy')?.send({
+            const healthResponse = await machine.parentMachine.getSubMachine(MACHINE_NAMES.BACKGROUND_PROXY)?.send({
                 from: 'popup',
                 name: 'health-check',
                 timestamp: Date.now()
@@ -170,7 +172,7 @@ export const SyncSystem = {
         
         try {
             // Send ping to background to get current state
-            const pingResponse = await machine.parentMachine.getSubMachine('background-proxy')?.send({
+            const pingResponse = await machine.parentMachine.getSubMachine(MACHINE_NAMES.BACKGROUND_PROXY)?.send({
                 from: 'popup',
                 name: 'ping',
                 timestamp: Date.now(),
