@@ -6,7 +6,8 @@ import Text from '../../models/text';
 import { MachineRouter } from 'log-view-machine';
 import EditorWrapper from '../../app/components/EditorWrapper';
 import { AppTome } from '../../app/tomes/AppTome';
-import { normalizeKey } from '../../components/util/user-input';
+import { KeyChord, normalizeKey } from '../../components/util/user-input';
+import { KeyChordDefaultFactory } from 'src/models/defaults';
 
 // Styled components for the Tomes-based settings
 const SettingsContainer = styled.div`
@@ -583,7 +584,12 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
             const result = await chrome.storage.local.get(['waveReaderSettings', 'waveReaderDomainPaths']);
             
             if (result.waveReaderSettings) {
-              setSettings(prev => sanitizeSettings({ ...prev, ...result.waveReaderSettings }));
+              console.log('⚙️ SettingsTomes: Loading settings from storage:', result.waveReaderSettings);
+              setSettings(prev => {
+                const sanitized = sanitizeSettings({ ...prev, ...result.waveReaderSettings });
+                console.log('⚙️ SettingsTomes: Sanitized settings, toggleKeys:', sanitized.toggleKeys);
+                return sanitized;
+              });
               setSaved(true);
             }
             
@@ -1262,31 +1268,47 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
               <SettingItem>
                 <SettingLabel>Toggle Keys:</SettingLabel>
                 <KeyboardInput>
-                  {Array.from({ length: MAX_TOGGLE_KEYS }).map((_, index) => {
-                    const selectedKey = settings.toggleKeys.keyChord[index];
+                  {Array.from({ length: MAX_TOGGLE_KEYS }, (_, index) => {
+                    if (!settings.toggleKeys) {
+                      console.warn('⚙️ SettingsTomes: No toggleKeys found, using default factory');
+                    }
+                    // Ensure toggleKeys.keyChord exists and is an array, default to empty array
+                    const keyChord = (settings.toggleKeys?.keyChord || KeyChordDefaultFactory() as KeyChord);
+                    // Get the key at this index, or undefined if index is out of bounds
+                    const selectedKey = keyChord[index];
+                    // First check if the stored key is already valid
+                    const isKeyValid = selectedKey && KEY_OPTIONS_SET.has(selectedKey);
+                    // If not valid, try normalizing it
                     const normalizedValue = selectedKey ? normalizeKey(selectedKey) : null;
-                    const currentValue =
-                      normalizedValue && KEY_OPTIONS_SET.has(normalizedValue)
+                    const normalizedIsValid = normalizedValue && KEY_OPTIONS_SET.has(normalizedValue);
+                    // Use the stored key if valid, otherwise use normalized if valid, otherwise 'None'
+                    const currentValue = isKeyValid
+                      ? selectedKey
+                      : normalizedIsValid
                         ? normalizedValue
                         : 'None';
+                    
+                    // Debug logging
+                    if (selectedKey) {
+                      console.log(`⚙️ SettingsTomes: Keyboard shortcut ${index}: selectedKey=${selectedKey}, currentValue=${currentValue}, isKeyValid=${isKeyValid}, normalizedValue=${normalizedValue}, normalizedIsValid=${normalizedIsValid}`);
+                    }
+                    
                     return (
                       <SettingSelect
                         key={`toggle-key-${index}`}
                         value={currentValue}
                         onChange={(e) => handleToggleKeyChange(index, e.target.value)}
                       >
-                        <option value="None">None</option>
-                        {KEY_OPTIONS.map(option => {
-                          const isSelected = option === currentValue;
-                          return option === selectedKey ?
-                            (<option key={`${option}-${index}`} value={option} selected={true}>
-                              {option}
-                            </option>)
-                          : 
-                            (<option key={`${option}-${index}`} value={option}>
-                              {option}
-                            </option>)
-                        })}
+                        <option value="None" selected={currentValue === 'None' ? true : undefined}>None</option>
+                        {KEY_OPTIONS.map((option: string) => (
+                          <option 
+                            key={`${option}-${index}`} 
+                            value={option}
+                            selected={currentValue === option ? true : undefined}
+                          >
+                            {option}
+                          </option>
+                        ))}
                       </SettingSelect>
                     );
                   })}
