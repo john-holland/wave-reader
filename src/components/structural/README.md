@@ -1,45 +1,22 @@
 # 🌊 Wave Reader Structural System
 
-This directory contains the structural system integration for Wave Reader, connecting existing component middleware tomes with enhanced message routing and state management.
+This directory contains the structural system integration for Wave Reader. Component middleware uses the structural system for message routing and state management.
 
 ## 🏗️ Architecture Overview
 
-The Wave Reader Structural System provides a **bridge** between two state management systems:
+The Wave Reader Structural System provides the foundation for component middleware:
 
-1. **Existing System**: RobotProxy ProxyStateMachines (component middleware)
-2. **New System**: Enhanced structural system with priority-based message routing
+**Component Middleware** → **Structural System** → **Foundation Services**
+
+Component middleware (React components with UI and business logic) uses the structural system for:
+- Message routing with priority queuing
+- State management
+- Performance monitoring
+- Health checks
 
 ## 🔗 Key Components
 
-### 1. **Tome Integration Bridge** (`tome-integration-bridge.ts`)
-Connects existing component middleware tomes with the new structural system:
-
-```typescript
-import { TomeIntegrationBridge } from './components/structural';
-
-const bridge = new TomeIntegrationBridge(messageRouter);
-
-// Create bridge for a component
-await bridge.createBridge({
-  componentName: 'go-button',
-  existingTomePath: '../component-middleware/go-button/GoButtonTomes.tsx',
-  structuralTomeConfig: WaveReaderMainTome.machines.goButton,
-  messageRouter: messageRouter
-});
-```
-
-### 2. **Wave Reader Tome Config** (`wave-reader-tome-config.ts`)
-Defines the state machine configurations and message routing for all components:
-
-```typescript
-import { WaveReaderMainTome, GoButtonTome } from './components/structural';
-
-// Access individual tome configurations
-const goButtonConfig = GoButtonTome.xstateConfig;
-const mainAppConfig = WaveReaderMainTome.machines.mainApp.xstateConfig;
-```
-
-### 3. **Message Router** (`wave-reader-message-router.ts`)
+### 1. **Message Router** (`wave-reader-message-router.ts`)
 Enhanced message routing with priority queuing, retry logic, and performance monitoring:
 
 ```typescript
@@ -57,9 +34,38 @@ const {
 });
 ```
 
+### 2. **Wave Reader Tome Config** (`wave-reader-tome-config.ts`)
+Defines the state machine configurations and message routing for all components:
+
+```typescript
+import { WaveReaderMainTome, GoButtonTome } from './components/structural';
+
+// Access individual tome configurations
+const goButtonConfig = GoButtonTome.xstateConfig;
+const mainAppConfig = WaveReaderMainTome.machines.mainApp.xstateConfig;
+```
+
+### 3. **Component Middleware Adapter** (`tome-integration-bridge.ts`)
+Optional adapter for component middleware to use the structural system:
+
+```typescript
+import { ComponentMiddlewareAdapter } from './components/structural';
+
+const adapter = new ComponentMiddlewareAdapter(messageRouter);
+
+// Create adapter for a component
+await adapter.createAdapter({
+  componentName: 'go-button',
+  structuralTomeConfig: WaveReaderMainTome.machines.goButton,
+  messageRouter: messageRouter
+});
+```
+
 ## 🚀 Usage Examples
 
 ### **Basic Component Integration**
+
+Component middleware uses the structural system directly via the message router hook:
 
 ```tsx
 import React from 'react';
@@ -86,46 +92,48 @@ const MyComponent = () => {
 };
 ```
 
-### **Dual System Integration**
+### **Component with State Management**
 
 ```tsx
-import React, { useState, useEffect } from 'react';
-import { useWaveReaderMessageRouter, TomeIntegrationBridge } from './components/structural';
+import React, { useState } from 'react';
+import { useWaveReaderMessageRouter } from './components/structural';
 
 const EnhancedComponent = () => {
-  const [tomeBridge, setTomeBridge] = useState(null);
-  const { isConnected } = useWaveReaderMessageRouter({
-    componentName: 'enhanced-component'
+  const [isActive, setIsActive] = useState(false);
+  
+  const { isConnected, startWaveReader, stopWaveReader, messageStats } = useWaveReaderMessageRouter({
+    componentName: 'enhanced-component',
+    autoProcess: true,
+    enableMetrics: true
   });
 
-  useEffect(() => {
-    if (isConnected) {
-      const bridge = new TomeIntegrationBridge(messageRouter);
-      
-      bridge.createBridge({
-        componentName: 'enhanced-component',
-        existingTomePath: '../component-middleware/enhanced/EnhancedTomes.tsx',
-        structuralTomeConfig: WaveReaderMainTome.machines.enhanced,
-        messageRouter: messageRouter
-      }).then(() => {
-        setTomeBridge(bridge);
-      });
+  const handleStart = async () => {
+    if (!isConnected) return;
+    
+    const result = await startWaveReader('.wave-selector');
+    if (result.success) {
+      setIsActive(true);
     }
-  }, [isConnected]);
+  };
 
-  const handleAction = async (event) => {
-    if (tomeBridge) {
-      // Send through both systems
-      const result = await tomeBridge.sendMessage('enhanced-component', event);
-      console.log('Dual system result:', result);
+  const handleStop = async () => {
+    if (!isConnected) return;
+    
+    const result = await stopWaveReader();
+    if (result.success) {
+      setIsActive(false);
     }
   };
 
   return (
     <div>
-      <div>Bridge Status: {tomeBridge ? '🟢 Active' : '🔴 Inactive'}</div>
-      <button onClick={() => handleAction({ type: 'TEST_ACTION' })}>
-        Test Dual System
+      <div>Connection: {isConnected ? '🟢 Connected' : '🔴 Disconnected'}</div>
+      <div>Status: {isActive ? '🟢 Active' : '⚪ Inactive'}</div>
+      <button onClick={handleStart} disabled={!isConnected || isActive}>
+        Start
+      </button>
+      <button onClick={handleStop} disabled={!isConnected || !isActive}>
+        Stop
       </button>
     </div>
   );
@@ -134,16 +142,14 @@ const EnhancedComponent = () => {
 
 ## 🔄 Message Flow
 
-### **Single System (Structural)**
 ```
-Component → Message Router → Priority Queue → Target Component
-```
-
-### **Dual System (Bridge)**
-```
-Component → TomeIntegrationBridge → [Existing System + Structural System]
-                                    ↓
-                              Synchronized State
+Component Middleware
+    ↓
+Message Router (Structural System)
+    ↓
+Priority Queue
+    ↓
+Target Component
 ```
 
 ## 📊 Monitoring and Debugging
@@ -205,16 +211,6 @@ if (lastError) {
 }
 ```
 
-### **4. Bridge Initialization**
-Initialize bridges only when the message router is connected:
-```typescript
-useEffect(() => {
-  if (isConnected && !tomeBridge) {
-    initializeBridge();
-  }
-}, [isConnected, tomeBridge]);
-```
-
 ## 🔧 Configuration
 
 ### **Structural Config**
@@ -245,20 +241,15 @@ const customConfig = {
 
 ### **Common Issues**
 
-1. **Bridge Not Initializing**
-   - Check if message router is connected
-   - Verify component name matches tome configuration
-   - Check console for import errors
-
-2. **Messages Not Routing**
+1. **Messages Not Routing**
    - Verify message types match routing configuration
    - Check if target components are registered
    - Ensure message router is connected
 
-3. **State Synchronization Issues**
-   - Use bridge.syncStates() to manually sync
-   - Check if both systems are receiving events
-   - Verify tome configurations match
+2. **Connection Issues**
+   - Check if structural system is initialized
+   - Verify component name matches tome configuration
+   - Check console for initialization errors
 
 ### **Debug Mode**
 Enable debug information in development:
@@ -267,8 +258,8 @@ Enable debug information in development:
   <div className="debug-section">
     <h4>Debug Information</h4>
     <div>Connection: {isConnected ? '🟢' : '🔴'}</div>
-    <div>Bridge: {tomeBridge ? '🟢' : '🔴'}</div>
     <div>Messages: {messageStats.totalMessages}</div>
+    <div>Success Rate: {messageStats.successRate.toFixed(1)}%</div>
   </div>
 )}
 ```
@@ -284,8 +275,8 @@ Enable debug information in development:
 
 1. **Install Dependencies**: Ensure `log-view-machine` is properly installed
 2. **Import Components**: Use the pre-configured structural components
-3. **Create Bridges**: Connect existing tomes with the structural system
-4. **Send Messages**: Use the enhanced message router for communication
+3. **Use Message Router**: Component middleware uses the message router hook for communication
+4. **Send Messages**: Use the enhanced message router for all component communication
 5. **Monitor Performance**: Track message statistics and system health
 
-The Wave Reader Structural System provides a powerful, flexible foundation for building complex state management applications while maintaining compatibility with existing systems! 🚀
+The Wave Reader Structural System provides a powerful, flexible foundation for building complex state management applications! 🚀

@@ -19413,6 +19413,18 @@ class LogViewContentSystemIntegrated {
             };
             console.log("🌊 Integrated System: Coalesced nested message:", normalizedMessage);
         }
+        // Normalize message name: handle both 'type' and 'name' fields, and convert to lowercase
+        if (!normalizedMessage.name && normalizedMessage.type) {
+            normalizedMessage.name = normalizedMessage.type.toLowerCase();
+        }
+        else if (normalizedMessage.name && typeof normalizedMessage.name === 'string') {
+            normalizedMessage.name = normalizedMessage.name.toLowerCase();
+        }
+        // Ensure 'from' field is set
+        if (!normalizedMessage.from) {
+            normalizedMessage.from = normalizedMessage.source || sender?.id ? 'background' : 'unknown';
+        }
+        console.log("🌊 Integrated System: Normalized message name:", normalizedMessage.name, "from:", normalizedMessage.from);
         try {
             switch (normalizedMessage.name) {
                 case 'start':
@@ -19424,13 +19436,25 @@ class LogViewContentSystemIntegrated {
                     });
                     break;
                 case 'stop':
-                    this.handleStop(normalizedMessage);
-                    sendResponse({ success: true, state: this.proxyState });
+                    try {
+                        this.handleStop(normalizedMessage);
+                        sendResponse({ success: true, state: this.proxyState });
+                    }
+                    catch (error) {
+                        console.error("🌊 Integrated System: Error in handleStop", error);
+                        sendResponse({ success: false, error: error.message });
+                    }
                     break;
                 case 'toggle':
                 case 'toggle-wave-reader':
-                    this.handleToggle(normalizedMessage);
-                    sendResponse({ success: true, state: this.proxyState });
+                    try {
+                        this.handleToggle(normalizedMessage);
+                        sendResponse({ success: true, state: this.proxyState });
+                    }
+                    catch (error) {
+                        console.error("🌊 Integrated System: Error in handleToggle", error);
+                        sendResponse({ success: false, error: error.message });
+                    }
                     break;
                 case 'ping':
                     this.handlePing(normalizedMessage);
@@ -20412,7 +20436,7 @@ var WaveAnimationControl;
     WaveAnimationControl[WaveAnimationControl["CSS"] = 0] = "CSS";
     WaveAnimationControl[WaveAnimationControl["MOUSE"] = 1] = "MOUSE";
 })(WaveAnimationControl || (WaveAnimationControl = {}));
-const KeyChordDefaultFactory = () => ["w", "Shift"];
+const KeyChordDefaultFactory = () => ["f", "Shift"];
 const WaveAnimationControlDefault = WaveAnimationControl.CSS;
 const ShowNotificationsDefault = true;
 const GoingDefault = false;
@@ -20791,7 +20815,34 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-const defaultCssTemplate = (options) => `
+const defaultCssTemplate = (options, cssGenerationMode = 'hardcoded') => {
+    const mode = cssGenerationMode || 'hardcoded';
+    if (mode === 'template') {
+        // Template mode: Use TEMPLATE variables that get replaced at runtime
+        return `
+@-webkit-keyframes wobble {
+  0% { transform: translateX(0%); rotateY(0deg); }
+  25% { transform: translateX(TRANSLATE_X_MIN%) rotateY(ROTATE_Y_MINdeg); }
+  50% { transform: translateX(0%); rotateY(ROTATE_Y_MAXdeg); }
+  75% { transform: translateX(TRANSLATE_X_MAX%) rotateY(ROTATE_Y_MINdeg); }
+  100% { transform: translateX(0%); rotateY(0deg); }
+}
+
+${options.selector || '.wave-reader__text'} {
+  font-size: ${options.text?.size || 'inherit'};
+  -webkit-animation-name: wobble;
+  animation-name: wobble;
+  -webkit-animation-duration: ${options.waveSpeed}s;
+  animation-duration: ${options.waveSpeed}s;
+  -webkit-animation-fill-mode: both;
+  animation-fill-mode: both;
+  animation-iteration-count: infinite;
+}
+`;
+    }
+    else {
+        // Hardcoded mode: Use actual values (current behavior)
+        return `
 @-webkit-keyframes wobble {
   0% { transform: translateX(0%); rotateY(0deg); }
   25% { transform: translateX(${options.axisTranslateAmountXMin}%); rotateY(${options.axisRotationAmountYMin}deg); }
@@ -20811,17 +20862,41 @@ ${options.selector || '.wave-reader__text'} {
   animation-iteration-count: infinite;
 }
 `;
+    }
+};
 // Direct positioning template - no keyframes, just direct transforms
-const defaultCssMouseTemplate = (options) => `
+const defaultCssMouseTemplate = (options, cssGenerationMode = 'template') => {
+    const mode = cssGenerationMode || 'template';
+    if (mode === 'template') {
+        // Template mode: Use TEMPLATE variables (current behavior)
+        return `
 ${options.selector || '.wave-reader__text'} {
   font-size: ${options.text?.size || 'inherit'};
   transform: translateX(TRANSLATE_X%) rotateY(ROTATE_Ydeg);
   transition: transform ANIMATION_DURATIONs ease-out;
 }
 `;
+    }
+    else {
+        // Hardcoded mode: Use actual values (for consistency with CSS template)
+        // Note: For mouse template, hardcoded mode is less useful since values change dynamically,
+        // but we provide it for consistency
+        return `
+${options.selector || '.wave-reader__text'} {
+  font-size: ${options.text?.size || 'inherit'};
+  transform: translateX(0%) rotateY(0deg);
+  transition: transform ${options.waveSpeed || 2}s ease-out;
+}
+`;
+    }
+};
 const TRANSLATE_X = "TRANSLATE_X";
 const ROTATE_Y = "ROTATE_Y";
 const ANIMATION_DURATION = "ANIMATION_DURATION";
+const TRANSLATE_X_MIN = "TRANSLATE_X_MIN";
+const TRANSLATE_X_MAX = "TRANSLATE_X_MAX";
+const ROTATE_Y_MIN = "ROTATE_Y_MIN";
+const ROTATE_Y_MAX = "ROTATE_Y_MAX";
 const replaceAnimationVariables = (wave, translateX, rotateY) => {
     return (wave.cssMouseTemplate || "")
         .replaceAll(TRANSLATE_X, translateX)
@@ -20869,13 +20944,16 @@ class Wave extends _util_attribute_constructor__WEBPACK_IMPORTED_MODULE_1__["def
         // Always generate CSS templates from current parameters (shader-like approach)
         // Use the attributes directly to ensure we have the correct values
         const waveWithAttributes = { ...this, ...attributes };
-        this.cssTemplate = defaultCssTemplate(waveWithAttributes);
-        this.cssMouseTemplate = defaultCssMouseTemplate(waveWithAttributes);
+        const cssGenerationMode = attributes.cssGenerationMode || 'hardcoded';
+        this.cssGenerationMode = cssGenerationMode;
+        this.cssTemplate = defaultCssTemplate(waveWithAttributes, cssGenerationMode);
+        this.cssMouseTemplate = defaultCssMouseTemplate(waveWithAttributes, cssGenerationMode);
     }
     // Always regenerate CSS templates from current parameters
     update() {
-        this.cssTemplate = defaultCssTemplate(this);
-        this.cssMouseTemplate = defaultCssMouseTemplate(this);
+        const cssGenerationMode = this.cssGenerationMode || 'hardcoded';
+        this.cssTemplate = defaultCssTemplate(this, cssGenerationMode);
+        this.cssMouseTemplate = defaultCssMouseTemplate(this, cssGenerationMode);
         return this;
     }
     static getDefaultWave() {
@@ -21854,14 +21932,30 @@ class KeyChordService {
      */
     updateKeyChord(newKeyChord) {
         console.log('⌨️ KeyChordService: Updating keyboard shortcut from', this.currentKeyChord.join(' + '), 'to', newKeyChord.join(' + '));
-        const wasActive = this.isActive;
-        if (wasActive) {
-            this.stop();
+        // Normalize the new keychord
+        const normalizedNewKeyChord = (0,_components_util_user_input__WEBPACK_IMPORTED_MODULE_0__.sortKeyChord)(newKeyChord);
+        // Check if the keychord actually changed
+        if ((0,_components_util_user_input__WEBPACK_IMPORTED_MODULE_0__.compareKeyChords)(this.currentKeyChord, normalizedNewKeyChord)) {
+            console.log('⌨️ KeyChordService: Keychord unchanged, skipping update');
+            return;
         }
-        // Normalize the keychord when updating it
-        this.currentKeyChord = (0,_components_util_user_input__WEBPACK_IMPORTED_MODULE_0__.sortKeyChord)(newKeyChord);
-        this.resetActiveKeys();
+        const wasActive = this.isActive;
+        // Stop the current listener completely - ensure it's fully stopped
         if (wasActive) {
+            console.log('⌨️ KeyChordService: Stopping current listener before update');
+            this.stop();
+            // Double-check that we're actually stopped
+            if (this.isActive) {
+                console.warn('⌨️ KeyChordService: Service still active after stop(), forcing cleanup');
+                this.stop();
+            }
+        }
+        // Update the keychord
+        this.currentKeyChord = normalizedNewKeyChord;
+        this.resetActiveKeys();
+        // Restart if it was active before
+        if (wasActive) {
+            console.log('⌨️ KeyChordService: Restarting listener with new keychord:', normalizedNewKeyChord.join(' + '));
             this.start();
         }
     }

@@ -34,14 +34,14 @@ const SettingsComponentTemplate = {
         toggleKeys: { keyChord: [] },
         textColor: 'initial',
         textSize: 'initial',
-        selector: 'p',
+        selector: 'body',
         cssTemplate: '',
         cssMouseTemplate: '',
         waveSpeed: 2.0,
-        axisTranslateAmountXMax: 10,
-        axisTranslateAmountXMin: -10,
-        axisRotationAmountYMax: 5,
-        axisRotationAmountYMin: -5,
+        axisTranslateAmountXMax: 2,
+        axisTranslateAmountXMin: -2,
+        axisRotationAmountYMax: 2,
+        axisRotationAmountYMin: -2,
         mouseFollowInterval: 50
       }
     }

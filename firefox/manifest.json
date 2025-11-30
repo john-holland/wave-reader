@@ -53,11 +53,7 @@
   ],
   "permissions": [
     "scripting",
-    "declarativeContent",
     "storage",
-    "notifications",
-    "webNavigation",
-    "activeTab",
     "tabs"
   ]
 }

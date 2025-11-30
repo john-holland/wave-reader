@@ -31,14 +31,14 @@ export const Settings: React.FC<SettingsProps> = (props) => {
       },
       textColor: options.wave?.text?.color ?? 'initial',
       textSize: options.wave?.text?.size ?? 'initial',
-      selector: options.selectors?.[0] ?? 'p',
+      selector: options.selectors?.[0] ?? 'body',
       cssTemplate: options.wave?.cssTemplate ?? '',
       cssMouseTemplate: options.wave?.cssMouseTemplate ?? '',
       waveSpeed: options.wave?.waveSpeed ?? 2.0,
-      axisTranslateAmountXMax: options.wave?.axisTranslateAmountXMax ?? 10,
-      axisTranslateAmountXMin: options.wave?.axisTranslateAmountXMin ?? -10,
-      axisRotationAmountYMax: options.wave?.axisRotationAmountYMax ?? 5,
-      axisRotationAmountYMin: options.wave?.axisRotationAmountYMin ?? -5,
+      axisTranslateAmountXMax: options.wave?.axisTranslateAmountXMax ?? 2,
+      axisTranslateAmountXMin: options.wave?.axisTranslateAmountXMin ?? -2,
+      axisRotationAmountYMax: options.wave?.axisRotationAmountYMax ?? 2,
+      axisRotationAmountYMin: options.wave?.axisRotationAmountYMin ?? -2,
       // Note: autoGenerateCss and cssGenerationMode are SettingsTomes-specific, not Wave properties
       autoGenerateCss: true, // Default value
       cssGenerationMode: 'template' as 'template' | 'hardcoded', // Default value

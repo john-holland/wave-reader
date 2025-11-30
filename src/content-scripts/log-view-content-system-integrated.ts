@@ -24,6 +24,7 @@ export class LogViewContentSystemIntegrated {
   private colorService: SimpleColorServiceAdapter;
   
   private going: boolean = false;
+  private lastSyncedGoingState: boolean | null = null; // Track last synced state to avoid spam
   private latestOptions: Options | undefined;
   private sessionId: string;
   private messageHistory: any[] = [];
@@ -141,6 +142,20 @@ export class LogViewContentSystemIntegrated {
       console.log("🌊 Integrated System: Coalesced nested message:", normalizedMessage);
     }
     
+    // Normalize message name: handle both 'type' and 'name' fields, and convert to lowercase
+    if (!normalizedMessage.name && normalizedMessage.type) {
+      normalizedMessage.name = normalizedMessage.type.toLowerCase();
+    } else if (normalizedMessage.name && typeof normalizedMessage.name === 'string') {
+      normalizedMessage.name = normalizedMessage.name.toLowerCase();
+    }
+    
+    // Ensure 'from' field is set
+    if (!normalizedMessage.from) {
+      normalizedMessage.from = normalizedMessage.source || sender?.id ? 'background' : 'unknown';
+    }
+    
+    console.log("🌊 Integrated System: Normalized message name:", normalizedMessage.name, "from:", normalizedMessage.from);
+    
     try {
       switch (normalizedMessage.name) {
         case 'start':
@@ -152,13 +167,23 @@ export class LogViewContentSystemIntegrated {
           });
           break;
         case 'stop':
-          this.handleStop(normalizedMessage);
-          sendResponse({ success: true, state: this.proxyState });
+          try {
+            this.handleStop(normalizedMessage);
+            sendResponse({ success: true, state: this.proxyState });
+          } catch (error: any) {
+            console.error("🌊 Integrated System: Error in handleStop", error);
+            sendResponse({ success: false, error: error.message });
+          }
           break;
         case 'toggle':
         case 'toggle-wave-reader':
-          this.handleToggle(normalizedMessage);
-          sendResponse({ success: true, state: this.proxyState });
+          try {
+            this.handleToggle(normalizedMessage);
+            sendResponse({ success: true, state: this.proxyState });
+          } catch (error: any) {
+            console.error("🌊 Integrated System: Error in handleToggle", error);
+            sendResponse({ success: false, error: error.message });
+          }
           break;
         case 'ping':
           this.handlePing(normalizedMessage);
@@ -395,6 +420,11 @@ export class LogViewContentSystemIntegrated {
   }
 
   private syncGoingStateWithBackground() {
+    // Only sync if the state has actually changed to reduce spam
+    if (this.going === this.lastSyncedGoingState) {
+      return;
+    }
+    
     console.log("🌊 Integrated System: Syncing going state with background", { going: this.going });
     
     if (typeof chrome !== 'undefined' && chrome.runtime) {
@@ -407,6 +437,9 @@ export class LogViewContentSystemIntegrated {
       }, (response) => {
         if (chrome.runtime.lastError) {
           console.warn("🌊 Integrated System: Failed to sync going state with background:", chrome.runtime.lastError.message);
+        } else {
+          // Only update lastSyncedGoingState on successful send
+          this.lastSyncedGoingState = this.going;
         }
       });
     }

@@ -7,7 +7,7 @@ import { MachineRouter } from 'log-view-machine';
 import EditorWrapper from '../../app/components/EditorWrapper';
 import { AppTome } from '../../app/tomes/AppTome';
 import { KeyChord, normalizeKey } from '../../components/util/user-input';
-import { KeyChordDefaultFactory } from 'src/models/defaults';
+import { KeyChordDefaultFactory } from '../../models/defaults';
 
 // Styled components for the Tomes-based settings
 const SettingsContainer = styled.div`
@@ -396,7 +396,7 @@ const DEFAULT_SETTINGS: Settings = {
   toggleKeys: { keyChord: [] },
   textColor: 'initial',
   textSize: 'initial',
-  selector: 'p',
+  selector: 'body',
   cssTemplate: '',
   cssMouseTemplate: '',
   waveSpeed: 2.0,
@@ -507,15 +507,17 @@ const generateCssFromSettings = (settings: Settings) => {
     axisTranslateAmountXMin: settings.axisTranslateAmountXMin,
     axisRotationAmountYMax: settings.axisRotationAmountYMax,
     axisRotationAmountYMin: settings.axisRotationAmountYMin,
+    cssGenerationMode: settings.cssGenerationMode || 'template',
     text: new Text({
       size: settings.textSize,
       color: settings.textColor
     })
   });
 
+  const cssGenerationMode = settings.cssGenerationMode || 'template';
   return {
-    cssTemplate: defaultCssTemplate(wave),
-    cssMouseTemplate: defaultCssMouseTemplate(wave)
+    cssTemplate: defaultCssTemplate(wave, cssGenerationMode),
+    cssMouseTemplate: defaultCssMouseTemplate(wave, cssGenerationMode)
   };
 };
 
@@ -1272,8 +1274,9 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                     if (!settings.toggleKeys) {
                       console.warn('⚙️ SettingsTomes: No toggleKeys found, using default factory');
                     }
+                    const keyChordDefaults = KeyChordDefaultFactory() as KeyChord;
                     // Ensure toggleKeys.keyChord exists and is an array, default to empty array
-                    const keyChord = (settings.toggleKeys?.keyChord || KeyChordDefaultFactory() as KeyChord);
+                    const keyChord = (settings.toggleKeys?.keyChord || keyChordDefaults);
                     // Get the key at this index, or undefined if index is out of bounds
                     const selectedKey = keyChord[index];
                     // First check if the stored key is already valid
@@ -1361,7 +1364,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                   value={settings.selector}
                   onChange={(e) => handleSettingChange('selector', e.target.value)}
                 />
-                <HelpText>CSS selector for target elements (e.g., 'p', '.content', '#main')</HelpText>
+                <HelpText>CSS selector for target elements (e.g., 'body', 'p', '.content', '#main')</HelpText>
               </SettingItem>
             </SettingGroup>
             

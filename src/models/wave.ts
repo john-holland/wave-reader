@@ -3,7 +3,34 @@ import Text from '../models/text';
 import AttributeConstructor from "../util/attribute-constructor";
 import {SelectorDefault} from "./defaults";
 
-export const defaultCssTemplate = (options: Wave) => `
+export const defaultCssTemplate = (options: Wave, cssGenerationMode: 'template' | 'hardcoded' = 'hardcoded') => {
+  const mode = cssGenerationMode || 'hardcoded';
+  
+  if (mode === 'template') {
+    // Template mode: Use TEMPLATE variables that get replaced at runtime
+    return `
+@-webkit-keyframes wobble {
+  0% { transform: translateX(0%); rotateY(0deg); }
+  25% { transform: translateX(TRANSLATE_X_MIN%) rotateY(ROTATE_Y_MINdeg); }
+  50% { transform: translateX(0%); rotateY(ROTATE_Y_MAXdeg); }
+  75% { transform: translateX(TRANSLATE_X_MAX%) rotateY(ROTATE_Y_MINdeg); }
+  100% { transform: translateX(0%); rotateY(0deg); }
+}
+
+${options.selector || '.wave-reader__text'} {
+  font-size: ${options.text?.size || 'inherit'};
+  -webkit-animation-name: wobble;
+  animation-name: wobble;
+  -webkit-animation-duration: ${options.waveSpeed}s;
+  animation-duration: ${options.waveSpeed}s;
+  -webkit-animation-fill-mode: both;
+  animation-fill-mode: both;
+  animation-iteration-count: infinite;
+}
+`;
+  } else {
+    // Hardcoded mode: Use actual values (current behavior)
+    return `
 @-webkit-keyframes wobble {
   0% { transform: translateX(0%); rotateY(0deg); }
   25% { transform: translateX(${options.axisTranslateAmountXMin}%); rotateY(${options.axisRotationAmountYMin}deg); }
@@ -23,19 +50,43 @@ ${options.selector || '.wave-reader__text'} {
   animation-iteration-count: infinite;
 }
 `;
+  }
+};
 
 // Direct positioning template - no keyframes, just direct transforms
-export const defaultCssMouseTemplate = (options: Wave) => `
+export const defaultCssMouseTemplate = (options: Wave, cssGenerationMode: 'template' | 'hardcoded' = 'template') => {
+  const mode = cssGenerationMode || 'template';
+  
+  if (mode === 'template') {
+    // Template mode: Use TEMPLATE variables (current behavior)
+    return `
 ${options.selector || '.wave-reader__text'} {
   font-size: ${options.text?.size || 'inherit'};
   transform: translateX(TRANSLATE_X%) rotateY(ROTATE_Ydeg);
   transition: transform ANIMATION_DURATIONs ease-out;
 }
 `;
+  } else {
+    // Hardcoded mode: Use actual values (for consistency with CSS template)
+    // Note: For mouse template, hardcoded mode is less useful since values change dynamically,
+    // but we provide it for consistency
+    return `
+${options.selector || '.wave-reader__text'} {
+  font-size: ${options.text?.size || 'inherit'};
+  transform: translateX(0%) rotateY(0deg);
+  transition: transform ${options.waveSpeed || 2}s ease-out;
+}
+`;
+  }
+};
 
 const TRANSLATE_X = "TRANSLATE_X";
 const ROTATE_Y = "ROTATE_Y";
 const ANIMATION_DURATION = "ANIMATION_DURATION";
+const TRANSLATE_X_MIN = "TRANSLATE_X_MIN";
+const TRANSLATE_X_MAX = "TRANSLATE_X_MAX";
+const ROTATE_Y_MIN = "ROTATE_Y_MIN";
+const ROTATE_Y_MAX = "ROTATE_Y_MAX";
 
 export const replaceAnimationVariables = (wave: Wave, translateX: string, rotateY: string): string => {
     return (wave.cssMouseTemplate || "")
@@ -91,20 +142,24 @@ export default class Wave extends AttributeConstructor<Wave>{
     axisRotationAmountYMax?: number;
     axisRotationAmountYMin?: number;
     mouseFollowInterval?: number;
+    cssGenerationMode?: 'template' | 'hardcoded';
 
     constructor(attributes: Partial<Wave> = Wave.getDefaultWave()) {
         super(attributes);
         // Always generate CSS templates from current parameters (shader-like approach)
         // Use the attributes directly to ensure we have the correct values
         const waveWithAttributes = { ...this, ...attributes };
-        this.cssTemplate = defaultCssTemplate(waveWithAttributes);
-        this.cssMouseTemplate = defaultCssMouseTemplate(waveWithAttributes);
+        const cssGenerationMode = attributes.cssGenerationMode || 'hardcoded';
+        this.cssGenerationMode = cssGenerationMode;
+        this.cssTemplate = defaultCssTemplate(waveWithAttributes, cssGenerationMode);
+        this.cssMouseTemplate = defaultCssMouseTemplate(waveWithAttributes, cssGenerationMode);
     }
 
     // Always regenerate CSS templates from current parameters
     public update(): Wave {
-        this.cssTemplate = defaultCssTemplate(this);
-        this.cssMouseTemplate = defaultCssMouseTemplate(this);
+        const cssGenerationMode = this.cssGenerationMode || 'hardcoded';
+        this.cssTemplate = defaultCssTemplate(this, cssGenerationMode);
+        this.cssMouseTemplate = defaultCssMouseTemplate(this, cssGenerationMode);
         return this
     }
 

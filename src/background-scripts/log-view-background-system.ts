@@ -198,7 +198,7 @@ export class LogViewBackgroundSystem {
         return tabs[0];
     }
 
-    private isUrlAccessible(url: string): boolean {
+    private isUrlAccessible(url: string | undefined): boolean {
         if (!url) return false;
         
         // Check if the URL is restricted
@@ -269,6 +269,20 @@ export class LogViewBackgroundSystem {
             console.log("BACKGROUND->RUNTIME: Coalesced nested message:", normalizedMessage);
         }
         
+        // Normalize message name: handle both 'type' and 'name' fields, and convert to lowercase
+        if (!normalizedMessage.name && normalizedMessage.type) {
+            normalizedMessage.name = normalizedMessage.type.toLowerCase();
+        } else if (normalizedMessage.name && typeof normalizedMessage.name === 'string') {
+            normalizedMessage.name = normalizedMessage.name.toLowerCase();
+        }
+        
+        // Ensure 'from' field is set
+        if (!normalizedMessage.from) {
+            normalizedMessage.from = normalizedMessage.source || sender?.id ? 'popup' : 'unknown';
+        }
+        
+        console.log("BACKGROUND->RUNTIME: Normalized message name:", normalizedMessage.name, "from:", normalizedMessage.from);
+        
         this.logMessage('runtime-message', `Received ${normalizedMessage.name} from ${normalizedMessage.from}`);
         
         // Create a proper message using our factory
@@ -287,7 +301,13 @@ export class LogViewBackgroundSystem {
     }
 
     private processRuntimeMessage(message: any, route: any, sender: any, sendResponse: any) {
-        const messageName = message?.name || message?.message?.name;
+        // Extract message name - check multiple possible locations and normalize
+        let messageName = message?.name || message?.message?.name || message?.type;
+        if (messageName && typeof messageName === 'string') {
+            messageName = messageName.toLowerCase();
+        }
+        
+        console.log("BACKGROUND->RUNTIME: Processing message with name:", messageName);
         
         try {
             switch (messageName) {
@@ -358,6 +378,11 @@ export class LogViewBackgroundSystem {
                 case 'LOOP_DETECTION_STATS':
                     console.log("BACKGROUND->LOOP: Processing loop detection stats");
                     this.handleLoopDetectionStats(message, sender, sendResponse);
+                    break;
+                    
+                case 'update-going-state':
+                    console.log("BACKGROUND->STATE: Processing update-going-state message");
+                    this.handleUpdateGoingState(message, sender, sendResponse);
                     break;
                     
                 default:
@@ -749,6 +774,43 @@ export class LogViewBackgroundSystem {
         }
     }
 
+    private handleUpdateGoingState(message: any, sender: any, sendResponse: any) {
+        try {
+            const tabId = sender?.tab?.id;
+            const going = message?.going ?? false;
+            
+            if (!tabId) {
+                console.warn('🌊 Log-View-Machine: update-going-state message missing tab ID');
+                sendResponse({ success: false, error: 'Missing tab ID' });
+                return;
+            }
+            
+            // Update active tabs tracking
+            if (this.activeTabs.has(tabId)) {
+                const tabInfo = this.activeTabs.get(tabId);
+                tabInfo.going = going;
+                tabInfo.state = going ? 'waving' : 'stopped';
+                tabInfo.lastActivity = Date.now();
+                this.activeTabs.set(tabId, tabInfo);
+            } else {
+                // Create new entry if tab not tracked yet
+                this.activeTabs.set(tabId, {
+                    state: going ? 'waving' : 'stopped',
+                    going: going,
+                    lastActivity: Date.now(),
+                    startTime: going ? Date.now() : undefined,
+                    stopTime: going ? undefined : Date.now()
+                });
+            }
+            
+            this.logMessage('going-state-updated', `Going state updated to ${going} for tab ${tabId}`);
+            sendResponse({ success: true, going, tabId });
+        } catch (error: any) {
+            console.error('🌊 Log-View-Machine: Failed to update going state:', error);
+            sendResponse({ success: false, error: error?.message || 'Unknown error' });
+        }
+    }
+
     private handleLoopDetectionStats(message: any, sender: any, sendResponse: any) {
         const { data } = message;
         const { timestamp, currentState, recentEvents, recentStates, eventFrequency, stateFrequency, source } = data;
@@ -804,13 +866,49 @@ export class LogViewBackgroundSystem {
                 throw new Error('No active tab found');
             }
             
+            // Check if the tab URL is accessible
+            if (!this.isUrlAccessible(tab.url)) {
+                // If URL is not accessible, wave reader can't be running, so "stopped" is already the state
+                console.log('🌊 Log-View-Machine: Tab URL not accessible, wave reader not active:', tab.url);
+                sendResponse({ 
+                    success: true, 
+                    message: 'Wave reader not active on this page',
+                    data: {
+                        going: false,
+                        tabId: tab.id,
+                        stopTime: Date.now()
+                    }
+                });
+                return;
+            }
+            
             // Send stop message to content script via chrome.tabs.sendMessage
             console.log("BACKGROUND->CONTENT: Sending stop message to tab", tab.id);
-            await this.injectMessageToContentScript(tab.id, {
-                from: 'background-script',
-                name: 'stop',
-                timestamp: Date.now()
-            });
+            try {
+                await this.injectMessageToContentScript(tab.id, {
+                    from: 'background-script',
+                    name: 'stop',
+                    timestamp: Date.now()
+                });
+            } catch (error: any) {
+                // Check if error is due to content script not being loaded
+                const errorMessage = error?.message || String(error);
+                const errorCode = (error as any)?.code;
+                const isContentScriptNotReady = 
+                    errorCode === 'CONTENT_SCRIPT_NOT_READY' ||
+                    errorMessage.includes('Content script not ready') ||
+                    errorMessage.includes('Could not establish connection') ||
+                    errorMessage.includes('Receiving end does not exist');
+                
+                if (isContentScriptNotReady) {
+                    // Content script not loaded means wave reader is already stopped
+                    console.log('🌊 Log-View-Machine: Content script not ready, wave reader already stopped');
+                    // Continue to update tab tracking and send success response
+                } else {
+                    // Other errors should be re-thrown
+                    throw error;
+                }
+            }
             
             // Update active tabs tracking
             if (this.activeTabs.has(tab.id)) {
@@ -939,14 +1037,107 @@ export class LogViewBackgroundSystem {
     private async injectMessageToContentScript(tabId: number, messageData: any) {
         // Use chrome.tabs.sendMessage directly from background script context
         // This is the correct way to send messages from background to content script
+        
+        // First, check if the tab URL is accessible
+        let tab: any;
+        try {
+            tab = await chrome.tabs.get(tabId);
+            if (!tab || !this.isUrlAccessible(tab.url)) {
+                // URL is not accessible (like about: pages, extension pages, etc.)
+                const errorMsg = `Cannot send message to restricted URL: ${tab?.url || 'unknown'}`;
+                console.log('🌊 Background: ' + errorMsg);
+                throw new Error(errorMsg);
+            }
+        } catch (error: any) {
+            // If we can't even get the tab, something is wrong
+            console.error('🌊 Background: Failed to get tab info:', tabId, error.message);
+            throw new Error(`Failed to access tab ${tabId}: ${error.message}`);
+        }
+        
+        // Try to send the message first
         try {
             await chrome.tabs.sendMessage(tabId, {
                 source: 'wave-reader-extension',
                 message: messageData
             });
+            // Success! Message sent
+            return;
         } catch (error: any) {
-            // Tab might not have content script loaded, which is normal
-            console.log('🌊 Background: Could not send message to tab:', tabId, error.message);
+            // Check for Firefox-specific error about receiving end not existing
+            const errorMessage = error?.message || String(error);
+            const isFirefoxConnectionError = 
+                errorMessage.includes('Could not establish connection') ||
+                errorMessage.includes('Receiving end does not exist') ||
+                errorMessage.includes('receiving end does not exist');
+            
+            // Check for Chrome runtime error
+            const lastError = chrome.runtime.lastError;
+            const isRuntimeError = lastError && (
+                lastError.message?.includes('Receiving end does not exist') ||
+                lastError.message?.includes('Could not establish connection')
+            );
+            
+            // If content script is not ready, try to inject it
+            if (isFirefoxConnectionError || isRuntimeError) {
+                console.log(`🌊 Background: Content script not ready in tab ${tabId}, attempting to inject...`);
+                
+                try {
+                    // Try to inject content scripts programmatically
+                    // Check if scripting API is available
+                    if (typeof chrome !== 'undefined' && chrome.scripting && chrome.scripting.executeScript) {
+                        // Inject shadowContent.js (required for Firefox)
+                        try {
+                            await chrome.scripting.executeScript({
+                                target: { tabId: tabId },
+                                files: ['shadowContent.js']
+                            });
+                            console.log('🌊 Background: shadowContent.js injected successfully');
+                        } catch (injectError: any) {
+                            console.log('🌊 Background: shadowContent.js injection failed (may already be loaded):', injectError.message);
+                        }
+                        
+                        // Try to inject content.js (may be needed for Chrome or some setups)
+                        try {
+                            await chrome.scripting.executeScript({
+                                target: { tabId: tabId },
+                                files: ['content.js']
+                            });
+                            console.log('🌊 Background: content.js injected successfully');
+                        } catch (injectError: any) {
+                            // content.js might not be available in all setups, which is fine
+                            console.log('🌊 Background: content.js not available or already loaded:', injectError.message);
+                        }
+                        
+                        // Wait a brief moment for scripts to initialize
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        
+                        // Retry sending the message
+                        try {
+                            await chrome.tabs.sendMessage(tabId, {
+                                source: 'wave-reader-extension',
+                                message: messageData
+                            });
+                            console.log('🌊 Background: Message sent successfully after content script injection');
+                            return;
+                        } catch (retryError: any) {
+                            console.error('🌊 Background: Failed to send message after injection:', retryError.message);
+                            // Fall through to throw the original error
+                        }
+                    } else {
+                        console.error('🌊 Background: Scripting API not available for injection');
+                    }
+                } catch (injectError: any) {
+                    console.error('🌊 Background: Failed to inject content scripts:', injectError.message);
+                }
+                
+                // If injection failed or message still can't be sent, throw error
+                const specificError = new Error(`Content script not ready on tab ${tabId}: ${errorMessage}`);
+                (specificError as any).code = 'CONTENT_SCRIPT_NOT_READY';
+                throw specificError;
+            }
+            
+            // For other errors, log and re-throw
+            console.error('🌊 Background: Failed to send message to tab:', tabId, errorMessage);
             throw error;
         }
     }

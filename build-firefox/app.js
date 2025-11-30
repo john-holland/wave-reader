@@ -53291,6 +53291,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _component_middleware_settings_SettingsTomes__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../../component-middleware/settings/SettingsTomes */ "./src/component-middleware/settings/SettingsTomes.tsx");
 /* harmony import */ var _services_settings__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ../../services/settings */ "./src/services/settings.ts");
 /* harmony import */ var _models_options__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ../../models/options */ "./src/models/options.ts");
+/* harmony import */ var _component_middleware_about_AboutTome__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ../../component-middleware/about/AboutTome */ "./src/component-middleware/about/AboutTome.tsx");
+
 
 
 
@@ -53393,53 +53395,7 @@ const AppComponent = () => {
             id: 'about',
             name: 'About',
             content: (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_EditorWrapper__WEBPACK_IMPORTED_MODULE_6__["default"], { title: "About Wave Reader", description: "Information about Wave Reader and its features", componentId: "about-component", onError: (error) => console.error('About Editor Error:', error) },
-                react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", { style: { padding: '20px', color: '#333' } },
-                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h2", { style: { color: '#2c3e50', marginTop: 0 } }, "About Wave Reader"),
-                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", { style: {
-                            backgroundColor: '#e8f5e8',
-                            padding: '20px',
-                            borderRadius: '8px',
-                            border: '1px solid #c8e6c9',
-                            marginBottom: '20px',
-                            color: '#2c3e50'
-                        } },
-                        react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h3", { style: { color: '#2c3e50', marginTop: 0 } }, "Wave Reader v1.0"),
-                        react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", { style: { color: '#495057', marginBottom: 0 } }, "Wave Reader is a Chrome extension that brings beautiful wave animations to web pages. Select elements and watch them come alive with smooth, flowing animations.")),
-                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h3", { style: { color: '#2c3e50' } }, "Features"),
-                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement("ul", { style: { color: '#495057' } },
-                        react__WEBPACK_IMPORTED_MODULE_0___default().createElement("li", null,
-                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement("strong", null, "CSS Selector Support:"),
-                            " Target any element using CSS selectors"),
-                        react__WEBPACK_IMPORTED_MODULE_0___default().createElement("li", null,
-                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement("strong", null, "Keyboard Shortcuts:"),
-                            " Quick access with customizable hotkeys"),
-                        react__WEBPACK_IMPORTED_MODULE_0___default().createElement("li", null,
-                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement("strong", null, "Smooth Animations:"),
-                            " Beautiful wave effects that enhance user experience"),
-                        react__WEBPACK_IMPORTED_MODULE_0___default().createElement("li", null,
-                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement("strong", null, "Real-time Control:"),
-                            " Start and stop animations instantly"),
-                        react__WEBPACK_IMPORTED_MODULE_0___default().createElement("li", null,
-                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement("strong", null, "Customizable Settings:"),
-                            " Adjust animation speed and behavior")),
-                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", { style: {
-                            backgroundColor: '#f0f8ff',
-                            padding: '15px',
-                            borderRadius: '8px',
-                            border: '1px solid #b3d9ff',
-                            marginTop: '20px',
-                            color: '#2c3e50'
-                        } },
-                        react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h4", { style: { color: '#2c3e50', marginTop: 0 } }, "Technical Details"),
-                        react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", { style: { color: '#495057', marginBottom: '8px' } },
-                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement("strong", null, "Architecture:"),
-                            " Tome-based state management with XState machines"),
-                        react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", { style: { color: '#495057', marginBottom: '8px' } },
-                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement("strong", null, "Rendering:"),
-                            " React with ViewStateMachine integration"),
-                        react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", { style: { color: '#495057', marginBottom: 0 } },
-                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement("strong", null, "Communication:"),
-                            " Chrome Extension APIs with background scripts"))))),
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_component_middleware_about_AboutTome__WEBPACK_IMPORTED_MODULE_10__["default"], null))),
             state: { type: 'about' }
         }
     ];
@@ -54392,10 +54348,10 @@ const createBackgroundProxyMachine = () => {
                             if (typeof chrome !== 'undefined' && chrome.runtime) {
                                 const response = await new Promise((resolve, reject) => {
                                     chrome.runtime.sendMessage({
-                                        type: 'START',
+                                        name: 'start',
                                         from: 'popup',
                                         timestamp: Date.now(),
-                                        data: event.data || {}
+                                        options: event.data?.options || {}
                                     }, (response) => {
                                         if (chrome.runtime.lastError) {
                                             reject(chrome.runtime.lastError);
@@ -54430,7 +54386,7 @@ const createBackgroundProxyMachine = () => {
                             if (typeof chrome !== 'undefined' && chrome.runtime) {
                                 const response = await new Promise((resolve, reject) => {
                                     chrome.runtime.sendMessage({
-                                        type: 'STOP',
+                                        name: 'stop',
                                         from: 'popup',
                                         timestamp: Date.now()
                                     }, (response) => {
@@ -55641,6 +55597,499 @@ const AppTome = new AppTomeClass();
 
 /***/ }),
 
+/***/ "./src/component-middleware/about/AboutTome.tsx":
+/*!******************************************************!*\
+  !*** ./src/component-middleware/about/AboutTome.tsx ***!
+  \******************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var styled_components__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! styled-components */ "./node_modules/styled-components/dist/styled-components.browser.esm.js");
+/* harmony import */ var log_view_machine__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! log-view-machine */ "../log-view-machine/dist/index.esm.js");
+/* harmony import */ var _app_components_EditorWrapper__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../app/components/EditorWrapper */ "./src/app/components/EditorWrapper.tsx");
+/* harmony import */ var _app_tomes_AppTome__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../app/tomes/AppTome */ "./src/app/tomes/AppTome.tsx");
+/* harmony import */ var _utils_backend_api_wrapper__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../../utils/backend-api-wrapper */ "./src/utils/backend-api-wrapper.ts");
+/* harmony import */ var _puppies_PuppyTome__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../puppies/PuppyTome */ "./src/component-middleware/puppies/PuppyTome.tsx");
+/* harmony import */ var _config_feature_toggles__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../../config/feature-toggles */ "./src/config/feature-toggles.ts");
+
+
+
+
+
+
+
+
+// Styled components for the Tomes-based about page
+const AboutView = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].div `
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+  line-height: 1.6;
+  color: #333;
+`;
+const AboutHeader = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].div `
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+`;
+const AboutTitle = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].h3 `
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #2c3e50;
+`;
+const AboutContent = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].div `
+  padding: 24px;
+  min-height: 200px;
+  color: #333;
+`;
+const Section = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].div `
+  margin-bottom: 32px;
+`;
+const SectionTitle = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].h4 `
+  color: #2c3e50;
+  margin-bottom: 16px;
+  font-size: 1.2rem;
+  font-weight: 600;
+`;
+const SectionText = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].p `
+  margin-bottom: 12px;
+  color: #495057;
+`;
+const DonationSection = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].div `
+  background: #f8f9fa;
+  padding: 24px;
+  border-radius: 8px;
+  text-align: center;
+  margin: 24px 0;
+  border: 2px solid #e9ecef;
+`;
+const DonationTitle = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].h4 `
+  color: #2c3e50;
+  margin-bottom: 16px;
+  font-size: 1.2rem;
+  font-weight: 600;
+`;
+const DonationText = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].p `
+  color: #495057;
+  margin-bottom: 16px;
+`;
+const QRCodeContainer = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].div `
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin: 20px 0;
+  flex-wrap: wrap;
+`;
+const QRCodeItem = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].div `
+  text-align: center;
+  background: white;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+`;
+const QRCodeImage = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].img `
+  width: 150px;
+  height: 150px;
+  display: block;
+  margin-bottom: 8px;
+`;
+const CryptoLabel = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].span `
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+`;
+const AddressText = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].p `
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+  color: #6c757d;
+  word-break: break-all;
+  margin-top: 8px;
+  background: #f8f9fa;
+  padding: 8px;
+  border-radius: 4px;
+`;
+const EasterEggSection = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].div `
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  padding: 24px;
+  border-radius: 8px;
+  text-align: center;
+  margin: 24px 0;
+`;
+const EasterEggTitle = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].h4 `
+  margin: 0 0 16px 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+`;
+const DonorList = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].div `
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+`;
+const DonorItem = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].div `
+  background: rgba(255, 255, 255, 0.1);
+  padding: 12px;
+  border-radius: 6px;
+  backdrop-filter: blur(10px);
+`;
+const DonorName = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].span `
+  font-weight: 600;
+`;
+const DonorAmount = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].span `
+  font-size: 12px;
+  opacity: 0.8;
+  display: block;
+  margin-top: 4px;
+`;
+const ReportEpilepticButton = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].button `
+  padding: 12px 20px;
+  margin: 16px 0;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+  color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+`;
+const ReportHelpText = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].p `
+  font-size: 12px;
+  color: #6c757d;
+  margin-top: 8px;
+  text-align: center;
+  line-height: 1.5;
+`;
+const AboutReadingDisabilityView = () => {
+    return (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(Section, null,
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SectionTitle, null, "\uD83C\uDF0A About Wave Reader"),
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SectionText, null, "Wave Reader is a browser extension designed to improve reading comprehension and eye tracking through gentle wave animations. By applying subtle wobble effects to text elements, it helps readers maintain focus and follow text more naturally."),
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SectionText, null,
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement("strong", null, "How it works:"),
+            " The extension applies CSS animations to selected text elements, creating a gentle wobble effect that mimics natural eye movement patterns. This can help reduce eye strain and improve reading speed for many users."),
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SectionText, null,
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement("strong", null, "Features:")),
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement("ul", { style: { color: '#495057', paddingLeft: '20px' } },
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement("li", null, "Customizable wave animations"),
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement("li", null, "Selector mode for choosing text elements"),
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement("li", null, "Keyboard shortcuts for quick activation"),
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement("li", null, "Settings persistence across sessions"),
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement("li", null, "Cross-browser compatibility"))));
+};
+const AboutNielsonResearchView = () => {
+    return (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(Section, null,
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SectionTitle, null, "\uD83D\uDCCA Research Foundation"),
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SectionText, null),
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SectionText, null, "The theoretical foundation draws from Nielsen Research findings on how the average reader scans webpages uniformly, which we use to support the approach of assisting those with tracking problems through gentle page animations.")));
+};
+const DonateView = ({ donated, hasEasterEggs, donors }) => {
+    return (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(Section, null,
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(DonationSection, null,
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(DonationTitle, null, "\uD83D\uDC9D Support Wave Reader"),
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(DonationText, null, "If you find Wave Reader helpful, consider supporting its development with a donation. Your contribution helps keep this project free and open source."),
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(QRCodeContainer, null,
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement(QRCodeItem, null,
+                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement(QRCodeImage, { src: "receive_eth.jpg", alt: "Ethereum QR Code" }),
+                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement(CryptoLabel, null, "Ethereum (ETH)"),
+                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement(AddressText, null, "0x30c599E83Afc27Fc7b2bCdaF400E5c15a31C6148")),
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement(QRCodeItem, null,
+                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement(QRCodeImage, { src: "receive_btc.jpg", alt: "Bitcoin QR Code" }),
+                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement(CryptoLabel, null, "Bitcoin (BTC)"),
+                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement(AddressText, null, "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"))),
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(DonationText, { style: { fontSize: '14px', color: '#6c757d' } },
+                "\uD83D\uDCA1 ",
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement("strong", null, "Tip:"),
+                " Send a receipt or message with your donation to get your name added to our supporter list!")),
+        donated && hasEasterEggs && (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(EasterEggSection, null,
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(EasterEggTitle, null, "\uD83C\uDF89 Thank You, Supporters!"),
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(DonationText, null, "Special thanks to our generous supporters who help keep Wave Reader free and open source:"),
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(DonorList, null, donors.map((donor, index) => (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(DonorItem, { key: index },
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement(DonorName, null, donor.name),
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement(DonorAmount, null,
+                    donor.amount,
+                    " ",
+                    donor.crypto ? `(${donor.crypto})` : '')))))))));
+};
+const AboutPageComponentView = (donated, hasEasterEggs, donors, error) => {
+    return (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(AboutView, null,
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(AboutHeader, null,
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(AboutTitle, null, "\uD83C\uDF0A About Wave Reader")),
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(AboutContent, null,
+            error && (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(Section, null,
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", { style: {
+                        background: '#f8d7da',
+                        color: '#721c24',
+                        padding: '16px',
+                        borderRadius: '8px',
+                        border: '1px solid #f5c6cb',
+                        marginBottom: '20px'
+                    } },
+                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h4", { style: { margin: '0 0 8px 0', color: '#721c24' } }, "\u26A0\uFE0F Error Loading Donation Status"),
+                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", { style: { margin: 0, fontSize: '14px' } }, error),
+                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement("button", { onClick: () => {
+                            // This would trigger a retry
+                            console.log('Retry donation status loading');
+                        }, style: {
+                            marginTop: '8px',
+                            padding: '8px 16px',
+                            background: '#dc3545',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                        } }, "Retry")))),
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(AboutReadingDisabilityView, null),
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(AboutNielsonResearchView, null),
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(DonateView, { donated: donated, hasEasterEggs: hasEasterEggs, donors: donors }),
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(Section, null,
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SectionText, { style: { textAlign: 'center', fontSize: '14px', color: '#6c757d' } }, "Version 1.0.0 \u2022 Made with \u2764\uFE0F for better reading")))));
+};
+// GraphQL queries and mutations for donation status
+const DONATION_STATUS_QUERY = `
+  query GetDonationStatus($userId: String!) {
+    donationStatus(userId: $userId) {
+      donated
+      hasEasterEggs
+      donors {
+        name
+        amount
+        crypto
+        timestamp
+      }
+      totalDonations
+      lastDonationDate
+    }
+  }
+`;
+const DONATION_STATUS_SUBSCRIPTION = `
+  subscription DonationStatusUpdates($userId: String!) {
+    donationStatusUpdated(userId: $userId) {
+      donated
+      hasEasterEggs
+      donors {
+        name
+        amount
+        crypto
+        timestamp
+      }
+    }
+  }
+`;
+const AboutPageComponent = (0,log_view_machine__WEBPACK_IMPORTED_MODULE_2__.createViewStateMachine)({
+    machineId: 'about-page-component',
+    xstateConfig: {
+        initial: 'idle',
+        context: {
+            donated: false,
+            hasEasterEggs: false,
+            donors: [
+                // we may want to remove this, as hopefully the list will grow to millions or billions
+                // that said, it's a nice way to show support and encourage others to donate
+                // so perhaps we'll do a `top(10) sort by Date_Donated ASC` or something
+                { name: "Anonymous Supporter", amount: "0.1 ETH", crypto: "ETH" },
+                { name: "Beta Tester", amount: "0.05 BTC", crypto: "BTC" },
+                { name: "Reading Enthusiast", amount: "0.2 ETH", crypto: "ETH" }
+            ],
+            isLoading: false,
+            error: null,
+            userId: 'anonymous', // This would come from auth context
+            subscription: null
+        },
+        states: {
+            idle: {
+                on: {
+                    LOAD_DONATION_STATUS: 'loading'
+                }
+            },
+            loading: {
+                on: {
+                    DONATION_STATUS_LOADED: 'idle',
+                    DONATION_STATUS_ERROR: 'error'
+                }
+            },
+            error: {
+                on: {
+                    RETRY: 'loading',
+                    CLEAR_ERROR: 'idle'
+                }
+            }
+        }
+    }
+}).withState('idle', async ({ context, event, send, log, transition, machine, view }) => {
+    // Auto-load donation status on idle if not already loaded
+    if (!context.donated && !context.isLoading) {
+        await log('Loading donation status...');
+        send({ type: 'LOAD_DONATION_STATUS' });
+    }
+    return view(AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error));
+}).withState('loading', async ({ context, event, send, log, transition, machine, view, graphql }) => {
+    try {
+        await log('Fetching donation status from GraphQL...');
+        // Execute GraphQL query via centralized backend service
+        const { data, backendDisabled } = await (0,_utils_backend_api_wrapper__WEBPACK_IMPORTED_MODULE_5__.safeGraphQLRequest)({
+            endpoint: '/api/graphql/donations',
+            query: DONATION_STATUS_QUERY,
+            variables: { userId: context.userId },
+            mockKey: 'graphql/donation-status',
+            context: { userId: context.userId }
+        });
+        const donationData = data?.donationStatus;
+        if (donationData) {
+            // Update context with GraphQL data
+            context.donated = donationData.donated || false;
+            context.hasEasterEggs = donationData.hasEasterEggs || false;
+            context.donors = donationData.donors || context.donors;
+            context.isLoading = false;
+            await log('Donation status loaded successfully', { donationData, backendDisabled });
+            // Start subscription for real-time updates
+            if (!context.subscription) {
+                try {
+                    context.subscription = await graphql.subscription(DONATION_STATUS_SUBSCRIPTION, {
+                        userId: context.userId
+                    });
+                    // Handle subscription updates
+                    context.subscription.subscribe({
+                        next: (update) => {
+                            if (update.data && update.data.donationStatusUpdated) {
+                                const updatedData = update.data.donationStatusUpdated;
+                                context.donated = updatedData.donated;
+                                context.hasEasterEggs = updatedData.hasEasterEggs;
+                                context.donors = updatedData.donors;
+                                log('Donation status updated via subscription', updatedData);
+                            }
+                        },
+                        error: (error) => {
+                            log('Subscription error', error);
+                        }
+                    });
+                }
+                catch (subError) {
+                    await log('Failed to start subscription', subError);
+                }
+            }
+            send({ type: 'DONATION_STATUS_LOADED', payload: donationData });
+        }
+        else {
+            throw new Error('Invalid GraphQL response format');
+        }
+    }
+    catch (error) {
+        await log('Failed to load donation status', error);
+        context.error = error instanceof Error ? error.message : 'Unknown error occurred';
+        context.isLoading = false;
+        send({ type: 'DONATION_STATUS_ERROR', payload: error });
+    }
+    return view(AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error));
+}).withState('error', ({ context, event, send, log, transition, machine, view }) => {
+    return view(AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error));
+});
+// Main component using withState pattern
+const AboutTome = ({ children, donated = false, hasEasterEggs = false, donors = [
+    { name: "Anonymous Supporter", amount: "0.1 ETH", crypto: "ETH" },
+    { name: "Beta Tester", amount: "0.05 BTC", crypto: "BTC" },
+    { name: "Reading Enthusiast", amount: "0.2 ETH", crypto: "ETH" }
+] }) => {
+    // State management using withState pattern
+    const [aboutPageComponent, setAboutPageComponent] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null);
+    const [router, setRouter] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null);
+    const [renderKey, setRenderKey] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(-1);
+    const [showPuppies, setShowPuppies] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+    // Handler for epileptic animation report
+    const handleReportEpileptic = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(() => {
+        const subject = encodeURIComponent('Epileptic Animation Report - Wave Reader');
+        const body = encodeURIComponent(`I am reporting an animation that may trigger epileptic symptoms.\n\n` +
+            `URL: ${window.location.href}\n` +
+            `Timestamp: ${new Date().toISOString()}\n\n` +
+            `Additional details:\n`);
+        const mailtoLink = `mailto:john.gebhard.holland+epileptic@gmail.com?subject=${subject}&body=${body}`;
+        window.location.href = mailtoLink;
+    }, []);
+    (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+        // Get router from AppTome
+        const appTomeRouter = _app_tomes_AppTome__WEBPACK_IMPORTED_MODULE_4__.AppTome.getRouter();
+        setRouter(appTomeRouter);
+        // Check feature toggle for puppies
+        const checkPuppiesToggle = async () => {
+            try {
+                // Try to get RobotCopy instance from background proxy machine
+                const bgProxyMachine = appTomeRouter?.resolve('BackgroundProxyMachine');
+                const robotCopy = bgProxyMachine?.robotCopy || null;
+                const toggleService = new _config_feature_toggles__WEBPACK_IMPORTED_MODULE_7__.FeatureToggleService(robotCopy);
+                const enabled = await toggleService.isEnabled('ENABLE_PUPPIES');
+                setShowPuppies(enabled);
+            }
+            catch (error) {
+                console.warn('Failed to check puppies feature toggle, defaulting to disabled', error);
+                setShowPuppies(false);
+            }
+        };
+        checkPuppiesToggle();
+        // Create machine instance
+        const component = AboutPageComponent;
+        // Set router on machine if available
+        if (appTomeRouter && component.setRouter) {
+            component.setRouter(appTomeRouter);
+            // Register machine with router
+            appTomeRouter.register('AboutMachine', component);
+        }
+        setAboutPageComponent(component);
+        component.start();
+        component.send({ type: 'INITIALIZE' });
+        // Observe view key changes to trigger re-renders (if method exists)
+        let unsubscribe = null;
+        const componentAny = component;
+        if (componentAny && typeof componentAny.observeViewKey === 'function') {
+            unsubscribe = componentAny.observeViewKey(setRenderKey);
+        }
+        // Cleanup: unregister on unmount
+        return () => {
+            if (unsubscribe) {
+                unsubscribe();
+            }
+            if (appTomeRouter && component) {
+                appTomeRouter.unregister('AboutMachine');
+            }
+        };
+    }, []);
+    if (!aboutPageComponent) {
+        return (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_app_components_EditorWrapper__WEBPACK_IMPORTED_MODULE_3__["default"], { title: "About Wave Reader", description: "Information about Wave Reader and its features", componentId: "about-component", router: router || undefined, key: renderKey, onError: (error) => console.error('About Editor Error:', error) },
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", null, "Loading...")));
+    }
+    return (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_app_components_EditorWrapper__WEBPACK_IMPORTED_MODULE_3__["default"], { title: "About Wave Reader", description: "Information about Wave Reader and its features", componentId: "about-component", router: router || undefined, key: renderKey, onError: (error) => console.error('About Editor Error:', error) },
+        aboutPageComponent.render(),
+        showPuppies && (react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", { style: { marginTop: '24px' } },
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_puppies_PuppyTome__WEBPACK_IMPORTED_MODULE_6__["default"], { skipWrapper: true }))),
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", { style: { marginTop: '24px' } },
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(Section, null,
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement(ReportEpilepticButton, { onClick: handleReportEpileptic, title: "Report epileptic triggering animation" }, "\uD83D\uDEA8 Report Epileptic Animation"),
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement(ReportHelpText, null, "If any animation triggers epileptic symptoms or seizures, please report it immediately. We prioritize accessibility and will investigate all reports.")))));
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (AboutTome);
+
+
+/***/ }),
+
 /***/ "./src/component-middleware/error-boundary/ErrorBoundaryTomes.tsx":
 /*!************************************************************************!*\
   !*** ./src/component-middleware/error-boundary/ErrorBoundaryTomes.tsx ***!
@@ -56228,6 +56677,293 @@ function renderDevelopmentView(context) {
 
 /***/ }),
 
+/***/ "./src/component-middleware/puppies/PuppyTome.tsx":
+/*!********************************************************!*\
+  !*** ./src/component-middleware/puppies/PuppyTome.tsx ***!
+  \********************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var styled_components__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! styled-components */ "./node_modules/styled-components/dist/styled-components.browser.esm.js");
+/* harmony import */ var log_view_machine__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! log-view-machine */ "../log-view-machine/dist/index.esm.js");
+/* harmony import */ var _app_components_EditorWrapper__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../app/components/EditorWrapper */ "./src/app/components/EditorWrapper.tsx");
+/* harmony import */ var _app_tomes_AppTome__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../app/tomes/AppTome */ "./src/app/tomes/AppTome.tsx");
+
+
+
+
+
+// Styled components for the Puppies page
+const PuppiesView = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].div `
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+  line-height: 1.6;
+  color: #333;
+`;
+const PuppiesHeader = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].div `
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+`;
+const PuppiesTitle = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].h3 `
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #2c3e50;
+`;
+const PuppiesContent = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].div `
+  padding: 24px;
+  min-height: 200px;
+  color: #333;
+`;
+const PuppiesSection = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].div `
+  margin-bottom: 32px;
+`;
+const SectionTitle = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].h4 `
+  color: #2c3e50;
+  margin-bottom: 16px;
+  font-size: 1.2rem;
+  font-weight: 600;
+`;
+const HeroImageContainer = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].div `
+  width: 100%;
+  margin-bottom: 24px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+`;
+const HeroImage = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].img `
+  width: 100%;
+  height: auto;
+  display: block;
+  max-height: 400px;
+  object-fit: cover;
+`;
+const PuppiesCarousel = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].div `
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+`;
+const PuppyImage = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].img `
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+  &:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+`;
+const LoadingContainer = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].div `
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  color: #6c757d;
+`;
+const ErrorContainer = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].div `
+  background: #f8d7da;
+  color: #721c24;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #f5c6cb;
+  margin-bottom: 20px;
+`;
+const AttributionText = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].p `
+  font-size: 12px;
+  color: #6c757d;
+  text-align: center;
+  margin-top: 16px;
+  font-style: italic;
+`;
+const PuppyView = (heroImage, carouselImages, isLoading, error) => {
+    if (isLoading) {
+        return (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(PuppiesView, null,
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(PuppiesHeader, null,
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement(PuppiesTitle, null, "\uD83D\uDC3E Puppies & Kittens")),
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(PuppiesContent, null,
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement(LoadingContainer, null,
+                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", null, "Loading adorable puppies and kittens...")))));
+    }
+    if (error) {
+        return (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(PuppiesView, null,
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(PuppiesHeader, null,
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement(PuppiesTitle, null, "\uD83D\uDC3E Puppies & Kittens")),
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(PuppiesContent, null,
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement(ErrorContainer, null,
+                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h4", { style: { margin: '0 0 8px 0', color: '#721c24' } }, "\u26A0\uFE0F Error Loading Images"),
+                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", { style: { margin: 0, fontSize: '14px' } }, error)))));
+    }
+    return (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(PuppiesView, null,
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(PuppiesHeader, null,
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(PuppiesTitle, null, "\uD83D\uDC3E Puppies & Kittens")),
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(PuppiesContent, null,
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(PuppiesSection, null,
+                heroImage && (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(HeroImageContainer, null,
+                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement(HeroImage, { src: heroImage.url, alt: heroImage.alt, onError: (e) => {
+                            console.error('Failed to load hero image:', heroImage.url);
+                        } }))),
+                carouselImages.length > 0 && (react__WEBPACK_IMPORTED_MODULE_0___default().createElement((react__WEBPACK_IMPORTED_MODULE_0___default().Fragment), null,
+                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SectionTitle, null, "More Cuteness"),
+                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement(PuppiesCarousel, null, carouselImages.map((image, index) => (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(PuppyImage, { key: image.id || index, src: image.url, alt: image.alt, onError: (e) => {
+                            console.error('Failed to load image:', image.url);
+                        } })))))),
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement(AttributionText, null,
+                    "Photos from",
+                    ' ',
+                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement("a", { href: "https://unsplash.com/?utm_source=wave-reader&utm_medium=referral", target: "_blank", rel: "noopener noreferrer", style: { color: '#667eea' } }, "Unsplash"))))));
+};
+// Generate Unsplash URLs for puppy/kitten images
+const generateUnsplashUrls = (count) => {
+    const imageData = [];
+    const width = 800;
+    const height = 600;
+    const queries = ['puppy', 'kitten', 'puppies', 'kittens', 'dog', 'cat'];
+    for (let i = 0; i < count; i++) {
+        const query = queries[i % queries.length];
+        const url = `https://source.unsplash.com/${width}x${height}/?${query}&sig=${Date.now()}-${i}`;
+        imageData.push({
+            id: `unsplash-${i}-${Date.now()}`,
+            url,
+            alt: `Cute ${query}`,
+        });
+    }
+    return imageData;
+};
+const PuppyPageComponent = (0,log_view_machine__WEBPACK_IMPORTED_MODULE_2__.createViewStateMachine)({
+    machineId: 'puppy-page-component',
+    xstateConfig: {
+        initial: 'idle',
+        context: {
+            heroImage: null,
+            carouselImages: [],
+            isLoading: false,
+            error: null,
+        },
+        states: {
+            idle: {
+                on: {
+                    LOAD_IMAGES: 'loading',
+                    REFRESH_IMAGES: 'loading'
+                }
+            },
+            loading: {
+                on: {
+                    IMAGES_LOADED: 'loaded',
+                    IMAGES_ERROR: 'error'
+                }
+            },
+            loaded: {
+                on: {
+                    REFRESH_IMAGES: 'loading'
+                }
+            },
+            error: {
+                on: {
+                    RETRY: 'loading',
+                    CLEAR_ERROR: 'idle'
+                }
+            }
+        }
+    }
+}).withState('idle', async ({ context, event, send, log, transition, machine, view }) => {
+    // Auto-load images on idle if not already loaded
+    if (!context.heroImage && !context.isLoading) {
+        await log('Loading puppy images...');
+        send({ type: 'LOAD_IMAGES' });
+    }
+    return view(PuppyView(context.heroImage, context.carouselImages, context.isLoading, context.error));
+}).withState('loading', async ({ context, event, send, log, transition, machine, view }) => {
+    try {
+        await log('Fetching images from Unsplash...');
+        // Generate image URLs (1 hero + 6 carousel = 7 total)
+        const allImages = generateUnsplashUrls(7);
+        const hero = allImages[0];
+        const carousel = allImages.slice(1);
+        // Update context with images
+        context.heroImage = hero;
+        context.carouselImages = carousel;
+        context.isLoading = false;
+        context.error = null;
+        await log('Images loaded successfully', { heroCount: 1, carouselCount: carousel.length });
+        send({ type: 'IMAGES_LOADED', payload: { hero, carousel } });
+    }
+    catch (error) {
+        await log('Failed to load images', error);
+        context.error = error instanceof Error ? error.message : 'Unknown error occurred';
+        context.isLoading = false;
+        send({ type: 'IMAGES_ERROR', payload: error });
+    }
+    return view(PuppyView(context.heroImage, context.carouselImages, context.isLoading, context.error));
+}).withState('loaded', ({ context, event, send, log, transition, machine, view }) => {
+    return view(PuppyView(context.heroImage, context.carouselImages, context.isLoading, context.error));
+}).withState('error', ({ context, event, send, log, transition, machine, view }) => {
+    return view(PuppyView(context.heroImage, context.carouselImages, context.isLoading, context.error));
+});
+const PuppyTome = ({ children, skipWrapper = false }) => {
+    const [puppyPageComponent, setPuppyPageComponent] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null);
+    const [router, setRouter] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null);
+    const [renderKey, setRenderKey] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(-1);
+    (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+        // Get router from AppTome
+        const appTomeRouter = _app_tomes_AppTome__WEBPACK_IMPORTED_MODULE_4__.AppTome.getRouter();
+        setRouter(appTomeRouter);
+        // Create machine instance
+        const component = PuppyPageComponent;
+        // Set router on machine if available
+        if (appTomeRouter && component.setRouter) {
+            component.setRouter(appTomeRouter);
+            // Register machine with router
+            appTomeRouter.register('PuppyMachine', component);
+        }
+        setPuppyPageComponent(component);
+        component.start();
+        component.send({ type: 'INITIALIZE' });
+        // Observe view key changes to trigger re-renders (if method exists)
+        let unsubscribe = null;
+        const componentAny = component;
+        if (componentAny && typeof componentAny.observeViewKey === 'function') {
+            unsubscribe = componentAny.observeViewKey(setRenderKey);
+        }
+        // Cleanup: unregister on unmount
+        return () => {
+            if (unsubscribe) {
+                unsubscribe();
+            }
+            if (appTomeRouter && component) {
+                appTomeRouter.unregister('PuppyMachine');
+            }
+        };
+    }, []);
+    const renderedContent = !puppyPageComponent ? react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", null, "Loading...") : puppyPageComponent.render();
+    if (skipWrapper) {
+        return react__WEBPACK_IMPORTED_MODULE_0___default().createElement((react__WEBPACK_IMPORTED_MODULE_0___default().Fragment), null, renderedContent);
+    }
+    if (!puppyPageComponent) {
+        return (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_app_components_EditorWrapper__WEBPACK_IMPORTED_MODULE_3__["default"], { title: "Puppies & Kittens", description: "Adorable puppies and kittens to brighten your day", componentId: "puppy-component", router: router || undefined, key: renderKey, onError: (error) => console.error('Puppy Editor Error:', error) },
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", null, "Loading...")));
+    }
+    return (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_app_components_EditorWrapper__WEBPACK_IMPORTED_MODULE_3__["default"], { title: "Puppies & Kittens", description: "Adorable puppies and kittens to brighten your day", componentId: "puppy-component", router: router || undefined, key: renderKey, onError: (error) => console.error('Puppy Editor Error:', error) }, puppyPageComponent.render()));
+};
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (PuppyTome);
+
+
+/***/ }),
+
 /***/ "./src/component-middleware/settings/SettingsTomes.tsx":
 /*!*************************************************************!*\
   !*** ./src/component-middleware/settings/SettingsTomes.tsx ***!
@@ -56248,6 +56984,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _app_components_EditorWrapper__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../../app/components/EditorWrapper */ "./src/app/components/EditorWrapper.tsx");
 /* harmony import */ var _app_tomes_AppTome__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../../app/tomes/AppTome */ "./src/app/tomes/AppTome.tsx");
 /* harmony import */ var _components_util_user_input__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../../components/util/user-input */ "./src/components/util/user-input.ts");
+/* harmony import */ var _models_defaults__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ../../models/defaults */ "./src/models/defaults.ts");
+
 
 
 
@@ -56684,14 +57422,16 @@ const generateCssFromSettings = (settings) => {
         axisTranslateAmountXMin: settings.axisTranslateAmountXMin,
         axisRotationAmountYMax: settings.axisRotationAmountYMax,
         axisRotationAmountYMin: settings.axisRotationAmountYMin,
+        cssGenerationMode: settings.cssGenerationMode || 'template',
         text: new _models_text__WEBPACK_IMPORTED_MODULE_4__["default"]({
             size: settings.textSize,
             color: settings.textColor
         })
     });
+    const cssGenerationMode = settings.cssGenerationMode || 'template';
     return {
-        cssTemplate: (0,_models_wave__WEBPACK_IMPORTED_MODULE_3__.defaultCssTemplate)(wave),
-        cssMouseTemplate: (0,_models_wave__WEBPACK_IMPORTED_MODULE_3__.defaultCssMouseTemplate)(wave)
+        cssTemplate: (0,_models_wave__WEBPACK_IMPORTED_MODULE_3__.defaultCssTemplate)(wave, cssGenerationMode),
+        cssMouseTemplate: (0,_models_wave__WEBPACK_IMPORTED_MODULE_3__.defaultCssMouseTemplate)(wave, cssGenerationMode)
     };
 };
 // Main component using withState pattern
@@ -56727,7 +57467,12 @@ const SettingsTomes = ({ initialSettings = {}, domainPaths = [], currentDomain =
                     try {
                         const result = await chrome.storage.local.get(['waveReaderSettings', 'waveReaderDomainPaths']);
                         if (result.waveReaderSettings) {
-                            setSettings(prev => sanitizeSettings({ ...prev, ...result.waveReaderSettings }));
+                            console.log('⚙️ SettingsTomes: Loading settings from storage:', result.waveReaderSettings);
+                            setSettings(prev => {
+                                const sanitized = sanitizeSettings({ ...prev, ...result.waveReaderSettings });
+                                console.log('⚙️ SettingsTomes: Sanitized settings, toggleKeys:', sanitized.toggleKeys);
+                                return sanitized;
+                            });
                             setSaved(true);
                         }
                         if (result.waveReaderDomainPaths) {
@@ -57103,21 +57848,33 @@ const SettingsTomes = ({ initialSettings = {}, domainPaths = [], currentDomain =
                         react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingGroupTitle, null, "Wave Toggle Shortcut"),
                         react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingItem, null,
                             react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingLabel, null, "Toggle Keys:"),
-                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(KeyboardInput, null, Array.from({ length: MAX_TOGGLE_KEYS }).map((_, index) => {
-                                const selectedKey = settings.toggleKeys.keyChord[index];
+                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(KeyboardInput, null, Array.from({ length: MAX_TOGGLE_KEYS }, (_, index) => {
+                                if (!settings.toggleKeys) {
+                                    console.warn('⚙️ SettingsTomes: No toggleKeys found, using default factory');
+                                }
+                                const keyChordDefaults = (0,_models_defaults__WEBPACK_IMPORTED_MODULE_8__.KeyChordDefaultFactory)();
+                                // Ensure toggleKeys.keyChord exists and is an array, default to empty array
+                                const keyChord = (settings.toggleKeys?.keyChord || keyChordDefaults);
+                                // Get the key at this index, or undefined if index is out of bounds
+                                const selectedKey = keyChord[index];
+                                // First check if the stored key is already valid
+                                const isKeyValid = selectedKey && KEY_OPTIONS_SET.has(selectedKey);
+                                // If not valid, try normalizing it
                                 const normalizedValue = selectedKey ? (0,_components_util_user_input__WEBPACK_IMPORTED_MODULE_7__.normalizeKey)(selectedKey) : null;
-                                const currentValue = normalizedValue && KEY_OPTIONS_SET.has(normalizedValue)
-                                    ? normalizedValue
-                                    : 'None';
+                                const normalizedIsValid = normalizedValue && KEY_OPTIONS_SET.has(normalizedValue);
+                                // Use the stored key if valid, otherwise use normalized if valid, otherwise 'None'
+                                const currentValue = isKeyValid
+                                    ? selectedKey
+                                    : normalizedIsValid
+                                        ? normalizedValue
+                                        : 'None';
+                                // Debug logging
+                                if (selectedKey) {
+                                    console.log(`⚙️ SettingsTomes: Keyboard shortcut ${index}: selectedKey=${selectedKey}, currentValue=${currentValue}, isKeyValid=${isKeyValid}, normalizedValue=${normalizedValue}, normalizedIsValid=${normalizedIsValid}`);
+                                }
                                 return (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingSelect, { key: `toggle-key-${index}`, value: currentValue, onChange: (e) => handleToggleKeyChange(index, e.target.value) },
-                                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement("option", { value: "None" }, "None"),
-                                    KEY_OPTIONS.map(option => {
-                                        const isSelected = option === currentValue;
-                                        return option === selectedKey ?
-                                            (react__WEBPACK_IMPORTED_MODULE_0___default().createElement("option", { key: `${option}-${index}`, value: option, selected: true }, option))
-                                            :
-                                                (react__WEBPACK_IMPORTED_MODULE_0___default().createElement("option", { key: `${option}-${index}`, value: option }, option));
-                                    })));
+                                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement("option", { value: "None", selected: currentValue === 'None' ? true : undefined }, "None"),
+                                    KEY_OPTIONS.map((option) => (react__WEBPACK_IMPORTED_MODULE_0___default().createElement("option", { key: `${option}-${index}`, value: option, selected: currentValue === option ? true : undefined }, option)))));
                             })),
                             react__WEBPACK_IMPORTED_MODULE_0___default().createElement(HelpText, null, "Choose up to four keys from left to right. Modifiers (Ctrl, Shift, Alt, Meta) must be combined with at least one non-modifier key."))),
                     react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingsActions, null,
@@ -57412,10 +58169,10 @@ var SettingsMessageHandler = /*#__PURE__*/function () {
         cssTemplate: '',
         cssMouseTemplate: '',
         waveSpeed: 2.0,
-        axisTranslateAmountXMax: 10,
-        axisTranslateAmountXMin: -10,
-        axisRotationAmountYMax: 5,
-        axisRotationAmountYMin: -5,
+        axisTranslateAmountXMax: 2,
+        axisTranslateAmountXMin: -2,
+        axisRotationAmountYMax: 2,
+        axisRotationAmountYMin: -2,
         mouseFollowInterval: 50,
         autoGenerateCss: true
       };
@@ -58532,6 +59289,8 @@ const FEATURE_TOGGLES = {
     ENABLE_DONATIONS: 'enable-donations',
     // Developer Features
     DEVELOPER_MODE: 'developer-mode',
+    // UI Features
+    ENABLE_PUPPIES: 'enable-puppies',
 };
 const DEFAULT_TOGGLE_VALUES = {
     [FEATURE_TOGGLES.ENABLE_BACKEND_API_REQUESTS]: false, // Off by default for release
@@ -58540,6 +59299,7 @@ const DEFAULT_TOGGLE_VALUES = {
     [FEATURE_TOGGLES.ENABLE_TOKEN_SYSTEM]: false,
     [FEATURE_TOGGLES.ENABLE_DONATIONS]: false,
     [FEATURE_TOGGLES.DEVELOPER_MODE]: "development" === 'development',
+    [FEATURE_TOGGLES.ENABLE_PUPPIES]: false,
 };
 /**
  * Feature Toggle Service
@@ -58638,7 +59398,7 @@ var WaveAnimationControl;
     WaveAnimationControl[WaveAnimationControl["CSS"] = 0] = "CSS";
     WaveAnimationControl[WaveAnimationControl["MOUSE"] = 1] = "MOUSE";
 })(WaveAnimationControl || (WaveAnimationControl = {}));
-const KeyChordDefaultFactory = () => ["w", "Shift"];
+const KeyChordDefaultFactory = () => ["f", "Shift"];
 const WaveAnimationControlDefault = WaveAnimationControl.CSS;
 const ShowNotificationsDefault = true;
 const GoingDefault = false;
@@ -58864,7 +59624,34 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-const defaultCssTemplate = (options) => `
+const defaultCssTemplate = (options, cssGenerationMode = 'hardcoded') => {
+    const mode = cssGenerationMode || 'hardcoded';
+    if (mode === 'template') {
+        // Template mode: Use TEMPLATE variables that get replaced at runtime
+        return `
+@-webkit-keyframes wobble {
+  0% { transform: translateX(0%); rotateY(0deg); }
+  25% { transform: translateX(TRANSLATE_X_MIN%) rotateY(ROTATE_Y_MINdeg); }
+  50% { transform: translateX(0%); rotateY(ROTATE_Y_MAXdeg); }
+  75% { transform: translateX(TRANSLATE_X_MAX%) rotateY(ROTATE_Y_MINdeg); }
+  100% { transform: translateX(0%); rotateY(0deg); }
+}
+
+${options.selector || '.wave-reader__text'} {
+  font-size: ${options.text?.size || 'inherit'};
+  -webkit-animation-name: wobble;
+  animation-name: wobble;
+  -webkit-animation-duration: ${options.waveSpeed}s;
+  animation-duration: ${options.waveSpeed}s;
+  -webkit-animation-fill-mode: both;
+  animation-fill-mode: both;
+  animation-iteration-count: infinite;
+}
+`;
+    }
+    else {
+        // Hardcoded mode: Use actual values (current behavior)
+        return `
 @-webkit-keyframes wobble {
   0% { transform: translateX(0%); rotateY(0deg); }
   25% { transform: translateX(${options.axisTranslateAmountXMin}%); rotateY(${options.axisRotationAmountYMin}deg); }
@@ -58884,17 +59671,41 @@ ${options.selector || '.wave-reader__text'} {
   animation-iteration-count: infinite;
 }
 `;
+    }
+};
 // Direct positioning template - no keyframes, just direct transforms
-const defaultCssMouseTemplate = (options) => `
+const defaultCssMouseTemplate = (options, cssGenerationMode = 'template') => {
+    const mode = cssGenerationMode || 'template';
+    if (mode === 'template') {
+        // Template mode: Use TEMPLATE variables (current behavior)
+        return `
 ${options.selector || '.wave-reader__text'} {
   font-size: ${options.text?.size || 'inherit'};
   transform: translateX(TRANSLATE_X%) rotateY(ROTATE_Ydeg);
   transition: transform ANIMATION_DURATIONs ease-out;
 }
 `;
+    }
+    else {
+        // Hardcoded mode: Use actual values (for consistency with CSS template)
+        // Note: For mouse template, hardcoded mode is less useful since values change dynamically,
+        // but we provide it for consistency
+        return `
+${options.selector || '.wave-reader__text'} {
+  font-size: ${options.text?.size || 'inherit'};
+  transform: translateX(0%) rotateY(0deg);
+  transition: transform ${options.waveSpeed || 2}s ease-out;
+}
+`;
+    }
+};
 const TRANSLATE_X = "TRANSLATE_X";
 const ROTATE_Y = "ROTATE_Y";
 const ANIMATION_DURATION = "ANIMATION_DURATION";
+const TRANSLATE_X_MIN = "TRANSLATE_X_MIN";
+const TRANSLATE_X_MAX = "TRANSLATE_X_MAX";
+const ROTATE_Y_MIN = "ROTATE_Y_MIN";
+const ROTATE_Y_MAX = "ROTATE_Y_MAX";
 const replaceAnimationVariables = (wave, translateX, rotateY) => {
     return (wave.cssMouseTemplate || "")
         .replaceAll(TRANSLATE_X, translateX)
@@ -58942,13 +59753,16 @@ class Wave extends _util_attribute_constructor__WEBPACK_IMPORTED_MODULE_1__["def
         // Always generate CSS templates from current parameters (shader-like approach)
         // Use the attributes directly to ensure we have the correct values
         const waveWithAttributes = { ...this, ...attributes };
-        this.cssTemplate = defaultCssTemplate(waveWithAttributes);
-        this.cssMouseTemplate = defaultCssMouseTemplate(waveWithAttributes);
+        const cssGenerationMode = attributes.cssGenerationMode || 'hardcoded';
+        this.cssGenerationMode = cssGenerationMode;
+        this.cssTemplate = defaultCssTemplate(waveWithAttributes, cssGenerationMode);
+        this.cssMouseTemplate = defaultCssMouseTemplate(waveWithAttributes, cssGenerationMode);
     }
     // Always regenerate CSS templates from current parameters
     update() {
-        this.cssTemplate = defaultCssTemplate(this);
-        this.cssMouseTemplate = defaultCssMouseTemplate(this);
+        const cssGenerationMode = this.cssGenerationMode || 'hardcoded';
+        this.cssTemplate = defaultCssTemplate(this, cssGenerationMode);
+        this.cssMouseTemplate = defaultCssMouseTemplate(this, cssGenerationMode);
         return this;
     }
     static getDefaultWave() {

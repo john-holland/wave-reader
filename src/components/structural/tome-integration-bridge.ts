@@ -1,23 +1,21 @@
 import React from 'react';
-import { createViewStateMachine } from 'log-view-machine';
 
 /**
- * Tome Integration Bridge
+ * Component Middleware Adapter
  * 
- * This bridge connects the existing component middleware tomes with our new
- * structural system, enabling seamless integration between the robotproxy
- * ProxyStateMachine system and our enhanced message routing.
+ * Provides a simple adapter for component middleware to use the structural system
+ * for message routing and state management. Component middleware uses the structural
+ * system directly - this adapter provides a convenient interface.
  */
 
-export interface TomeBridgeConfig {
+export interface ComponentMiddlewareConfig {
   componentName: string;
-  existingTomePath: string;
   structuralTomeConfig: any;
   messageRouter: any;
 }
 
-export class TomeIntegrationBridge {
-  private bridges: Map<string, any> = new Map();
+export class ComponentMiddlewareAdapter {
+  private adapters: Map<string, any> = new Map();
   private messageRouter: any;
 
   constructor(messageRouter: any) {
@@ -25,35 +23,19 @@ export class TomeIntegrationBridge {
   }
 
   /**
-   * Create a bridge for a specific component
+   * Create an adapter for a specific component
    */
-  async createBridge(config: TomeBridgeConfig) {
-    const { componentName, existingTomePath, structuralTomeConfig } = config;
+  async createAdapter(config: ComponentMiddlewareConfig) {
+    const { componentName, structuralTomeConfig } = config;
 
     try {
-      // Import the existing component tome
-      const existingTomeModule = await this.importExistingTome(existingTomePath);
-      
-      // Create a bridge that connects both systems
-      const bridge = {
+      // Create a simple adapter that routes to the structural system
+      const adapter = {
         componentName,
-        existingTome: existingTomeModule,
         structuralTome: structuralTomeConfig,
         messageRouter: this.messageRouter,
         
-        // Bridge methods
-        sendToExisting: (event: any) => {
-          if (existingTomeModule && existingTomeModule.sendEvent) {
-            return existingTomeModule.sendEvent(event);
-          }
-          return null;
-        },
-        
-        sendToStructural: (event: any) => {
-          return this.messageRouter.sendMessage(event.type, componentName, event.data);
-        },
-        
-        // Test-expected methods
+        // Route events to the structural system
         sendEvent: async (event: any) => {
           return await this.messageRouter.sendMessage(event.type, componentName, event.data);
         },
@@ -65,163 +47,107 @@ export class TomeIntegrationBridge {
         
         getTomeConfig: () => {
           return structuralTomeConfig;
-        },
-        
-        // Get current state from both systems
-        getExistingState: () => {
-          if (existingTomeModule && existingTomeModule.getCurrentState) {
-            return existingTomeModule.getCurrentState();
-          }
-          return null;
-        },
-        
-        getStructuralState: () => {
-          // This would come from the structural system
-          return null;
-        },
-        
-        // Sync states between systems
-        syncStates: () => {
-          const existingState = bridge.getExistingState();
-          const structuralState = bridge.getStructuralState();
-          
-          // Implement state synchronization logic
-          console.log(`Syncing states for ${componentName}:`, { existingState, structuralState });
         }
       };
 
-      this.bridges.set(componentName, bridge);
-      return bridge;
+      this.adapters.set(componentName, adapter);
+      return adapter;
     } catch (error) {
-      console.error(`Failed to create bridge for ${componentName}:`, error);
+      console.error(`Failed to create adapter for ${componentName}:`, error);
       throw error;
     }
   }
 
   /**
-   * Import existing tome from component middleware
+   * Get adapter for a component
    */
-  private async importExistingTome(tomePath: string) {
-    try {
-      // Dynamic import of the existing tome
-      const module = await (global as any).import(tomePath);
-      return module.default || module;
-    } catch (error) {
-      console.warn(`Could not import existing tome from ${tomePath}:`, error);
-      return null;
-    }
+  getAdapter(componentName: string) {
+    return this.adapters.get(componentName);
   }
 
   /**
-   * Get bridge for a component
-   */
-  getBridge(componentName: string) {
-    return this.bridges.get(componentName);
-  }
-
-  /**
-   * Send message through bridge
+   * Send message through adapter to structural system
    */
   async sendMessage(componentName: string, event: any) {
-    const bridge = this.getBridge(componentName);
-    if (!bridge) {
-      throw new Error(`No bridge found for component: ${componentName}`);
+    const adapter = this.getAdapter(componentName);
+    if (!adapter) {
+      throw new Error(`No adapter found for component: ${componentName}`);
     }
 
-    // Send to both systems for synchronization
-    const existingResult = bridge.sendToExisting(event);
-    const structuralResult = await bridge.sendToStructural(event);
-
-    return {
-      existing: existingResult,
-      structural: structuralResult,
-      bridge
-    };
+    // Route to structural system
+    return await adapter.sendEvent(event);
   }
 
   /**
-   * Get all bridges
+   * Get all adapters
    */
-  getAllBridges() {
-    return Array.from(this.bridges.values());
+  getAllAdapters() {
+    return Array.from(this.adapters.values());
   }
 
   /**
-   * Clean up bridges
+   * Clean up adapters
    */
   cleanup() {
-    this.bridges.clear();
+    this.adapters.clear();
   }
 }
 
 /**
- * React Hook for using tome integration bridge
+ * React Hook for using component middleware adapter
  */
-export function useTomeIntegrationBridge(componentName: string, bridgeConfig: TomeBridgeConfig) {
-  const [bridge, setBridge] = React.useState<any>(null);
+export function useComponentMiddlewareAdapter(componentName: string, adapterConfig: ComponentMiddlewareConfig) {
+  const [adapter, setAdapter] = React.useState<any>(null);
   const [isConnected, setIsConnected] = React.useState(false);
 
   React.useEffect(() => {
     let mounted = true;
 
-    const initializeBridge = async () => {
+    const initializeAdapter = async () => {
       try {
         // This would be initialized with the message router
-        const messageRouter = {}; // Placeholder
-        const tomeBridge = new TomeIntegrationBridge(messageRouter);
-        const newBridge = await tomeBridge.createBridge(bridgeConfig);
+        const messageRouter = adapterConfig.messageRouter;
+        const middlewareAdapter = new ComponentMiddlewareAdapter(messageRouter);
+        const newAdapter = await middlewareAdapter.createAdapter(adapterConfig);
         
         if (mounted) {
-          setBridge(newBridge);
+          setAdapter(newAdapter);
           setIsConnected(true);
         }
       } catch (error) {
-        console.error(`Failed to initialize bridge for ${componentName}:`, error);
+        console.error(`Failed to initialize adapter for ${componentName}:`, error);
         if (mounted) {
           setIsConnected(false);
         }
       }
     };
 
-    initializeBridge();
+    initializeAdapter();
 
     return () => {
       mounted = false;
     };
-  }, [componentName, bridgeConfig]);
+  }, [componentName, adapterConfig]);
 
   const sendEvent = React.useCallback(async (event: any) => {
-    if (!bridge) {
-      throw new Error('Bridge not initialized');
+    if (!adapter) {
+      throw new Error('Adapter not initialized');
     }
 
-    return await bridge.sendToStructural(event);
-  }, [bridge]);
-
-  const sendToExisting = React.useCallback((event: any) => {
-    if (!bridge) {
-      throw new Error('Bridge not initialized');
-    }
-
-    return bridge.sendToExisting(event);
-  }, [bridge]);
-
-  const syncStates = React.useCallback(() => {
-    if (!bridge) {
-      throw new Error('Bridge not initialized');
-    }
-
-    bridge.syncStates();
-  }, [bridge]);
+    return await adapter.sendEvent(event);
+  }, [adapter]);
 
   return {
-    bridge,
+    adapter,
     isConnected,
-    sendEvent,
-    sendToExisting,
-    syncStates
+    sendEvent
   };
 }
 
-// Export the bridge class and hook
-export default TomeIntegrationBridge;
+// Legacy exports for backward compatibility with existing code
+export const TomeIntegrationBridge = ComponentMiddlewareAdapter;
+export type TomeBridgeConfig = ComponentMiddlewareConfig;
+export const useTomeIntegrationBridge = useComponentMiddlewareAdapter;
+
+// Default export
+export default ComponentMiddlewareAdapter;

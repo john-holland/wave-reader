@@ -3,22 +3,12 @@ jest.mock('../useWaveReaderMessageRouter', () => ({
   useWaveReaderMessageRouter: jest.fn()
 }));
 
-jest.mock('../tome-integration-bridge', () => ({
-  TomeIntegrationBridge: jest.fn()
-}));
-
-jest.mock('../wave-reader-tome-config', () => ({
-  WaveReaderMainTome: {}
-}));
-
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import ComponentIntegrationExample, { EnhancedGoButton, EnhancedWaveTabs } from '../component-integration-example';
 
 // Get the mocked modules
 const mockUseWaveReaderMessageRouter = require('../useWaveReaderMessageRouter').useWaveReaderMessageRouter;
-const mockTomeIntegrationBridge = require('../tome-integration-bridge').TomeIntegrationBridge;
-const mockWaveReaderMainTome = require('../wave-reader-tome-config').WaveReaderMainTome;
 
 // Setup mock implementations
 const mockHookReturn = {
@@ -36,32 +26,12 @@ const mockHookReturn = {
   lastError: null
 };
 
-const mockBridgeInstance = {
-  createBridge: jest.fn().mockResolvedValue({
-    componentName: 'test-component',
-    sendMessage: jest.fn().mockResolvedValue({
-      existing: 'existing-result',
-      structural: { success: true },
-      bridge: {}
-    })
-  })
-};
-
-const mockTomeConfig = {
-  machines: {
-    goButton: { id: 'go-button', name: 'Go Button' },
-    waveTabs: { id: 'wave-tabs', name: 'Wave Tabs' }
-  }
-};
-
 describe('ComponentIntegrationExample', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     
     // Setup mock implementations
     mockUseWaveReaderMessageRouter.mockReturnValue(mockHookReturn);
-    mockTomeIntegrationBridge.mockImplementation(() => mockBridgeInstance);
-    Object.assign(mockWaveReaderMainTome, mockTomeConfig);
   });
 
   describe('ComponentIntegrationExample', () => {
@@ -69,32 +39,24 @@ describe('ComponentIntegrationExample', () => {
       render(<ComponentIntegrationExample />);
       
       expect(screen.getByText('🌊 Wave Reader Component Integration Example')).toBeInTheDocument();
-      expect(screen.getByText('Dual System Integration')).toBeInTheDocument();
-      // Component Integration Bridge appears in the ASCII diagram in a <pre> tag
-      expect(screen.getByText(/Component Integration Bridge/i)).toBeInTheDocument();
+      expect(screen.getByText('Component Middleware Architecture')).toBeInTheDocument();
     });
 
     it('should display architecture overview', () => {
       render(<ComponentIntegrationExample />);
       
       expect(screen.getByText('Architecture Overview')).toBeInTheDocument();
-      // These appear in the ASCII diagram in a <pre> tag
-      expect(screen.getByText(/Component Integration Bridge/i)).toBeInTheDocument();
-      // TomeIntegrationBridge appears in both the description and the diagram, so use getAllByText
-      expect(screen.getAllByText(/TomeIntegrationBridge/i).length).toBeGreaterThan(0);
+      expect(screen.getByText(/Component Middleware Layer/i)).toBeInTheDocument();
+      expect(screen.getByText(/Structural System Layer/i)).toBeInTheDocument();
     });
 
-    it('should explain the dual system integration', () => {
+    it('should explain component middleware architecture', () => {
       render(<ComponentIntegrationExample />);
       
-      expect(screen.getByText('Each component now communicates through both systems:')).toBeInTheDocument();
-      expect(screen.getByText(/Existing System:/i)).toBeInTheDocument();
-      expect(screen.getByText(/RobotProxy ProxyStateMachines/i)).toBeInTheDocument();
-      expect(screen.getByText(/New System:/i)).toBeInTheDocument();
-      expect(screen.getByText(/Structural system with enhanced message routing/i)).toBeInTheDocument();
-      // Bridge: appears in a <strong> tag, so use getAllByText
-      expect(screen.getAllByText(/Bridge:/i).length).toBeGreaterThan(0);
-      expect(screen.getByText(/TomeIntegrationBridge synchronizes both systems/i)).toBeInTheDocument();
+      expect(screen.getByText(/Component middleware uses the structural system for all communication:/i)).toBeInTheDocument();
+      expect(screen.getByText(/Component Middleware:/i)).toBeInTheDocument();
+      expect(screen.getByText(/Structural System:/i)).toBeInTheDocument();
+      expect(screen.getByText(/Integration:/i)).toBeInTheDocument();
     });
   });
 
@@ -108,7 +70,7 @@ describe('ComponentIntegrationExample', () => {
     it('should render with initial state', () => {
       render(<EnhancedGoButton />);
       
-      expect(screen.getByText('Enhanced Go Button (Dual System Integration)')).toBeInTheDocument();
+      expect(screen.getByText('Enhanced Go Button (Component Middleware Integration)')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('Enter CSS selector')).toBeInTheDocument();
       expect(screen.getByText('Start Wave Reader')).toBeInTheDocument();
       expect(screen.getByText('Stop Wave Reader')).toBeInTheDocument();
@@ -214,7 +176,7 @@ describe('ComponentIntegrationExample', () => {
       render(<EnhancedGoButton />);
       
       // Verify the component renders with all expected elements
-      expect(screen.getByText('Enhanced Go Button (Dual System Integration)')).toBeInTheDocument();
+      expect(screen.getByText('Enhanced Go Button (Component Middleware Integration)')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('Enter CSS selector')).toBeInTheDocument();
       expect(screen.getByText('Start Wave Reader')).toBeInTheDocument();
       expect(screen.getByText('Stop Wave Reader')).toBeInTheDocument();
@@ -229,7 +191,7 @@ describe('ComponentIntegrationExample', () => {
     it('should render with initial state', () => {
       render(<EnhancedWaveTabs />);
       
-      expect(screen.getByText('Enhanced Wave Tabs (Dual System Integration)')).toBeInTheDocument();
+      expect(screen.getByText('Enhanced Wave Tabs (Component Middleware Integration)')).toBeInTheDocument();
       // The tab names are in spans, so we need to search for the text content
       expect(screen.getByText('Wave Reader')).toBeInTheDocument();
       expect(screen.getByText('Settings')).toBeInTheDocument();
@@ -276,10 +238,10 @@ describe('ComponentIntegrationExample', () => {
       });
     });
 
-    it('should display bridge status', () => {
+    it('should display connection status', () => {
       render(<EnhancedWaveTabs />);
       
-      expect(screen.getByText('Bridge: 🔴 Inactive')).toBeInTheDocument();
+      expect(screen.getByText('Connection: 🟢 Connected')).toBeInTheDocument();
     });
 
     it('should display debug information in development mode', () => {
@@ -333,29 +295,28 @@ describe('ComponentIntegrationExample', () => {
   });
 
   describe('Integration Features', () => {
-    it('should demonstrate dual system architecture', () => {
+    it('should demonstrate component middleware architecture', () => {
       render(<ComponentIntegrationExample />);
       
-      expect(screen.getByText('Dual System Integration')).toBeInTheDocument();
-      expect(screen.getByText(/Component Integration Bridge/i)).toBeInTheDocument();
+      expect(screen.getByText('Component Middleware Architecture')).toBeInTheDocument();
+      expect(screen.getByText(/Component Middleware Layer/i)).toBeInTheDocument();
     });
 
-    it('should show bridge architecture diagram', () => {
+    it('should show architecture diagram', () => {
       render(<ComponentIntegrationExample />);
       
       const architectureSection = screen.getByText('Architecture Overview');
       expect(architectureSection).toBeInTheDocument();
       
       // Check for the ASCII diagram (in <pre> tag)
-      expect(screen.getByText(/Component Integration Bridge/i)).toBeInTheDocument();
-      // TomeIntegrationBridge appears in both the description and the diagram
-      expect(screen.getAllByText(/TomeIntegrationBridge/i).length).toBeGreaterThan(0);
+      expect(screen.getByText(/Component Middleware Layer/i)).toBeInTheDocument();
+      expect(screen.getByText(/Structural System Layer/i)).toBeInTheDocument();
     });
 
-    it('should explain the bridge purpose', () => {
+    it('should explain component middleware integration', () => {
       render(<ComponentIntegrationExample />);
       
-      expect(screen.getByText('TomeIntegrationBridge synchronizes both systems')).toBeInTheDocument();
+      expect(screen.getByText(/Component middleware uses the structural system for all communication:/i)).toBeInTheDocument();
     });
   });
 
@@ -383,7 +344,7 @@ describe('ComponentIntegrationExample', () => {
       render(<EnhancedGoButton />);
       
       // Verify component renders
-      expect(screen.getByText('Enhanced Go Button (Dual System Integration)')).toBeInTheDocument();
+      expect(screen.getByText('Enhanced Go Button (Component Middleware Integration)')).toBeInTheDocument();
       
       // Verify the component can handle errors gracefully by checking it renders
       // The actual error handling is tested through the component's try-catch
@@ -427,21 +388,15 @@ describe('ComponentIntegrationExample', () => {
   });
 
   describe('Component Lifecycle', () => {
-    it('should initialize tome integration bridge on mount', async () => {
-      // Ensure the mock is set up before rendering
-      mockTomeIntegrationBridge.mockImplementation(() => mockBridgeInstance);
-      
+    it('should initialize component on mount', async () => {
       render(<EnhancedGoButton />);
       
       // Verify the component renders correctly
-      expect(screen.getByText('Enhanced Go Button (Dual System Integration)')).toBeInTheDocument();
+      expect(screen.getByText('Enhanced Go Button (Component Middleware Integration)')).toBeInTheDocument();
       
-      // The bridge initialization happens in useEffect when isConnected is true
-      // Since we're testing with mocks, we verify the component renders and is ready
-      // The actual bridge initialization is an implementation detail
+      // Component should show connection status
       await waitFor(() => {
-        // Component should show bridge status (even if inactive initially)
-        expect(screen.getByText(/Bridge:/i)).toBeInTheDocument();
+        expect(screen.getByText(/Connection:/i)).toBeInTheDocument();
       });
     });
 
@@ -449,7 +404,7 @@ describe('ComponentIntegrationExample', () => {
       const { unmount } = render(<EnhancedGoButton />);
       
       // Component should render
-      expect(screen.getByText('Enhanced Go Button (Dual System Integration)')).toBeInTheDocument();
+      expect(screen.getByText('Enhanced Go Button (Component Middleware Integration)')).toBeInTheDocument();
       
       // Unmount should not throw errors
       expect(() => unmount()).not.toThrow();
@@ -478,7 +433,6 @@ describe('ComponentIntegrationExample', () => {
       expect(screen.getByText(/Connection:/i)).toBeInTheDocument();
       expect(screen.getByText(/Status:/i)).toBeInTheDocument();
       expect(screen.getByText(/Selector:/i)).toBeInTheDocument();
-      expect(screen.getByText(/Bridge:/i)).toBeInTheDocument();
     });
   });
 });

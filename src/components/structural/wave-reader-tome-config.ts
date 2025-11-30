@@ -4,8 +4,8 @@
  * This configuration defines the state machines, message routing, and component
  * relationships for the Wave Reader application using the structural system.
  * 
- * IMPORTANT: This integrates with the existing robotproxy ProxyStateMachine system
- * that's already implemented in the component-middleware components.
+ * Component middleware uses this configuration through the structural system
+ * for message routing and state management.
  */
 
 // Wave Reader Main Application Tome Configuration
@@ -87,11 +87,11 @@ export const WaveReaderMainTome = {
       }
     },
     
-    // Wave Tabs Component Tome - References existing component-middleware
+    // Wave Tabs Component Tome
     waveTabs: {
       id: 'wave-tabs',
       name: 'Wave Tabs Navigation',
-      description: 'Manages tab navigation and content switching - integrates with existing WaveTabsTomes',
+      description: 'Manages tab navigation and content switching - uses WaveTabsTomes component middleware',
       componentPath: 'src/component-middleware/wave-tabs/WaveTabsTomes.tsx',
       xstateConfig: {
         id: 'wave-tabs',
@@ -124,11 +124,11 @@ export const WaveReaderMainTome = {
       }
     },
     
-    // Wave Reader Core Component Tome - References existing component-middleware
+    // Wave Reader Core Component Tome
     waveReader: {
       id: 'wave-reader',
       name: 'Wave Reader Core',
-      description: 'Manages wave reading functionality and animations - integrates with existing wave-reader middleware',
+      description: 'Manages wave reading functionality and animations - uses wave-reader component middleware',
       componentPath: 'src/component-middleware/wave-reader/',
       xstateConfig: {
         id: 'wave-reader',
@@ -192,11 +192,11 @@ export const WaveReaderMainTome = {
       }
     },
     
-    // Go Button Component Tome - References existing component-middleware
+    // Go Button Component Tome
     goButton: {
       id: 'go-button',
       name: 'Go Button Control',
-      description: 'Manages the go button state and wave reader activation - integrates with existing GoButtonTomes',
+      description: 'Manages the go button state and wave reader activation - uses GoButtonTomes component middleware',
       componentPath: 'src/component-middleware/go-button/GoButtonTomes.tsx',
       xstateConfig: {
         id: 'go-button',
@@ -235,11 +235,11 @@ export const WaveReaderMainTome = {
       }
     },
     
-    // Selector Input Component Tome - References existing component-middleware
+    // Selector Input Component Tome
     selectorInput: {
       id: 'selector-input',
       name: 'Selector Input Management',
-      description: 'Manages CSS selector input and validation - integrates with existing SelectorInputTomes',
+      description: 'Manages CSS selector input and validation - uses SelectorInputTomes component middleware',
       componentPath: 'src/component-middleware/selector-input/SelectorInputTomes.tsx',
       xstateConfig: {
         id: 'selector-input',
@@ -298,11 +298,11 @@ export const WaveReaderMainTome = {
       }
     },
     
-    // Settings Component Tome - References existing component-middleware
+    // Settings Component Tome
     settings: {
       id: 'settings',
       name: 'Settings Management',
-      description: 'Manages application settings and configuration - integrates with existing settings middleware',
+      description: 'Manages application settings and configuration - uses settings component middleware',
       componentPath: 'src/component-middleware/settings/',
       xstateConfig: {
         id: 'settings',
@@ -350,11 +350,11 @@ export const WaveReaderMainTome = {
       }
     },
     
-    // About Component Tome - References existing component-middleware
+    // About Component Tome
     about: {
       id: 'about',
       name: 'About Information',
-      description: 'Manages about page and version information - integrates with existing about component',
+      description: 'Manages about page and version information - uses about component middleware',
       componentPath: 'src/components/about.tsx',
       xstateConfig: {
         id: 'about',
@@ -389,7 +389,7 @@ export const WaveReaderMainTome = {
     }
   },
   
-  // Message routing configuration - Integrates with robotproxy ProxyStateMachine system
+  // Message routing configuration for component middleware
   routing: {
     // Main application routing
     mainApp: {

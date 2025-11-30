@@ -1,4 +1,4 @@
-import { TomeIntegrationBridge, TomeBridgeConfig } from '../tome-integration-bridge';
+import { ComponentMiddlewareAdapter, ComponentMiddlewareConfig, TomeIntegrationBridge, TomeBridgeConfig } from '../tome-integration-bridge';
 
 // Mock message router
 const mockMessageRouter = {
@@ -6,24 +6,23 @@ const mockMessageRouter = {
   isConnected: true
 };
 
-describe('TomeIntegrationBridge', () => {
-  let bridge: TomeIntegrationBridge;
+describe('ComponentMiddlewareAdapter', () => {
+  let adapter: ComponentMiddlewareAdapter;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    bridge = new TomeIntegrationBridge(mockMessageRouter);
+    adapter = new ComponentMiddlewareAdapter(mockMessageRouter);
   });
 
   describe('constructor', () => {
     it('should initialize with message router', () => {
-      expect(bridge).toBeInstanceOf(TomeIntegrationBridge);
+      expect(adapter).toBeInstanceOf(ComponentMiddlewareAdapter);
     });
   });
 
-  describe('createBridge', () => {
-    const mockConfig: TomeBridgeConfig = {
+  describe('createAdapter', () => {
+    const mockConfig: ComponentMiddlewareConfig = {
       componentName: 'test-component',
-      existingTomePath: '../component-middleware/test/TestTomes.tsx',
       structuralTomeConfig: {
         id: 'test-component',
         name: 'Test Component',
@@ -32,8 +31,8 @@ describe('TomeIntegrationBridge', () => {
       messageRouter: mockMessageRouter
     };
 
-    it('should create a bridge successfully', async () => {
-      const result = await bridge.createBridge(mockConfig);
+    it('should create an adapter successfully', async () => {
+      const result = await adapter.createAdapter(mockConfig);
 
       expect(result).toBeDefined();
       expect(result.componentName).toBe('test-component');
@@ -41,131 +40,125 @@ describe('TomeIntegrationBridge', () => {
       expect(result.messageRouter).toBe(mockMessageRouter);
     });
 
-    it('should store bridge in internal map', async () => {
-      await bridge.createBridge(mockConfig);
+    it('should store adapter in internal map', async () => {
+      await adapter.createAdapter(mockConfig);
       
-      const storedBridge = bridge.getBridge('test-component');
-      expect(storedBridge).toBeDefined();
-      expect(storedBridge.componentName).toBe('test-component');
+      const storedAdapter = adapter.getAdapter('test-component');
+      expect(storedAdapter).toBeDefined();
+      expect(storedAdapter.componentName).toBe('test-component');
     });
   });
 
-  describe('getBridge', () => {
-    it('should return bridge for existing component', async () => {
-      const mockConfig: TomeBridgeConfig = {
+  describe('getAdapter', () => {
+    it('should return adapter for existing component', async () => {
+      const mockConfig: ComponentMiddlewareConfig = {
         componentName: 'existing-component',
-        existingTomePath: '../component-middleware/existing/ExistingTomes.tsx',
         structuralTomeConfig: {},
         messageRouter: mockMessageRouter
       };
 
-      await bridge.createBridge(mockConfig);
-      const result = bridge.getBridge('existing-component');
+      await adapter.createAdapter(mockConfig);
+      const result = adapter.getAdapter('existing-component');
       
       expect(result).toBeDefined();
       expect(result.componentName).toBe('existing-component');
     });
 
     it('should return undefined for non-existent component', () => {
-      const result = bridge.getBridge('non-existent');
+      const result = adapter.getAdapter('non-existent');
       expect(result).toBeUndefined();
     });
   });
 
   describe('sendMessage', () => {
     beforeEach(async () => {
-      const mockConfig: TomeBridgeConfig = {
+      const mockConfig: ComponentMiddlewareConfig = {
         componentName: 'test-component',
-        existingTomePath: '../component-middleware/test/TestTomes.tsx',
         structuralTomeConfig: {},
         messageRouter: mockMessageRouter
       };
 
-      await bridge.createBridge(mockConfig);
+      await adapter.createAdapter(mockConfig);
     });
 
-    it('should send message through bridge successfully', async () => {
+    it('should send message through adapter successfully', async () => {
       const event = { type: 'TEST_EVENT', data: { value: 'test' } };
-      const result = await bridge.sendMessage('test-component', event);
+      const result = await adapter.sendMessage('test-component', event);
 
       expect(result).toBeDefined();
-      expect(result.existing).toBeDefined();
-      expect(result.structural).toBeDefined();
-      expect(result.bridge).toBeDefined();
+      expect(result.success).toBe(true);
     });
 
-    it('should throw error for non-existent bridge', async () => {
+    it('should throw error for non-existent adapter', async () => {
       const event = { type: 'TEST_EVENT', data: {} };
       
-      await expect(bridge.sendMessage('non-existent', event))
-        .rejects.toThrow('No bridge found for component: non-existent');
+      await expect(adapter.sendMessage('non-existent', event))
+        .rejects.toThrow('No adapter found for component: non-existent');
     });
 
     it('should call message router sendMessage', async () => {
       const event = { type: 'TEST_EVENT', data: { value: 'test' } };
-      await bridge.sendMessage('test-component', event);
+      await adapter.sendMessage('test-component', event);
 
       expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith('TEST_EVENT', 'test-component', { value: 'test' });
     });
   });
 
-  describe('getAllBridges', () => {
-    it('should return all created bridges', async () => {
+  describe('getAllAdapters', () => {
+    it('should return all created adapters', async () => {
       const configs = [
-        { componentName: 'component1', existingTomePath: '../component-middleware/component1/Component1Tomes.tsx', structuralTomeConfig: {}, messageRouter: mockMessageRouter },
-        { componentName: 'component2', existingTomePath: '../component-middleware/component2/Component2Tomes.tsx', structuralTomeConfig: {}, messageRouter: mockMessageRouter }
+        { componentName: 'component1', structuralTomeConfig: {}, messageRouter: mockMessageRouter },
+        { componentName: 'component2', structuralTomeConfig: {}, messageRouter: mockMessageRouter }
       ];
 
       for (const config of configs) {
-        await bridge.createBridge(config as TomeBridgeConfig);
+        await adapter.createAdapter(config as ComponentMiddlewareConfig);
       }
 
-      const allBridges = bridge.getAllBridges();
-      expect(allBridges).toHaveLength(2);
-      expect(allBridges.map(b => b.componentName)).toEqual(['component1', 'component2']);
+      const allAdapters = adapter.getAllAdapters();
+      expect(allAdapters).toHaveLength(2);
+      expect(allAdapters.map(a => a.componentName)).toEqual(['component1', 'component2']);
     });
 
-    it('should return empty array when no bridges exist', () => {
-      const allBridges = bridge.getAllBridges();
-      expect(allBridges).toEqual([]);
+    it('should return empty array when no adapters exist', () => {
+      const allAdapters = adapter.getAllAdapters();
+      expect(allAdapters).toEqual([]);
     });
   });
 
   describe('cleanup', () => {
-    it('should clear all bridges', async () => {
-      const mockConfig: TomeBridgeConfig = {
+    it('should clear all adapters', async () => {
+      const mockConfig: ComponentMiddlewareConfig = {
         componentName: 'test-component',
-        existingTomePath: '../component-middleware/test/TestTomes.tsx',
         structuralTomeConfig: {},
         messageRouter: mockMessageRouter
       };
 
-      await bridge.createBridge(mockConfig);
-      expect(bridge.getAllBridges()).toHaveLength(1);
+      await adapter.createAdapter(mockConfig);
+      expect(adapter.getAllAdapters()).toHaveLength(1);
 
-      bridge.cleanup();
-      expect(bridge.getAllBridges()).toHaveLength(0);
+      adapter.cleanup();
+      expect(adapter.getAllAdapters()).toHaveLength(0);
     });
   });
 
-  describe('bridge methods', () => {
-    let testBridge: any;
+  describe('adapter methods', () => {
+    let testAdapter: any;
 
     beforeEach(async () => {
-      const mockConfig: TomeBridgeConfig = {
+      const mockConfig: ComponentMiddlewareConfig = {
         componentName: 'test-component',
-        existingTomePath: '../component-middleware/test/TestTomes.tsx',
         structuralTomeConfig: { id: 'test', name: 'Test' },
         messageRouter: mockMessageRouter
       };
 
-      testBridge = await bridge.createBridge(mockConfig);
+      testAdapter = await adapter.createAdapter(mockConfig);
     });
 
     describe('sendEvent', () => {
       it('should call message router sendMessage', async () => {
         const event = { type: 'TEST_EVENT', data: { value: 'test' } };
-        const result = await testBridge.sendEvent(event);
+        const result = await testAdapter.sendEvent(event);
 
         expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith('TEST_EVENT', 'test-component', { value: 'test' });
         expect(result).toEqual({ success: true });
@@ -174,14 +167,14 @@ describe('TomeIntegrationBridge', () => {
 
     describe('getState', () => {
       it('should return null (placeholder implementation)', () => {
-        const state = testBridge.getState();
+        const state = testAdapter.getState();
         expect(state).toBeNull();
       });
     });
 
     describe('getTomeConfig', () => {
       it('should return tome configuration', () => {
-        const config = testBridge.getTomeConfig();
+        const config = testAdapter.getTomeConfig();
         expect(config).toEqual({ id: 'test', name: 'Test' });
       });
     });
@@ -189,20 +182,35 @@ describe('TomeIntegrationBridge', () => {
 
   describe('error handling', () => {
     it('should handle message sending errors', async () => {
-      const mockConfig: TomeBridgeConfig = {
+      const mockConfig: ComponentMiddlewareConfig = {
         componentName: 'error-component',
-        existingTomePath: '../component-middleware/test/TestTomes.tsx',
         structuralTomeConfig: {},
         messageRouter: mockMessageRouter
       };
 
-      await bridge.createBridge(mockConfig);
+      await adapter.createAdapter(mockConfig);
 
       // Mock message router to throw error
       mockMessageRouter.sendMessage.mockRejectedValue(new Error('Send failed'));
 
-      await expect(bridge.sendMessage('error-component', { type: 'TEST' }))
+      await expect(adapter.sendMessage('error-component', { type: 'TEST' }))
         .rejects.toThrow('Send failed');
+    });
+  });
+
+  describe('legacy compatibility', () => {
+    it('should support TomeIntegrationBridge alias', () => {
+      const legacyAdapter = new TomeIntegrationBridge(mockMessageRouter);
+      expect(legacyAdapter).toBeInstanceOf(ComponentMiddlewareAdapter);
+    });
+
+    it('should support TomeBridgeConfig alias', () => {
+      const legacyConfig: TomeBridgeConfig = {
+        componentName: 'test',
+        structuralTomeConfig: {},
+        messageRouter: mockMessageRouter
+      };
+      expect(legacyConfig).toBeDefined();
     });
   });
 });

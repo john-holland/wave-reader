@@ -6,8 +6,6 @@ This directory contains comprehensive documentation for the Wave Reader project,
 
 ### 🌊 Structural System
 - **[STRUCTURAL_SYSTEM_COMPREHENSIVE.md](./STRUCTURAL_SYSTEM_COMPREHENSIVE.md)** - Complete guide to the structural system with examples
-- **[STRUCTURAL_SYSTEM_INTEGRATION_README.md](./STRUCTURAL_SYSTEM_INTEGRATION_README.md)** - Integration guide for the structural system
-- **[STRUCTURAL_SYSTEM_IMPROVEMENTS.md](./STRUCTURAL_SYSTEM_IMPROVEMENTS.md)** - System improvements and enhancements
 
 ### 🧩 Component System
 - **[COMPONENT_REFACTORING_SUMMARY.md](./COMPONENT_REFACTORING_SUMMARY.md)** - Component refactoring overview
@@ -15,12 +13,10 @@ This directory contains comprehensive documentation for the Wave Reader project,
 - **[TOMECONNECTOR_IMPROVEMENTS.md](./TOMECONNECTOR_IMPROVEMENTS.md)** - TomeConnector improvements
 
 ### 🔄 Integration & Communication
-- **[INTEGRATION_GUIDE.md](./INTEGRATION_GUIDE.md)** - Integration guide for external systems
 - **[INTERCHANGE_SYSTEM_README.md](./INTERCHANGE_SYSTEM_README.md)** - Interchange system documentation
 - **[CHROME_EXTENSION_INTERCHANGE_SUMMARY.md](./CHROME_EXTENSION_INTERCHANGE_SUMMARY.md)** - Chrome extension integration
 
 ### 🎯 Content & Shadow Systems
-- **[LOGVIEW_CONTENT_SYSTEM_REFACTORING_SUMMARY.md](./LOGVIEW_CONTENT_SYSTEM_REFACTORING_SUMMARY.md)** - Content system refactoring
 - **[LOG_VIEW_MACHINE_ARCHITECTURE.md](./LOG_VIEW_MACHINE_ARCHITECTURE.md)** - Log view machine architecture
 - **[ENHANCED_SYSTEM_README.md](./ENHANCED_SYSTEM_README.md)** - Enhanced system features
 
@@ -42,8 +38,7 @@ This directory contains comprehensive documentation for the Wave Reader project,
 
 For developers new to the project, start with:
 1. **[STRUCTURAL_SYSTEM_COMPREHENSIVE.md](./STRUCTURAL_SYSTEM_COMPREHENSIVE.md)** - Complete system overview
-2. **[INTEGRATION_GUIDE.md](./INTEGRATION_GUIDE.md)** - Integration patterns
-3. **[LOG_VIEW_MACHINE_ARCHITECTURE.md](./LOG_VIEW_MACHINE_ARCHITECTURE.md)** - System architecture
+2. **[LOG_VIEW_MACHINE_ARCHITECTURE.md](./LOG_VIEW_MACHINE_ARCHITECTURE.md)** - System architecture
 
 ## 🔍 Finding Information
 

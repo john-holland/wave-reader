@@ -1010,6 +1010,18 @@ class LogViewBackgroundSystem {
             };
             console.log("BACKGROUND->RUNTIME: Coalesced nested message:", normalizedMessage);
         }
+        // Normalize message name: handle both 'type' and 'name' fields, and convert to lowercase
+        if (!normalizedMessage.name && normalizedMessage.type) {
+            normalizedMessage.name = normalizedMessage.type.toLowerCase();
+        }
+        else if (normalizedMessage.name && typeof normalizedMessage.name === 'string') {
+            normalizedMessage.name = normalizedMessage.name.toLowerCase();
+        }
+        // Ensure 'from' field is set
+        if (!normalizedMessage.from) {
+            normalizedMessage.from = normalizedMessage.source || sender?.id ? 'popup' : 'unknown';
+        }
+        console.log("BACKGROUND->RUNTIME: Normalized message name:", normalizedMessage.name, "from:", normalizedMessage.from);
         this.logMessage('runtime-message', `Received ${normalizedMessage.name} from ${normalizedMessage.from}`);
         // Create a proper message using our factory
         const properMessage = _models_messages_simplified_messages__WEBPACK_IMPORTED_MODULE_0__.MessageFactory.createMessage(normalizedMessage.name, normalizedMessage.from, normalizedMessage);
@@ -1019,7 +1031,12 @@ class LogViewBackgroundSystem {
         this.processRuntimeMessage(properMessage, route, sender, sendResponse);
     }
     processRuntimeMessage(message, route, sender, sendResponse) {
-        const messageName = message?.name || message?.message?.name;
+        // Extract message name - check multiple possible locations and normalize
+        let messageName = message?.name || message?.message?.name || message?.type;
+        if (messageName && typeof messageName === 'string') {
+            messageName = messageName.toLowerCase();
+        }
+        console.log("BACKGROUND->RUNTIME: Processing message with name:", messageName);
         try {
             switch (messageName) {
                 case 'initialize':
@@ -1456,13 +1473,48 @@ class LogViewBackgroundSystem {
             if (!tab) {
                 throw new Error('No active tab found');
             }
+            // Check if the tab URL is accessible
+            if (!this.isUrlAccessible(tab.url)) {
+                // If URL is not accessible, wave reader can't be running, so "stopped" is already the state
+                console.log('🌊 Log-View-Machine: Tab URL not accessible, wave reader not active:', tab.url);
+                sendResponse({
+                    success: true,
+                    message: 'Wave reader not active on this page',
+                    data: {
+                        going: false,
+                        tabId: tab.id,
+                        stopTime: Date.now()
+                    }
+                });
+                return;
+            }
             // Send stop message to content script via chrome.tabs.sendMessage
             console.log("BACKGROUND->CONTENT: Sending stop message to tab", tab.id);
-            await this.injectMessageToContentScript(tab.id, {
-                from: 'background-script',
-                name: 'stop',
-                timestamp: Date.now()
-            });
+            try {
+                await this.injectMessageToContentScript(tab.id, {
+                    from: 'background-script',
+                    name: 'stop',
+                    timestamp: Date.now()
+                });
+            }
+            catch (error) {
+                // Check if error is due to content script not being loaded
+                const errorMessage = error?.message || String(error);
+                const errorCode = error?.code;
+                const isContentScriptNotReady = errorCode === 'CONTENT_SCRIPT_NOT_READY' ||
+                    errorMessage.includes('Content script not ready') ||
+                    errorMessage.includes('Could not establish connection') ||
+                    errorMessage.includes('Receiving end does not exist');
+                if (isContentScriptNotReady) {
+                    // Content script not loaded means wave reader is already stopped
+                    console.log('🌊 Log-View-Machine: Content script not ready, wave reader already stopped');
+                    // Continue to update tab tracking and send success response
+                }
+                else {
+                    // Other errors should be re-thrown
+                    throw error;
+                }
+            }
             // Update active tabs tracking
             if (this.activeTabs.has(tab.id)) {
                 const tabInfo = this.activeTabs.get(tab.id);
@@ -1570,15 +1622,101 @@ class LogViewBackgroundSystem {
     async injectMessageToContentScript(tabId, messageData) {
         // Use chrome.tabs.sendMessage directly from background script context
         // This is the correct way to send messages from background to content script
+        // First, check if the tab URL is accessible
+        let tab;
+        try {
+            tab = await chrome.tabs.get(tabId);
+            if (!tab || !this.isUrlAccessible(tab.url)) {
+                // URL is not accessible (like about: pages, extension pages, etc.)
+                const errorMsg = `Cannot send message to restricted URL: ${tab?.url || 'unknown'}`;
+                console.log('🌊 Background: ' + errorMsg);
+                throw new Error(errorMsg);
+            }
+        }
+        catch (error) {
+            // If we can't even get the tab, something is wrong
+            console.error('🌊 Background: Failed to get tab info:', tabId, error.message);
+            throw new Error(`Failed to access tab ${tabId}: ${error.message}`);
+        }
+        // Try to send the message first
         try {
             await chrome.tabs.sendMessage(tabId, {
                 source: 'wave-reader-extension',
                 message: messageData
             });
+            // Success! Message sent
+            return;
         }
         catch (error) {
-            // Tab might not have content script loaded, which is normal
-            console.log('🌊 Background: Could not send message to tab:', tabId, error.message);
+            // Check for Firefox-specific error about receiving end not existing
+            const errorMessage = error?.message || String(error);
+            const isFirefoxConnectionError = errorMessage.includes('Could not establish connection') ||
+                errorMessage.includes('Receiving end does not exist') ||
+                errorMessage.includes('receiving end does not exist');
+            // Check for Chrome runtime error
+            const lastError = chrome.runtime.lastError;
+            const isRuntimeError = lastError && (lastError.message?.includes('Receiving end does not exist') ||
+                lastError.message?.includes('Could not establish connection'));
+            // If content script is not ready, try to inject it
+            if (isFirefoxConnectionError || isRuntimeError) {
+                console.log(`🌊 Background: Content script not ready in tab ${tabId}, attempting to inject...`);
+                try {
+                    // Try to inject content scripts programmatically
+                    // Check if scripting API is available
+                    if (typeof chrome !== 'undefined' && chrome.scripting && chrome.scripting.executeScript) {
+                        // Inject shadowContent.js (required for Firefox)
+                        try {
+                            await chrome.scripting.executeScript({
+                                target: { tabId: tabId },
+                                files: ['shadowContent.js']
+                            });
+                            console.log('🌊 Background: shadowContent.js injected successfully');
+                        }
+                        catch (injectError) {
+                            console.log('🌊 Background: shadowContent.js injection failed (may already be loaded):', injectError.message);
+                        }
+                        // Try to inject content.js (may be needed for Chrome or some setups)
+                        try {
+                            await chrome.scripting.executeScript({
+                                target: { tabId: tabId },
+                                files: ['content.js']
+                            });
+                            console.log('🌊 Background: content.js injected successfully');
+                        }
+                        catch (injectError) {
+                            // content.js might not be available in all setups, which is fine
+                            console.log('🌊 Background: content.js not available or already loaded:', injectError.message);
+                        }
+                        // Wait a brief moment for scripts to initialize
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        // Retry sending the message
+                        try {
+                            await chrome.tabs.sendMessage(tabId, {
+                                source: 'wave-reader-extension',
+                                message: messageData
+                            });
+                            console.log('🌊 Background: Message sent successfully after content script injection');
+                            return;
+                        }
+                        catch (retryError) {
+                            console.error('🌊 Background: Failed to send message after injection:', retryError.message);
+                            // Fall through to throw the original error
+                        }
+                    }
+                    else {
+                        console.error('🌊 Background: Scripting API not available for injection');
+                    }
+                }
+                catch (injectError) {
+                    console.error('🌊 Background: Failed to inject content scripts:', injectError.message);
+                }
+                // If injection failed or message still can't be sent, throw error
+                const specificError = new Error(`Content script not ready on tab ${tabId}: ${errorMessage}`);
+                specificError.code = 'CONTENT_SCRIPT_NOT_READY';
+                throw specificError;
+            }
+            // For other errors, log and re-throw
+            console.error('🌊 Background: Failed to send message to tab:', tabId, errorMessage);
             throw error;
         }
     }
@@ -1704,6 +1842,8 @@ const FEATURE_TOGGLES = {
     ENABLE_DONATIONS: 'enable-donations',
     // Developer Features
     DEVELOPER_MODE: 'developer-mode',
+    // UI Features
+    ENABLE_PUPPIES: 'enable-puppies',
 };
 const DEFAULT_TOGGLE_VALUES = {
     [FEATURE_TOGGLES.ENABLE_BACKEND_API_REQUESTS]: false, // Off by default for release
@@ -1712,6 +1852,7 @@ const DEFAULT_TOGGLE_VALUES = {
     [FEATURE_TOGGLES.ENABLE_TOKEN_SYSTEM]: false,
     [FEATURE_TOGGLES.ENABLE_DONATIONS]: false,
     [FEATURE_TOGGLES.DEVELOPER_MODE]: "development" === 'development',
+    [FEATURE_TOGGLES.ENABLE_PUPPIES]: false,
 };
 /**
  * Feature Toggle Service
@@ -1810,7 +1951,7 @@ var WaveAnimationControl;
     WaveAnimationControl[WaveAnimationControl["CSS"] = 0] = "CSS";
     WaveAnimationControl[WaveAnimationControl["MOUSE"] = 1] = "MOUSE";
 })(WaveAnimationControl || (WaveAnimationControl = {}));
-const KeyChordDefaultFactory = () => ["w", "Shift"];
+const KeyChordDefaultFactory = () => ["f", "Shift"];
 const WaveAnimationControlDefault = WaveAnimationControl.CSS;
 const ShowNotificationsDefault = true;
 const GoingDefault = false;
@@ -2189,7 +2330,34 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-const defaultCssTemplate = (options) => `
+const defaultCssTemplate = (options, cssGenerationMode = 'hardcoded') => {
+    const mode = cssGenerationMode || 'hardcoded';
+    if (mode === 'template') {
+        // Template mode: Use TEMPLATE variables that get replaced at runtime
+        return `
+@-webkit-keyframes wobble {
+  0% { transform: translateX(0%); rotateY(0deg); }
+  25% { transform: translateX(TRANSLATE_X_MIN%) rotateY(ROTATE_Y_MINdeg); }
+  50% { transform: translateX(0%); rotateY(ROTATE_Y_MAXdeg); }
+  75% { transform: translateX(TRANSLATE_X_MAX%) rotateY(ROTATE_Y_MINdeg); }
+  100% { transform: translateX(0%); rotateY(0deg); }
+}
+
+${options.selector || '.wave-reader__text'} {
+  font-size: ${options.text?.size || 'inherit'};
+  -webkit-animation-name: wobble;
+  animation-name: wobble;
+  -webkit-animation-duration: ${options.waveSpeed}s;
+  animation-duration: ${options.waveSpeed}s;
+  -webkit-animation-fill-mode: both;
+  animation-fill-mode: both;
+  animation-iteration-count: infinite;
+}
+`;
+    }
+    else {
+        // Hardcoded mode: Use actual values (current behavior)
+        return `
 @-webkit-keyframes wobble {
   0% { transform: translateX(0%); rotateY(0deg); }
   25% { transform: translateX(${options.axisTranslateAmountXMin}%); rotateY(${options.axisRotationAmountYMin}deg); }
@@ -2209,17 +2377,41 @@ ${options.selector || '.wave-reader__text'} {
   animation-iteration-count: infinite;
 }
 `;
+    }
+};
 // Direct positioning template - no keyframes, just direct transforms
-const defaultCssMouseTemplate = (options) => `
+const defaultCssMouseTemplate = (options, cssGenerationMode = 'template') => {
+    const mode = cssGenerationMode || 'template';
+    if (mode === 'template') {
+        // Template mode: Use TEMPLATE variables (current behavior)
+        return `
 ${options.selector || '.wave-reader__text'} {
   font-size: ${options.text?.size || 'inherit'};
   transform: translateX(TRANSLATE_X%) rotateY(ROTATE_Ydeg);
   transition: transform ANIMATION_DURATIONs ease-out;
 }
 `;
+    }
+    else {
+        // Hardcoded mode: Use actual values (for consistency with CSS template)
+        // Note: For mouse template, hardcoded mode is less useful since values change dynamically,
+        // but we provide it for consistency
+        return `
+${options.selector || '.wave-reader__text'} {
+  font-size: ${options.text?.size || 'inherit'};
+  transform: translateX(0%) rotateY(0deg);
+  transition: transform ${options.waveSpeed || 2}s ease-out;
+}
+`;
+    }
+};
 const TRANSLATE_X = "TRANSLATE_X";
 const ROTATE_Y = "ROTATE_Y";
 const ANIMATION_DURATION = "ANIMATION_DURATION";
+const TRANSLATE_X_MIN = "TRANSLATE_X_MIN";
+const TRANSLATE_X_MAX = "TRANSLATE_X_MAX";
+const ROTATE_Y_MIN = "ROTATE_Y_MIN";
+const ROTATE_Y_MAX = "ROTATE_Y_MAX";
 const replaceAnimationVariables = (wave, translateX, rotateY) => {
     return (wave.cssMouseTemplate || "")
         .replaceAll(TRANSLATE_X, translateX)
@@ -2267,13 +2459,16 @@ class Wave extends _util_attribute_constructor__WEBPACK_IMPORTED_MODULE_1__["def
         // Always generate CSS templates from current parameters (shader-like approach)
         // Use the attributes directly to ensure we have the correct values
         const waveWithAttributes = { ...this, ...attributes };
-        this.cssTemplate = defaultCssTemplate(waveWithAttributes);
-        this.cssMouseTemplate = defaultCssMouseTemplate(waveWithAttributes);
+        const cssGenerationMode = attributes.cssGenerationMode || 'hardcoded';
+        this.cssGenerationMode = cssGenerationMode;
+        this.cssTemplate = defaultCssTemplate(waveWithAttributes, cssGenerationMode);
+        this.cssMouseTemplate = defaultCssMouseTemplate(waveWithAttributes, cssGenerationMode);
     }
     // Always regenerate CSS templates from current parameters
     update() {
-        this.cssTemplate = defaultCssTemplate(this);
-        this.cssMouseTemplate = defaultCssMouseTemplate(this);
+        const cssGenerationMode = this.cssGenerationMode || 'hardcoded';
+        this.cssTemplate = defaultCssTemplate(this, cssGenerationMode);
+        this.cssMouseTemplate = defaultCssMouseTemplate(this, cssGenerationMode);
         return this;
     }
     static getDefaultWave() {

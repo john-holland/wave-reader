@@ -172,10 +172,10 @@ export const createBackgroundProxyMachine = () => {
                             if (typeof chrome !== 'undefined' && chrome.runtime) {
                                 const response: any = await new Promise((resolve, reject) => {
                                     chrome.runtime.sendMessage({
-                                        type: 'START',
+                                        name: 'start',
                                         from: 'popup',
                                         timestamp: Date.now(),
-                                        data: event.data || {}
+                                        options: event.data?.options || {}
                                     }, (response: any) => {
                                         if (chrome.runtime.lastError) {
                                             reject(chrome.runtime.lastError);
@@ -208,7 +208,7 @@ export const createBackgroundProxyMachine = () => {
                             if (typeof chrome !== 'undefined' && chrome.runtime) {
                                 const response: any = await new Promise((resolve, reject) => {
                                     chrome.runtime.sendMessage({
-                                        type: 'STOP',
+                                        name: 'stop',
                                         from: 'popup',
                                         timestamp: Date.now()
                                     }, (response: any) => {

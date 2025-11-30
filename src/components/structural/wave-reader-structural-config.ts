@@ -4,8 +4,8 @@ import WaveReaderMainTome from './wave-reader-tome-config';
 /**
  * Wave Reader Structural System Configuration
  * 
- * This configuration defines how the structural system integrates with the
- * existing wave-reader components and provides message routing between them.
+ * This configuration defines how component middleware uses the structural system
+ * for message routing and state management.
  */
 
 export const WaveReaderStructuralConfig = createStructuralConfig({

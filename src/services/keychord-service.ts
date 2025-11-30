@@ -286,17 +286,36 @@ export class KeyChordService {
         console.log('⌨️ KeyChordService: Updating keyboard shortcut from', 
             this.currentKeyChord.join(' + '), 'to', newKeyChord.join(' + '));
         
-        const wasActive = this.isActive;
+        // Normalize the new keychord
+        const normalizedNewKeyChord = sortKeyChord(newKeyChord);
         
-        if (wasActive) {
-            this.stop();
+        // Check if the keychord actually changed
+        if (compareKeyChords(this.currentKeyChord, normalizedNewKeyChord)) {
+            console.log('⌨️ KeyChordService: Keychord unchanged, skipping update');
+            return;
         }
         
-        // Normalize the keychord when updating it
-        this.currentKeyChord = sortKeyChord(newKeyChord);
+        const wasActive = this.isActive;
+        
+        // Stop the current listener completely - ensure it's fully stopped
+        if (wasActive) {
+            console.log('⌨️ KeyChordService: Stopping current listener before update');
+            this.stop();
+            
+            // Double-check that we're actually stopped
+            if (this.isActive) {
+                console.warn('⌨️ KeyChordService: Service still active after stop(), forcing cleanup');
+                this.stop();
+            }
+        }
+        
+        // Update the keychord
+        this.currentKeyChord = normalizedNewKeyChord;
         this.resetActiveKeys();
 
+        // Restart if it was active before
         if (wasActive) {
+            console.log('⌨️ KeyChordService: Restarting listener with new keychord:', normalizedNewKeyChord.join(' + '));
             this.start();
         }
     }

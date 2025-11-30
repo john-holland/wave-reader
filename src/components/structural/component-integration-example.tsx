@@ -1,21 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useWaveReaderMessageRouter } from './useWaveReaderMessageRouter';
-import { TomeIntegrationBridge } from './tome-integration-bridge';
-import { WaveReaderMainTome } from './wave-reader-tome-config';
 
 /**
  * Component Integration Example
  * 
- * This example shows how to integrate existing component middleware tomes
- * with the new structural system using the TomeIntegrationBridge.
+ * This example demonstrates how component middleware uses the structural system
+ * for message routing and state management.
  */
 
-// Example: Enhanced GoButton that uses both systems
+// Example: GoButton component that uses the structural system
 const EnhancedGoButton = () => {
   const [isActive, setIsActive] = useState(false);
   const [selector, setSelector] = useState('');
 
-  // Use the message router for structural system communication
+  // Component middleware uses the structural system's message router
   const {
     isConnected,
     startWaveReader,
@@ -28,49 +26,14 @@ const EnhancedGoButton = () => {
     enableMetrics: true
   });
 
-  // Create tome integration bridge
-  const [tomeBridge, setTomeBridge] = useState<TomeIntegrationBridge | null>(null);
-
-  useEffect(() => {
-    if (isConnected) {
-      // Initialize the bridge when connected
-      const bridge = new TomeIntegrationBridge({
-        sendMessage: async (type: string, target: string, data: any) => {
-          // This would use the actual message router
-          console.log('Sending message through bridge:', { type, target, data });
-          return { success: true };
-        }
-      });
-
-      // Create bridge for go-button component
-      bridge.createBridge({
-        componentName: 'go-button',
-        existingTomePath: '../component-middleware/go-button/GoButtonTomes.tsx',
-        structuralTomeConfig: WaveReaderMainTome.machines.goButton,
-        messageRouter: { sendMessage: async () => ({ success: true }) }
-      }).then(() => {
-        setTomeBridge(bridge);
-      });
-    }
-  }, [isConnected]);
-
   const handleStart = async () => {
     if (!isConnected || !selector.trim()) return;
 
     try {
       // Send through structural system
-      const structuralResult = await startWaveReader(selector);
-      
-      // Also send through existing tome system if bridge is available
-      if (tomeBridge) {
-        const bridgeResult = await tomeBridge.sendMessage('go-button', {
-          type: 'GO',
-          data: { selector }
-        });
-        console.log('Bridge result:', bridgeResult);
-      }
+      const result = await startWaveReader(selector);
 
-      if (structuralResult.success) {
+      if (result.success) {
         setIsActive(true);
         console.log('Wave reader started successfully');
       }
@@ -84,18 +47,9 @@ const EnhancedGoButton = () => {
 
     try {
       // Send through structural system
-      const structuralResult = await stopWaveReader();
-      
-      // Also send through existing tome system if bridge is available
-      if (tomeBridge) {
-        const bridgeResult = await tomeBridge.sendMessage('go-button', {
-          type: 'STOP',
-          data: {}
-        });
-        console.log('Bridge result:', bridgeResult);
-      }
+      const result = await stopWaveReader();
 
-      if (structuralResult.success) {
+      if (result.success) {
         setIsActive(false);
         console.log('Wave reader stopped successfully');
       }
@@ -114,24 +68,15 @@ const EnhancedGoButton = () => {
         component: 'go-button'
       });
 
-      // setMessageStats(prev => ({
-      //   totalMessages: prev.totalMessages + 1,
-      //   successRate: result.success ? 100 : 0
-      // }));
-
       console.log('Go action result:', result);
     } catch (error) {
       console.error('Failed to send go action:', error);
-      // setMessageStats(prev => ({
-      //   totalMessages: prev.totalMessages + 1,
-      //   successRate: 0
-      // }));
     }
   };
 
   return (
     <div className="enhanced-go-button">
-      <h3>Enhanced Go Button (Dual System Integration)</h3>
+      <h3>Enhanced Go Button (Component Middleware Integration)</h3>
       
       <div className="input-section">
         <input
@@ -165,7 +110,6 @@ const EnhancedGoButton = () => {
         <div>Connection: {isConnected ? '🟢 Connected' : '🔴 Disconnected'}</div>
         <div>Status: {isActive ? '🟢 Active' : '⚪ Inactive'}</div>
         <div>Selector: {selector || 'None'}</div>
-        <div>Bridge: {tomeBridge ? '🟢 Active' : '🔴 Inactive'}</div>
       </div>
 
       {process.env.NODE_ENV === 'development' && (
@@ -181,10 +125,11 @@ const EnhancedGoButton = () => {
   );
 };
 
-// Example: Enhanced WaveTabs that uses both systems
+// Example: WaveTabs component that uses the structural system
 const EnhancedWaveTabs = () => {
   const [activeTab, setActiveTab] = useState('wave-tabs');
 
+  // Component middleware uses the structural system's message router
   const {
     isConnected,
     changeTab,
@@ -195,28 +140,6 @@ const EnhancedWaveTabs = () => {
     autoProcess: true,
     enableMetrics: true
   });
-
-  const [tomeBridge, setTomeBridge] = useState<TomeIntegrationBridge | null>(null);
-
-  useEffect(() => {
-    if (isConnected) {
-      const bridge = new TomeIntegrationBridge({
-        sendMessage: async (type: string, target: string, data: any) => {
-          console.log('Sending message through bridge:', { type, target, data });
-          return { success: true };
-        }
-      });
-
-      bridge.createBridge({
-        componentName: 'wave-tabs',
-        existingTomePath: '../component-middleware/wave-tabs/WaveTabsTomes.tsx',
-        structuralTomeConfig: WaveReaderMainTome.machines.waveTabs,
-        messageRouter: { sendMessage: async () => ({ success: true }) }
-      }).then(() => {
-        setTomeBridge(bridge);
-      });
-    }
-  }, [isConnected]);
 
   const handleTabChange = async (tabId: string) => {
     if (!isConnected) return;
@@ -229,18 +152,9 @@ const EnhancedWaveTabs = () => {
       });
 
       setActiveTab(tabId);
-      // setMessageStats(prev => ({
-      //   totalMessages: prev.totalMessages + 1,
-      //   successRate: result.success ? 100 : 0
-      // }));
-
       console.log('Tab change result:', result);
     } catch (error) {
       console.error('Failed to change tab:', error);
-      // setMessageStats(prev => ({
-      //   totalMessages: prev.totalMessages + 1,
-      //   successRate: 0
-      // }));
     }
   };
 
@@ -252,7 +166,7 @@ const EnhancedWaveTabs = () => {
 
   return (
     <div className="enhanced-wave-tabs">
-      <h3>Enhanced Wave Tabs (Dual System Integration)</h3>
+      <h3>Enhanced Wave Tabs (Component Middleware Integration)</h3>
       
       <div className="tabs-container">
         {tabs.map(tab => (
@@ -271,7 +185,6 @@ const EnhancedWaveTabs = () => {
       <div className="status-section">
         <div>Connection: {isConnected ? '🟢 Connected' : '🔴 Disconnected'}</div>
         <div>Active Tab: {activeTab}</div>
-        <div>Bridge: {tomeBridge ? '🟢 Active' : '🔴 Inactive'}</div>
       </div>
 
       {process.env.NODE_ENV === 'development' && (
@@ -291,19 +204,19 @@ const ComponentIntegrationExample = () => {
     <div className="component-integration-example">
       <h2>🌊 Wave Reader Component Integration Example</h2>
       <p>
-        This example demonstrates how to integrate existing component middleware tomes
-        with the new structural system using the TomeIntegrationBridge.
+        This example demonstrates how component middleware uses the structural system
+        for message routing and state management.
       </p>
       
       <div className="integration-section">
-        <h3>Dual System Integration</h3>
+        <h3>Component Middleware Architecture</h3>
         <p>
-          Each component now communicates through both systems:
+          Component middleware uses the structural system for all communication:
         </p>
         <ul>
-          <li><strong>Existing System:</strong> RobotProxy ProxyStateMachines (component middleware)</li>
-          <li><strong>New System:</strong> Structural system with enhanced message routing</li>
-          <li><strong>Bridge:</strong> TomeIntegrationBridge synchronizes both systems</li>
+          <li><strong>Component Middleware:</strong> React components with UI and business logic</li>
+          <li><strong>Structural System:</strong> Provides message routing, priority queuing, and state management</li>
+          <li><strong>Integration:</strong> Components use the message router hook to communicate through the structural system</li>
         </ul>
       </div>
 
@@ -317,18 +230,21 @@ const ComponentIntegrationExample = () => {
         <pre>
 {`
 ┌─────────────────────────────────────────────────────────────┐
-│                Component Integration Bridge                 │
+│              Component Middleware Layer                     │
+│  ┌──────────────────┐  ┌──────────────────┐               │
+│  │ GoButtonTomes   │  │ WaveTabsTomes    │               │
+│  │ SettingsTomes   │  │ AboutTomes       │               │
+│  └────────┬─────────┘  └────────┬─────────┘               │
+│           │                     │                          │
+│           └──────────┬──────────┘                          │
+│                      │                                      │
+│                      ▼                                      │
 ├─────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────┐    ┌─────────────────────────────┐ │
-│  │ Existing Tomes      │    │   New Structural System    │ │
-│  │ (Component Middleware) │  │                             │ │
-│  │ • GoButtonTomes    │    │ • Enhanced Message Router   │ │
-│  │ • WaveTabsTomes    │    │ • Priority-based routing    │ │
-│  │ • RobotProxy       │    │ • Performance monitoring    │ │
-│  └─────────────────────┘    └─────────────────────────────┘ │
-├─────────────────────────────────────────────────────────────┤
-│                    TomeIntegrationBridge                    │
-│              (Synchronizes Both Systems)                   │
+│              Structural System Layer                        │
+│  • Enhanced Message Router                                  │
+│  • Priority-based routing                                   │
+│  • Performance monitoring                                    │
+│  • State management                                         │
 └─────────────────────────────────────────────────────────────┘
 `}
         </pre>

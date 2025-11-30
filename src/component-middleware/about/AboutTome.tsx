@@ -298,13 +298,9 @@ interface AboutTomeProps {
 
 const AboutPageComponentView = (donated: boolean, hasEasterEggs: boolean, donors: Array<{name: string, amount: string, crypto?: string}>, error?: string | null) => {
   return (
-    <AboutView>
-      <AboutHeader>
-        <AboutTitle>🌊 About Wave Reader</AboutTitle>
-      </AboutHeader>  
-      
-      <AboutContent>
-        {error && (
+    <AboutContent>
+      {/* Header removed - EditorWrapper already provides it */}
+      {error && (
           <Section>
             <div style={{ 
               background: '#f8d7da', 
@@ -346,8 +342,7 @@ const AboutPageComponentView = (donated: boolean, hasEasterEggs: boolean, donors
             Version 1.0.0 • Made with ❤️ for better reading
           </SectionText>
         </Section>
-      </AboutContent>
-    </AboutView>
+    </AboutContent>
   );
 };
 
@@ -527,7 +522,16 @@ const AboutTome: FunctionComponent<AboutTomeProps> = ({
       `Additional details:\n`
     );
     const mailtoLink = `mailto:john.gebhard.holland+epileptic@gmail.com?subject=${subject}&body=${body}`;
-    window.location.href = mailtoLink;
+    
+    // Create and click an anchor element to maintain user gesture chain
+    // This is required by browsers for mailto links to work
+    const anchor = document.createElement('a');
+    anchor.href = mailtoLink;
+    anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
   }, []);
  
   useEffect(() => {

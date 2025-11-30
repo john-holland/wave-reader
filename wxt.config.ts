@@ -20,17 +20,11 @@ export default defineConfig({
       service_worker: 'background.js'
     },
     host_permissions: [
-      '<all_urls>',
-      'tabs',
-      'activeTab'
+      '<all_urls>'
     ],
     permissions: [
       'scripting',
-      'declarativeContent',
       'storage',
-      'notifications',
-      'webNavigation',
-      'activeTab',
       'tabs'
     ]
   },
