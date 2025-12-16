@@ -112,7 +112,7 @@ export function getCurrentKeyChord(): string[] {
     if (keyChordService) {
         return keyChordService.getCurrentKeyChord();
     }
-    return ['Ctrl', 'Shift', 'W'];
+    return ['Shift', 'W'];
 }
 
 /**

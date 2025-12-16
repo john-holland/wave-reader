@@ -6,7 +6,7 @@ export const enum WaveAnimationControl {
     MOUSE
 }
 
-export const KeyChordDefaultFactory = () => ["f", "Shift"]
+export const KeyChordDefaultFactory = () => ["Shift", "W"]
 export const WaveAnimationControlDefault: WaveAnimationControl = WaveAnimationControl.CSS;
 export const ShowNotificationsDefault = true
 export const GoingDefault = false

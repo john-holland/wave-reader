@@ -20,8 +20,8 @@
   "commands": {
     "_execute_action": {
       "suggested_key": {
-        "default": "Ctrl+Shift+W",
-        "mac": "Command+Shift+W"
+        "default": "Shift+W",
+        "mac": "Shift+W"
       },
       "description": "Toggle Wave Reader"
     },

@@ -41,7 +41,7 @@ export const createAppMachine = (router?: MachineRouter) => {
                     settings: null,
                     showNotifications: true,
                     toggleKeys: {
-                        keyChord: ['Ctrl', 'Shift', 'W']
+                        keyChord: ['Shift', 'W']
                     }
                 },
                 // State machine metadata

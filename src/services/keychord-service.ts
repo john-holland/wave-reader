@@ -27,7 +27,7 @@ export class KeyChordService {
     private static readonly MODIFIER_KEYS = new Set(['Alt', 'Ctrl', 'Shift', 'Meta']);
 
     constructor(
-        initialKeyChord: KeyChord = ['Shift', 'F'],
+        initialKeyChord: KeyChord = ['Shift', 'W'],
         onToggleCallback?: () => void
     ) {
         // Normalize the keychord when setting it
@@ -417,7 +417,7 @@ export class KeyChordService {
      * Load key chord from Chrome storage
      */
     static async loadKeyChordFromStorage(): Promise<KeyChord> {
-        const defaultKeyChord: KeyChord = ['Ctrl', 'Shift', 'W'];
+        const defaultKeyChord: KeyChord = ['Shift', 'W'];
         
         if (typeof chrome === 'undefined' || !chrome.storage) {
             return defaultKeyChord;
