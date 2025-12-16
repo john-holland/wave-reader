@@ -37,8 +37,8 @@ export const Settings: React.FC<SettingsProps> = (props) => {
       waveSpeed: options.wave?.waveSpeed ?? 2.0,
       axisTranslateAmountXMax: options.wave?.axisTranslateAmountXMax ?? 2,
       axisTranslateAmountXMin: options.wave?.axisTranslateAmountXMin ?? -2,
-      axisRotationAmountYMax: options.wave?.axisRotationAmountYMax ?? 2,
-      axisRotationAmountYMin: options.wave?.axisRotationAmountYMin ?? -2,
+      axisRotationAmountYMax: options.wave?.axisRotationAmountYMax ?? 1,
+      axisRotationAmountYMin: options.wave?.axisRotationAmountYMin ?? -1,
       // Note: autoGenerateCss and cssGenerationMode are SettingsTomes-specific, not Wave properties
       autoGenerateCss: true, // Default value
       cssGenerationMode: 'template' as 'template' | 'hardcoded', // Default value

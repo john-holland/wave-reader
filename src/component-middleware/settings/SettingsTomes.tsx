@@ -402,8 +402,8 @@ const DEFAULT_SETTINGS: Settings = {
   waveSpeed: 2.0,
   axisTranslateAmountXMax: 4,
   axisTranslateAmountXMin: -4,
-  axisRotationAmountYMax: 2,
-  axisRotationAmountYMin: -2,
+  axisRotationAmountYMax: 1,
+  axisRotationAmountYMin: -1,
   autoGenerateCss: true,
   cssGenerationMode: 'template'
 };
@@ -537,37 +537,34 @@ const sanitizeSettings = (overrides: Partial<Settings> = {}): Settings => {
 };
 
 const generateCssFromSettings = (settings: Settings) => {
-  const numericParams = [
-    settings.waveSpeed,
-    settings.axisTranslateAmountXMax,
-    settings.axisTranslateAmountXMin,
-    settings.axisRotationAmountYMax,
-    settings.axisRotationAmountYMin
-  ];
+  // Helper function to safely convert to number, using default if empty/invalid
+  const safeParseNumber = (value: number | string | null | undefined, defaultValue: number): number => {
+    if (value === '' || value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) {
+      return defaultValue;
+    }
+    const parsed = typeof value === 'string' ? parseFloat(value) : value;
+    return Number.isNaN(parsed) ? defaultValue : parsed;
+  };
 
-  // Skip CSS generation if any parameter is empty string or invalid
-  if (numericParams.some(param => 
-    param === '' || 
-    param === null || 
-    param === undefined || 
-    (typeof param === 'string' && param.trim() === '') ||
-    (typeof param === 'number' && Number.isNaN(param))
-  )) {
-    console.warn('⚙️ SettingsTomes: Skipping CSS generation due to invalid or empty numeric parameters');
-    return null;
-  }
+  // Convert string values to numbers for CSS generation, using defaults for empty/invalid values
+  const waveSpeed = safeParseNumber(settings.waveSpeed, DEFAULT_SETTINGS.waveSpeed as number);
+  const axisTranslateAmountXMax = safeParseNumber(settings.axisTranslateAmountXMax, DEFAULT_SETTINGS.axisTranslateAmountXMax as number);
+  const axisTranslateAmountXMin = safeParseNumber(settings.axisTranslateAmountXMin, DEFAULT_SETTINGS.axisTranslateAmountXMin as number);
+  const axisRotationAmountYMax = safeParseNumber(settings.axisRotationAmountYMax, DEFAULT_SETTINGS.axisRotationAmountYMax as number);
+  const axisRotationAmountYMin = safeParseNumber(settings.axisRotationAmountYMin, DEFAULT_SETTINGS.axisRotationAmountYMin as number);
 
-  // Convert string values to numbers for CSS generation
-  const waveSpeed = typeof settings.waveSpeed === 'string' ? parseFloat(settings.waveSpeed) : settings.waveSpeed;
-  const axisTranslateAmountXMax = typeof settings.axisTranslateAmountXMax === 'string' ? parseFloat(settings.axisTranslateAmountXMax) : settings.axisTranslateAmountXMax;
-  const axisTranslateAmountXMin = typeof settings.axisTranslateAmountXMin === 'string' ? parseFloat(settings.axisTranslateAmountXMin) : settings.axisTranslateAmountXMin;
-  const axisRotationAmountYMax = typeof settings.axisRotationAmountYMax === 'string' ? parseFloat(settings.axisRotationAmountYMax) : settings.axisRotationAmountYMax;
-  const axisRotationAmountYMin = typeof settings.axisRotationAmountYMin === 'string' ? parseFloat(settings.axisRotationAmountYMin) : settings.axisRotationAmountYMin;
+  // Log if we're using defaults for any parameter (for debugging)
+  const usingDefaults = [
+    { name: 'waveSpeed', value: settings.waveSpeed, default: waveSpeed },
+    { name: 'axisTranslateAmountXMax', value: settings.axisTranslateAmountXMax, default: axisTranslateAmountXMax },
+    { name: 'axisTranslateAmountXMin', value: settings.axisTranslateAmountXMin, default: axisTranslateAmountXMin },
+    { name: 'axisRotationAmountYMax', value: settings.axisRotationAmountYMax, default: axisRotationAmountYMax },
+    { name: 'axisRotationAmountYMin', value: settings.axisRotationAmountYMin, default: axisRotationAmountYMin }
+  ].filter(p => (p.value === '' || p.value === null || p.value === undefined || (typeof p.value === 'string' && p.value.trim() === '')));
 
-  // Double-check all are valid numbers after conversion
-  if ([waveSpeed, axisTranslateAmountXMax, axisTranslateAmountXMin, axisRotationAmountYMax, axisRotationAmountYMin].some(param => Number.isNaN(param))) {
-    console.warn('⚙️ SettingsTomes: Skipping CSS generation due to invalid numeric parameters after conversion');
-    return null;
+  if (usingDefaults.length > 0) {
+    console.warn('⚙️ SettingsTomes: Using default values for empty/invalid parameters:', 
+      usingDefaults.map(p => `${p.name}="${p.value}" (using default: ${p.default})`).join(', '));
   }
 
   const wave = new Wave({

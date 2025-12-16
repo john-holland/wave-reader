@@ -42,8 +42,8 @@ export class MLSettingsService {
                         waveSpeed: 3,
                         axisTranslateAmountXMax: 1,
                         axisTranslateAmountXMin: -1,
-                        axisRotationAmountYMax: 2,
-                        axisRotationAmountYMin: -2,
+                        axisRotationAmountYMax: 1,
+                        axisRotationAmountYMin: -1,
                         mouseFollowInterval: 80
                     }),
                     showNotifications: true,

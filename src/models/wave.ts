@@ -170,8 +170,8 @@ export default class Wave extends AttributeConstructor<Wave>{
             shape: WaveShape.F_SHAPED,
             axisTranslateAmountXMax: 0,
             axisTranslateAmountXMin: -1,
-            axisRotationAmountYMin: -2,
-            axisRotationAmountYMax: 2,
+            axisRotationAmountYMin: -1,
+            axisRotationAmountYMax: 1,
             mouseFollowInterval: 100,
             text: new Text({
                 size: 'initial',

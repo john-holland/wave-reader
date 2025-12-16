@@ -220,8 +220,8 @@ function updateWaveToMouseWithDuration(options, duration, loadCSSFunction, repla
                 const mouseYNormalized = Math.max(0, Math.min(1, mouseY / window.innerHeight)); // Clamp to 0-1
                 
                 // Use default values if settings are missing
-                const minRotation = options.wave.axisRotationAmountYMin ?? -2;
-                const maxRotation = options.wave.axisRotationAmountYMax ?? 2;
+                const minRotation = options.wave.axisRotationAmountYMin ?? -1;
+                const maxRotation = options.wave.axisRotationAmountYMax ?? 1;
                 const rotationRange = maxRotation - minRotation;
                 
                 // Calculate target rotation (center position)
@@ -313,8 +313,8 @@ function enableMouseFollowingWave(options, loadCSSFunction, replaceAnimationVari
     };
     
     // Initialize smooth animation state
-    const minRotation = options?.wave?.axisRotationAmountYMin ?? -2;
-    const maxRotation = options?.wave?.axisRotationAmountYMax ?? 2;
+    const minRotation = options?.wave?.axisRotationAmountYMin ?? -1;
+    const maxRotation = options?.wave?.axisRotationAmountYMax ?? 1;
     const centerRotation = (minRotation + maxRotation) / 2;
     
     // Start at center position

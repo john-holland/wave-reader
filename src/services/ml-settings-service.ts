@@ -124,8 +124,8 @@ export class MLSettingsService {
                 waveSpeed: 3,
                 axisTranslateAmountXMax: 1,
                 axisTranslateAmountXMin: -1,
-                axisRotationAmountYMax: 2,
-                axisRotationAmountYMin: -2,
+                axisRotationAmountYMax: 1,
+                axisRotationAmountYMin: -1,
                 mouseFollowInterval: 80
             }),
             showNotifications: true,
@@ -797,8 +797,8 @@ export class MLSettingsService {
             waveSpeed: this.constrainToBounds(settings.wave.waveSpeed ?? 3, 'waveSpeed'),
             axisTranslateAmountXMax: this.constrainToBounds(settings.wave.axisTranslateAmountXMax ?? 1, 'axisTranslateAmountXMax'),
             axisTranslateAmountXMin: this.constrainToBounds(settings.wave.axisTranslateAmountXMin ?? -1, 'axisTranslateAmountXMin'),
-            axisRotationAmountYMax: this.constrainToBounds(settings.wave.axisRotationAmountYMax ?? 2, 'axisRotationAmountYMax'),
-            axisRotationAmountYMin: this.constrainToBounds(settings.wave.axisRotationAmountYMin ?? -2, 'axisRotationAmountYMin'),
+            axisRotationAmountYMax: this.constrainToBounds(settings.wave.axisRotationAmountYMax ?? 1, 'axisRotationAmountYMax'),
+            axisRotationAmountYMin: this.constrainToBounds(settings.wave.axisRotationAmountYMin ?? -1, 'axisRotationAmountYMin'),
             mouseFollowInterval: this.constrainToBounds(settings.wave.mouseFollowInterval ?? 80, 'mouseFollowInterval')
         });
 

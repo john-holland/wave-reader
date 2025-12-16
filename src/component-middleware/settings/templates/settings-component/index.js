@@ -40,8 +40,8 @@ const SettingsComponentTemplate = {
         waveSpeed: 2.0,
         axisTranslateAmountXMax: 2,
         axisTranslateAmountXMin: -2,
-        axisRotationAmountYMax: 2,
-        axisRotationAmountYMin: -2,
+        axisRotationAmountYMax: 1,
+        axisRotationAmountYMin: -1,
         mouseFollowInterval: 50
       }
     }
