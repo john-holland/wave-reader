@@ -82,6 +82,9 @@ class AppTomeClass extends TomeBase {
             // Initialize Chrome API connection
             this.chromeApiMachine.send('INITIALIZE');
             
+            // Refresh state from content script if available
+            this.appMachine.send('REFRESH_STATE');
+            
             this.isInitialized = true;
             this.updateViewKey('initialized');
             
@@ -212,7 +215,7 @@ class AppTomeClass extends TomeBase {
             try {
                 // Only handle messages from background script
                 if (message.from === 'background-script' || message.source === 'background') {
-                    console.log('🌊 AppTome: Routing message to ChromeApiMachine:', message.name || message.type);
+                    console.log('🌊 AppTome: Routing message to ChromeApiMachine:', message.name);
                     
                     // Route message to ChromeApiMachine using router
                     this.router.send(MACHINE_NAMES.CHROME_API, 'INCOMING_MESSAGE', { message })
@@ -503,6 +506,14 @@ class AppTomeClass extends TomeBase {
      */
     getRouter(): any {
         return this.router;
+    }
+
+    /**
+     * Static method to send messages to machines via router
+     * This allows components to send messages without direct access to the instance
+     */
+    static send(target: string, event: string, data?: any): Promise<any> {
+        return AppTome.router.send(target, event, data);
     }
 
     /**

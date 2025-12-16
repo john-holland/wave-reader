@@ -157,7 +157,7 @@ export function useWaveReaderMessageRouter(options: UseWaveReaderMessageRouterOp
 
     try {
       const result = await waveReaderMessageRouter.sendMessage({
-        type,
+        name: type,
         source: componentName,
         target,
         priority,
@@ -194,7 +194,7 @@ export function useWaveReaderMessageRouter(options: UseWaveReaderMessageRouterOp
 
     try {
       const result = await waveReaderMessageRouter.sendMessageWithRetry({
-        type,
+        name: type,
         source: componentName,
         target,
         priority,
@@ -230,7 +230,7 @@ export function useWaveReaderMessageRouter(options: UseWaveReaderMessageRouterOp
 
     try {
       const results = await waveReaderMessageRouter.broadcastMessage({
-        type,
+        name: type,
         source: componentName,
         priority,
         data

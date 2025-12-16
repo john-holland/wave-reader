@@ -248,7 +248,8 @@ export class KeyChordService {
      * Stop listening for keyboard shortcuts
      */
     stop(): void {
-        if (!this.isActive) {
+        if (!this.isActive && !this.listener && !this.keyupListener && !this.blurListener && !this.subscription) {
+            // Already fully stopped
             return;
         }
 
@@ -256,27 +257,50 @@ export class KeyChordService {
         
         this.isActive = false;
 
+        // Unsubscribe from observable first
         if (this.subscription) {
-            this.subscription.unsubscribe();
+            try {
+                this.subscription.unsubscribe();
+            } catch (error) {
+                console.warn('⌨️ KeyChordService: Error unsubscribing:', error);
+            }
             this.subscription = null;
         }
 
+        // Remove all event listeners
         if (this.listener) {
-            window.removeEventListener('keydown', this.listener, true);
+            try {
+                window.removeEventListener('keydown', this.listener, true);
+            } catch (error) {
+                console.warn('⌨️ KeyChordService: Error removing keydown listener:', error);
+            }
             this.listener = null;
         }
 
         if (this.keyupListener) {
-            window.removeEventListener('keyup', this.keyupListener, true);
+            try {
+                window.removeEventListener('keyup', this.keyupListener, true);
+            } catch (error) {
+                console.warn('⌨️ KeyChordService: Error removing keyup listener:', error);
+            }
             this.keyupListener = null;
         }
 
         if (this.blurListener) {
-            window.removeEventListener('blur', this.blurListener, true);
+            try {
+                window.removeEventListener('blur', this.blurListener, true);
+            } catch (error) {
+                console.warn('⌨️ KeyChordService: Error removing blur listener:', error);
+            }
             this.blurListener = null;
         }
 
         this.resetActiveKeys();
+        
+        // Verify we're fully stopped
+        if (this.isActive || this.listener || this.keyupListener || this.blurListener || this.subscription) {
+            console.warn('⌨️ KeyChordService: Warning - service may not be fully stopped');
+        }
     }
 
     /**
@@ -295,16 +319,18 @@ export class KeyChordService {
             return;
         }
         
+        // Store the current callback before stopping
+        const currentCallback = this.onToggle;
         const wasActive = this.isActive;
         
         // Stop the current listener completely - ensure it's fully stopped
-        if (wasActive) {
+        if (wasActive || this.listener || this.keyupListener || this.blurListener || this.subscription) {
             console.log('⌨️ KeyChordService: Stopping current listener before update');
             this.stop();
             
             // Double-check that we're actually stopped
-            if (this.isActive) {
-                console.warn('⌨️ KeyChordService: Service still active after stop(), forcing cleanup');
+            if (this.isActive || this.listener || this.keyupListener || this.blurListener || this.subscription) {
+                console.warn('⌨️ KeyChordService: Service still active after stop(), forcing cleanup again');
                 this.stop();
             }
         }
@@ -313,8 +339,10 @@ export class KeyChordService {
         this.currentKeyChord = normalizedNewKeyChord;
         this.resetActiveKeys();
 
-        // Restart if it was active before
+        // Restart if it was active before, ensuring callback is preserved
         if (wasActive) {
+            // Ensure callback is preserved
+            this.onToggle = currentCallback;
             console.log('⌨️ KeyChordService: Restarting listener with new keychord:', normalizedNewKeyChord.join(' + '));
             this.start();
         }
@@ -362,6 +390,13 @@ export class KeyChordService {
      */
     setOnToggle(callback: () => void): void {
         this.onToggle = callback;
+    }
+
+    /**
+     * Get the current toggle callback
+     */
+    getOnToggle(): (() => void) | null {
+        return this.onToggle;
     }
 
     /**

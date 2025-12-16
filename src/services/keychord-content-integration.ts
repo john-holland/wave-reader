@@ -43,7 +43,13 @@ export async function initializeKeyChordService(
     settingsCleanup = KeyChordService.setupSettingsListener((newKeyChord: KeyChord) => {
         console.log('⌨️ KeyChordContentIntegration: Settings changed, updating keyboard shortcut');
         if (keyChordService) {
+            // Store current callback before update
+            const currentCallback = keyChordService.getOnToggle() || sendToggleToBackground;
             keyChordService.updateKeyChord(newKeyChord);
+            // Re-establish callback if needed (updateKeyChord should preserve it, but ensure it's set)
+            if (currentCallback) {
+                keyChordService.setOnToggle(currentCallback);
+            }
         }
     });
 

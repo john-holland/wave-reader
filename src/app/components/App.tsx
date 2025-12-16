@@ -155,16 +155,24 @@ const AppComponent: FunctionComponent = () => {
               console.log('🌊 App Component: Button state - going:', going);
               
               return going ? (
-                <StopWaveButton onClick={() => {
+                <StopWaveButton onClick={async () => {
                   console.log('🌊 App Component: Stop button clicked');
-                  AppTome.send(MACHINE_NAMES.APP, 'STOP');
+                  try {
+                    await AppTome.send(MACHINE_NAMES.APP, 'STOP');
+                  } catch (error) {
+                    console.error('🌊 App Component: Failed to send STOP:', error);
+                  }
                 }}>
                   Stop
                 </StopWaveButton>
               ) : (
-                <StartWaveButton onClick={() => {
+                <StartWaveButton onClick={async () => {
                   console.log('🌊 App Component: Start button clicked');
-                  AppTome.send(MACHINE_NAMES.APP, 'START');
+                  try {
+                    await AppTome.send(MACHINE_NAMES.APP, 'START');
+                  } catch (error) {
+                    console.error('🌊 App Component: Failed to send START:', error);
+                  }
                 }}>
                   Start
                 </StartWaveButton>
