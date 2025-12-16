@@ -128,11 +128,13 @@ export const createBackgroundProxyMachine = () => {
             actions: {
                 handleInitialize: {
                     exec: async (context: any, event: any, meta: any) => {
-                        const log = meta?.log || ((msg: string, data?: any) => {
+                        // Extract log and send from meta.state.machine if available
+                        const machine = meta?.state?.machine;
+                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
                             console.warn(`log not available for message "background-proxy-machine": ${msg}`, data);
                             console.log(msg, data);
                         });
-                        const send = meta?.send || ((evt: any) => console.warn('send not available:', evt));
+                        const send = meta?.send || machine?.send?.bind(machine) || ((evt: any) => console.warn('send not available:', evt));
                         log('🌊 Background Proxy: Handling initialization');
                         
                         try {
@@ -169,11 +171,13 @@ export const createBackgroundProxyMachine = () => {
                 },
                 handleStart: {
                     exec: async (context: any, event: any, meta: any) => {
-                        const log = meta?.log || ((msg: string, data?: any) => {
+                        // Extract log and send from meta.state.machine if available
+                        const machine = meta?.state?.machine;
+                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
                             console.warn(`log not available for message "background-proxy-machine": ${msg}`, data);
                             console.log(msg, data);
                         });
-                        const send = meta?.send || ((evt: any) => console.warn('send not available:', evt));
+                        const send = meta?.send || machine?.send?.bind(machine) || ((evt: any) => console.warn('send not available:', evt));
                         log('🌊 Background Proxy: Handling start');
                         
                         try {
@@ -209,11 +213,13 @@ export const createBackgroundProxyMachine = () => {
                 },
                 handleStop: {
                     exec: async (context: any, event: any, meta: any) => {
-                        const log = meta?.log || ((msg: string, data?: any) => {
+                        // Extract log and send from meta.state.machine if available
+                        const machine = meta?.state?.machine;
+                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
                             console.warn(`log not available for message "background-proxy-machine": ${msg}`, data);
                             console.log(msg, data);
                         });
-                        const send = meta?.send || ((evt: any) => console.warn('send not available:', evt));
+                        const send = meta?.send || machine?.send?.bind(machine) || ((evt: any) => console.warn('send not available:', evt));
                         log('🌊 Background Proxy: Handling stop');
                         
                         try {
@@ -248,11 +254,13 @@ export const createBackgroundProxyMachine = () => {
                 },
                 handleToggle: {
                     exec: async (context: any, event: any, meta: any) => {
-                        const log = meta?.log || ((msg: string, data?: any) => {
+                        // Extract log and send from meta.state.machine if available
+                        const machine = meta?.state?.machine;
+                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
                             console.warn(`log not available for message "background-proxy-machine": ${msg}`, data);
                             console.log(msg, data);
                         });
-                        const send = meta?.send || ((evt: any) => console.warn('send not available:', evt));
+                        const send = meta?.send || machine?.send?.bind(machine) || ((evt: any) => console.warn('send not available:', evt));
                         log('🌊 Background Proxy: Handling toggle');
                         
                         try {
@@ -288,7 +296,9 @@ export const createBackgroundProxyMachine = () => {
                 },
                 handleGetStatus: {
                     exec: async (context: any, event: any, meta: any) => {
-                        const log = meta?.log || ((msg: string, data?: any) => {
+                        // Extract log and send from meta.state.machine if available
+                        const machine = meta?.state?.machine;
+                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
                             console.warn(`log not available for message "background-proxy-machine": ${msg}`, data);
                             console.log(msg, data);
                         });
@@ -320,7 +330,9 @@ export const createBackgroundProxyMachine = () => {
                 },
                 handleHealthCheck: {
                     exec: async (context: any, event: any, meta: any) => {
-                        const log = meta?.log || ((msg: string, data?: any) => {
+                        // Extract log and send from meta.state.machine if available
+                        const machine = meta?.state?.machine;
+                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
                             console.warn(`log not available for message "background-proxy-machine": ${msg}`, data);
                             console.log(msg, data);
                         });
@@ -354,7 +366,9 @@ export const createBackgroundProxyMachine = () => {
                 },
                 completeBackendRequest: {
                     exec: (context: any, event: any, meta: any) => {
-                        const log = meta?.log || ((msg: string, data?: any) => {
+                        // Extract log and send from meta.state.machine if available
+                        const machine = meta?.state?.machine;
+                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
                             console.warn(`log not available for message "background-proxy-machine": ${msg}`, data);
                             console.log(msg, data);
                         });
@@ -364,7 +378,9 @@ export const createBackgroundProxyMachine = () => {
                 },
                 completeGraphQLRequest: {
                     exec: (context: any, event: any, meta: any) => {
-                        const log = meta?.log || ((msg: string, data?: any) => {
+                        // Extract log and send from meta.state.machine if available
+                        const machine = meta?.state?.machine;
+                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
                             console.warn(`log not available for message "background-proxy-machine": ${msg}`, data);
                             console.log(msg, data);
                         });
@@ -374,7 +390,9 @@ export const createBackgroundProxyMachine = () => {
                 },
                 completeBackendToggleQuery: {
                     exec: (context: any, event: any, meta: any) => {
-                        const log = meta?.log || ((msg: string, data?: any) => {
+                        // Extract log and send from meta.state.machine if available
+                        const machine = meta?.state?.machine;
+                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
                             console.warn(`log not available for message "background-proxy-machine": ${msg}`, data);
                             console.log(msg, data);
                         });
@@ -386,7 +404,9 @@ export const createBackgroundProxyMachine = () => {
                 },
                 setBackendToggleState: {
                     exec: (context: any, event: any, meta: any) => {
-                        const log = meta?.log || ((msg: string, data?: any) => {
+                        // Extract log and send from meta.state.machine if available
+                        const machine = meta?.state?.machine;
+                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
                             console.warn(`log not available for message "background-proxy-machine": ${msg}`, data);
                             console.log(msg, data);
                         });
@@ -397,7 +417,9 @@ export const createBackgroundProxyMachine = () => {
                 },
                 handlePing: {
                     exec: async (context: any, event: any, meta: any) => {
-                        const log = meta?.log || ((msg: string, data?: any) => {
+                        // Extract log and send from meta.state.machine if available
+                        const machine = meta?.state?.machine;
+                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
                             console.warn(`log not available for message "background-proxy-machine": ${msg}`, data);
                             console.log(msg, data);
                         });
@@ -430,7 +452,9 @@ export const createBackgroundProxyMachine = () => {
                 },
                 completeInitialization: {
                     exec: (context: any, event: any, meta: any) => {
-                        const log = meta?.log || ((msg: string, data?: any) => {
+                        // Extract log and send from meta.state.machine if available
+                        const machine = meta?.state?.machine;
+                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
                             console.warn(`log not available for message "background-proxy-machine": ${msg}`, data);
                             console.log(msg, data);
                         });
@@ -439,7 +463,9 @@ export const createBackgroundProxyMachine = () => {
                 },
                 completeStart: {
                     exec: (context: any, event: any, meta: any) => {
-                        const log = meta?.log || ((msg: string, data?: any) => {
+                        // Extract log and send from meta.state.machine if available
+                        const machine = meta?.state?.machine;
+                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
                             console.warn(`log not available for message "background-proxy-machine": ${msg}`, data);
                             console.log(msg, data);
                         });
@@ -448,7 +474,9 @@ export const createBackgroundProxyMachine = () => {
                 },
                 completeStop: {
                     exec: (context: any, event: any, meta: any) => {
-                        const log = meta?.log || ((msg: string, data?: any) => {
+                        // Extract log and send from meta.state.machine if available
+                        const machine = meta?.state?.machine;
+                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
                             console.warn(`log not available for message "background-proxy-machine": ${msg}`, data);
                             console.log(msg, data);
                         });
@@ -457,7 +485,9 @@ export const createBackgroundProxyMachine = () => {
                 },
                 completeToggle: {
                     exec: (context: any, event: any, meta: any) => {
-                        const log = meta?.log || ((msg: string, data?: any) => {
+                        // Extract log and send from meta.state.machine if available
+                        const machine = meta?.state?.machine;
+                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
                             console.warn(`log not available for message "background-proxy-machine": ${msg}`, data);
                             console.log(msg, data);
                         });
@@ -466,7 +496,9 @@ export const createBackgroundProxyMachine = () => {
                 },
                 handleError: {
                     exec: (context: any, event: any, meta: any) => {
-                        const log = meta?.log || ((msg: string, data?: any) => {
+                        // Extract log and send from meta.state.machine if available
+                        const machine = meta?.state?.machine;
+                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
                             console.warn(`log not available for message "background-proxy-machine": ${msg}`, data);
                             console.log(msg, data);
                         });
