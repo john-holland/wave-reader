@@ -1093,6 +1093,10 @@ class LogViewBackgroundSystem {
                     console.log("BACKGROUND->LOOP: Processing loop detection stats");
                     this.handleLoopDetectionStats(message, sender, sendResponse);
                     break;
+                case 'update-going-state':
+                    console.log("BACKGROUND->STATE: Processing update-going-state message");
+                    this.handleUpdateGoingState(message, sender, sendResponse);
+                    break;
                 default:
                     console.log(`🌊 Log-View-Machine: Unknown runtime message type: ${messageName}`);
                     this.logMessage('unknown-runtime-message', `Unknown message type: ${messageName}`);
@@ -1426,6 +1430,41 @@ class LogViewBackgroundSystem {
             console.error('🌊 Log-View-Machine: Failed to start wave reader:', error);
             this.logMessage('start-error', `Failed to start: ${error.message}`);
             sendResponse({ success: false, error: error.message });
+        }
+    }
+    handleUpdateGoingState(message, sender, sendResponse) {
+        try {
+            const tabId = sender?.tab?.id;
+            const going = message?.going ?? false;
+            if (!tabId) {
+                console.warn('🌊 Log-View-Machine: update-going-state message missing tab ID');
+                sendResponse({ success: false, error: 'Missing tab ID' });
+                return;
+            }
+            // Update active tabs tracking
+            if (this.activeTabs.has(tabId)) {
+                const tabInfo = this.activeTabs.get(tabId);
+                tabInfo.going = going;
+                tabInfo.state = going ? 'waving' : 'stopped';
+                tabInfo.lastActivity = Date.now();
+                this.activeTabs.set(tabId, tabInfo);
+            }
+            else {
+                // Create new entry if tab not tracked yet
+                this.activeTabs.set(tabId, {
+                    state: going ? 'waving' : 'stopped',
+                    going: going,
+                    lastActivity: Date.now(),
+                    startTime: going ? Date.now() : undefined,
+                    stopTime: going ? undefined : Date.now()
+                });
+            }
+            this.logMessage('going-state-updated', `Going state updated to ${going} for tab ${tabId}`);
+            sendResponse({ success: true, going, tabId });
+        }
+        catch (error) {
+            console.error('🌊 Log-View-Machine: Failed to update going state:', error);
+            sendResponse({ success: false, error: error?.message || 'Unknown error' });
         }
     }
     handleLoopDetectionStats(message, sender, sendResponse) {

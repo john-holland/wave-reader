@@ -77,7 +77,7 @@ const TestComponent = ({ componentName, options = {} }: { componentName: string;
       
       <button 
         data-testid="route-message" 
-        onClick={() => routeMessage({ type: 'ROUTE_TYPE', source: 'test-component', target: 'target', data: { data: 'route' }, priority: 'normal' })}
+        onClick={() => routeMessage({ name: 'ROUTE_NAME', source: 'test-component', target: 'target', data: { data: 'route' }, priority: 'normal' })}
       >
         Route Message
       </button>
@@ -219,7 +219,7 @@ describe('useWaveReaderMessageRouter', () => {
       await waitFor(() => {
         expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith(
           expect.objectContaining({
-            type: 'TEST_TYPE',
+            name: 'TEST_NAME',
             target: 'target',
             source: 'test-component',
             data: { data: 'test' },
@@ -237,7 +237,7 @@ describe('useWaveReaderMessageRouter', () => {
       await waitFor(() => {
         expect(mockMessageRouter.sendMessageWithRetry).toHaveBeenCalledWith(
           expect.objectContaining({
-            type: 'RETRY_TYPE',
+            name: 'RETRY_NAME',
             target: 'target',
             source: 'test-component',
             data: { data: 'retry' },
@@ -256,7 +256,7 @@ describe('useWaveReaderMessageRouter', () => {
       await waitFor(() => {
         expect(mockMessageRouter.broadcastMessage).toHaveBeenCalledWith(
           expect.objectContaining({
-            type: 'BROADCAST_TYPE',
+            name: 'BROADCAST_NAME',
             source: 'test-component',
             data: { message: 'hello' },
             priority: 'normal'
@@ -274,7 +274,7 @@ describe('useWaveReaderMessageRouter', () => {
       await waitFor(() => {
         expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith(
           expect.objectContaining({
-            type: 'ROUTE_TYPE',
+            name: 'ROUTE_NAME',
             target: 'target',
             source: 'test-component',
             data: { data: 'route' },
@@ -294,7 +294,7 @@ describe('useWaveReaderMessageRouter', () => {
       await waitFor(() => {
         expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith(
           expect.objectContaining({
-            type: 'WAVE_READER_START',
+            name: 'WAVE_READER_START',
             target: 'wave-reader',
             source: 'test-component',
             data: { selector: 'selector' },
@@ -312,7 +312,7 @@ describe('useWaveReaderMessageRouter', () => {
       await waitFor(() => {
         expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith(
           expect.objectContaining({
-            type: 'WAVE_READER_STOP',
+            name: 'WAVE_READER_STOP',
             target: 'wave-reader',
             source: 'test-component',
             data: {},
@@ -330,7 +330,7 @@ describe('useWaveReaderMessageRouter', () => {
       await waitFor(() => {
         expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith(
           expect.objectContaining({
-            type: 'TAB_CHANGE',
+            name: 'TAB_CHANGE',
             target: 'wave-tabs',
             source: 'test-component',
             data: { tabId: 'settings' },
@@ -348,7 +348,7 @@ describe('useWaveReaderMessageRouter', () => {
       await waitFor(() => {
         expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith(
           expect.objectContaining({
-            type: 'ENABLE_BUTTON',
+            name: 'ENABLE_BUTTON',
             target: 'go-button',
             source: 'test-component',
             data: {},
@@ -366,7 +366,7 @@ describe('useWaveReaderMessageRouter', () => {
       await waitFor(() => {
         expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith(
           expect.objectContaining({
-            type: 'DISABLE_BUTTON',
+            name: 'DISABLE_BUTTON',
             target: 'go-button',
             source: 'test-component',
             data: {},

@@ -368,20 +368,20 @@ export const createChromeApiMachine = (router?: MachineRouter) => {
                                 sessionId: message.sessionId,
                                 timestamp: message.timestamp || Date.now()
                             };
-                        } else if (message.type === 'TAB_ACTIVATED') {
+                        } else if (message.name === 'TAB_ACTIVATED') {
                             eventType = 'TAB_ACTIVATED';
                             messageData = {
                                 tabId: message.data?.tabId || message.tabId,
                                 timestamp: message.timestamp || Date.now()
                             };
                         } else {
-                            // For other message types, route with original message name/type
-                            eventType = message.name || message.type || 'UNKNOWN_MESSAGE';
+                            // For other message types, route with original message name
+                            eventType = message.name || 'UNKNOWN_MESSAGE';
                             messageData = {
                                 ...message,
                                 timestamp: message.timestamp || Date.now()
                             };
-                            console.log('🔌 ChromeApi: Routing unknown message type:', eventType);
+                            console.log('🔌 ChromeApi: Routing unknown message name:', eventType);
                         }
 
                         // Use relative path to route to parent (AppMachine)

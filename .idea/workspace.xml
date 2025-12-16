@@ -5,10 +5,18 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5270135f-6a8a-40f6-af5e-f7ca7cbef216" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/util/state-machine.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/util/state-machine.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/webpack.common.js" beforeDir="false" afterPath="$PROJECT_DIR$/webpack.common.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/yarn.lock" beforeDir="false" afterPath="$PROJECT_DIR$/yarn.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build-firefox/app.js" beforeDir="false" afterPath="$PROJECT_DIR$/build-firefox/app.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build-firefox/app.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/build-firefox/app.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build-firefox/background.js" beforeDir="false" afterPath="$PROJECT_DIR$/build-firefox/background.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build-firefox/background.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/build-firefox/background.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build-firefox/content.js" beforeDir="false" afterPath="$PROJECT_DIR$/build-firefox/content.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build-firefox/content.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/build-firefox/content.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build-firefox/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/build-firefox/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/component-middleware/settings/SettingsTomes.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/component-middleware/settings/SettingsTomes.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/content-scripts/log-view-content-system-integrated.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/content-scripts/log-view-content-system-integrated.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/content-scripts/wave-reader-simple.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/services/keychord-service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/services/keychord-service.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -32,6 +40,7 @@
     "Notification.DoNotAsk-Node.js interpreter": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "git-widget-placeholder": "main",
+    "kotlin-language-version-configured": "true",
     "last_opened_file_path": "/Users/johnholland/Developers/wave-reader",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
@@ -39,7 +48,7 @@
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs.jest.jest_package": "/Users/johnholland/Developers/wave-reader/node_modules/jest",
     "nodejs_package_manager_path": "yarn",
-    "settings.editor.selected.configurable": "settings.nodejs",
+    "settings.editor.selected.configurable": "preferences.keymap",
     "ts.external.directory.path": "/Users/johnholland/Developers/wave-reader/node_modules/typescript/lib",
     "vue.rearranger.settings.migration": "true"
   }
@@ -63,7 +72,8 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-js-predefined-1d06a55b98c1-0b3e54e931b4-JavaScript-WS-241.17011.90" />
+        <option value="bundled-jdk-9f38398b9061-39b83d9b5494-intellij.indexing.shared.core-IU-241.15989.150" />
+        <option value="bundled-js-predefined-1d06a55b98c1-91d5c284f522-JavaScript-IU-241.15989.150" />
       </set>
     </attachedChunks>
   </component>
@@ -124,10 +134,15 @@
       <workItem from="1745601442980" duration="598000" />
       <workItem from="1745694457609" duration="7700000" />
       <workItem from="1747955529200" duration="598000" />
+      <workItem from="1765053570416" duration="2434000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
   </component>
 </project>

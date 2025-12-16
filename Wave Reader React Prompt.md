@@ -80,6 +80,15 @@ content and backend permissions
 ### Sync Service
 
 Manages the backend api requests for settings, as well as local storage.
+Sync capabilities should result from sync requests automated by a sync statemachine.
+Sync state machines located in background.js should keep canonical notions of sync state as a MRU cache, but with easy going falloff.
+
+Sync commit should just be in safe operation states:
+ 
+ - settings on save settings send to background.js sync machine
+ - ui selector on save select send to background.js sync machine
+ - toggle keyboard shortcut activate send to background.js sync machine
+ - 
 
 Load order:
  - local storage

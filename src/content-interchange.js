@@ -91,12 +91,14 @@ class ContentInterchange {
     }
 
     handleIncomingMessage(message, sender, sendResponse) {
-        const { type, data, source, target, traceId } = message;
+        const { name, data, source, target, traceId } = message;
+        // Support both name and type for backward compatibility during transition
+        const messageName = name || message.type;
         
-        console.log('CONTENT-INTERCHANGE: Received message:', { type, source, target, traceId });
+        console.log('CONTENT-INTERCHANGE: Received message:', { name: messageName, source, target, traceId });
         
         try {
-            switch (type) {
+            switch (messageName) {
                 case 'START_WAVE_READER':
                     this.handleStartWaveReader(message, sendResponse);
                     break;
@@ -126,8 +128,8 @@ class ContentInterchange {
                     break;
                     
                 default:
-                    console.warn('🌊 Content Script: Unknown message type:', type);
-                    sendResponse({ success: false, error: 'Unknown message type: ' + type });
+                    console.warn('🌊 Content Script: Unknown message name:', messageName);
+                    sendResponse({ success: false, error: 'Unknown message name: ' + messageName });
             }
         } catch (error) {
             console.error('🌊 Content Script: Error handling message:', error);

@@ -35,7 +35,7 @@ export interface MessageHandler {
 
 export interface MessageHistoryEntry {
   timestamp: number;
-  type: string;
+  name: string;
   message: string;
   data?: any;
   sessionId: string;
@@ -247,10 +247,10 @@ export class ContentSystemMessageService {
   /**
    * Log a message to the history
    */
-  public logMessage(type: string, message: string, data?: any, state?: string): void {
+  public logMessage(name: string, message: string, data?: any, state?: string): void {
     const logEntry: MessageHistoryEntry = {
       timestamp: Date.now(),
-      type,
+      name,
       message,
       data,
       sessionId: this.sessionId,
@@ -267,7 +267,7 @@ export class ContentSystemMessageService {
     
     // Log to console in development
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      console.log(`🌊 ContentSystemMessageService [${type}]:`, message, data || '');
+      console.log(`🌊 ContentSystemMessageService [${name}]:`, message, data || '');
     }
   }
 
@@ -279,10 +279,10 @@ export class ContentSystemMessageService {
   }
 
   /**
-   * Get message history by type
+   * Get message history by name
    */
-  public getMessageHistoryByType(type: string): MessageHistoryEntry[] {
-    return this.messageHistory.filter(entry => entry.type === type);
+  public getMessageHistoryByName(name: string): MessageHistoryEntry[] {
+    return this.messageHistory.filter(entry => entry.name === name);
   }
 
   /**

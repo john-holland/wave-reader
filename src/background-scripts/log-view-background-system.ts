@@ -269,9 +269,12 @@ export class LogViewBackgroundSystem {
             console.log("BACKGROUND->RUNTIME: Coalesced nested message:", normalizedMessage);
         }
         
-        // Normalize message name: handle both 'type' and 'name' fields, and convert to lowercase
+        // Normalize message name: convert legacy 'type' field to 'name' if needed, and convert to lowercase
+        // We only use 'name' field now - 'type' is legacy and should be migrated
         if (!normalizedMessage.name && normalizedMessage.type) {
             normalizedMessage.name = normalizedMessage.type.toLowerCase();
+            // Remove type field since we're standardizing on name
+            delete normalizedMessage.type;
         } else if (normalizedMessage.name && typeof normalizedMessage.name === 'string') {
             normalizedMessage.name = normalizedMessage.name.toLowerCase();
         }

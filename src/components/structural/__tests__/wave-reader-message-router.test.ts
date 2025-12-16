@@ -69,7 +69,7 @@ describe('WaveReaderMessageRouter', () => {
 
   describe('sendMessage', () => {
     const mockMessage: Omit<WaveReaderMessage, 'id' | 'timestamp'> = {
-      type: 'TEST_MESSAGE',
+      name: 'TEST_MESSAGE',
       source: 'test-source',
       target: 'test-target',
       priority: 'normal',
@@ -128,7 +128,7 @@ describe('WaveReaderMessageRouter', () => {
 
       const history = (messageRouter as any).messageHistory;
       expect(history.length).toBe(1);
-      expect(history[0].type).toBe('TEST_MESSAGE');
+      expect(history[0].name).toBe('TEST_MESSAGE');
     });
 
     it('should update performance metrics', async () => {
@@ -146,7 +146,7 @@ describe('WaveReaderMessageRouter', () => {
 
   describe('sendMessageWithRetry', () => {
     const mockMessage: Omit<WaveReaderMessage, 'id' | 'timestamp'> = {
-      type: 'RETRY_MESSAGE',
+      name: 'RETRY_MESSAGE',
       source: 'test-source',
       target: 'test-target',
       priority: 'high',
@@ -202,7 +202,7 @@ describe('WaveReaderMessageRouter', () => {
 
   describe('broadcastMessage', () => {
     const mockMessage: Omit<WaveReaderMessage, 'id' | 'timestamp'> = {
-      type: 'BROADCAST_MESSAGE',
+      name: 'BROADCAST_MESSAGE',
       source: 'broadcaster',
       target: 'all',
       priority: 'normal',
@@ -246,7 +246,7 @@ describe('WaveReaderMessageRouter', () => {
       const mockMachine = createMockMachine();
       mockSystem.getMachine.mockReturnValue(mockMachine);
 
-      const result = await messageRouter.routeMessage('TEST_TYPE', 'target-component', { data: 'test' });
+      const result = await messageRouter.routeMessage('TEST_NAME', 'target-component', { data: 'test' });
 
       expect(result.success).toBe(true);
       expect(mockSystem.getMachine).toHaveBeenCalled();
@@ -287,7 +287,7 @@ describe('WaveReaderMessageRouter', () => {
         .mockReturnValueOnce(failMachine);
       
       await messageRouter.sendMessage({
-        type: 'SUCCESS_MESSAGE',
+        name: 'SUCCESS_MESSAGE',
         source: 'test',
         target: 'target',
         priority: 'normal',
@@ -295,7 +295,7 @@ describe('WaveReaderMessageRouter', () => {
       });
 
       await messageRouter.sendMessage({
-        type: 'SUCCESS_MESSAGE_2',
+        name: 'SUCCESS_MESSAGE_2',
         source: 'test',
         target: 'target',
         priority: 'high',
@@ -305,7 +305,7 @@ describe('WaveReaderMessageRouter', () => {
       // Mock one failure - this will be caught and added to history
       try {
         await messageRouter.sendMessage({
-          type: 'FAILED_MESSAGE',
+          name: 'FAILED_MESSAGE',
           source: 'test',
           target: 'target',
           priority: 'high',
@@ -356,7 +356,7 @@ describe('WaveReaderMessageRouter', () => {
       mockSystem.getMachine.mockReturnValue(slowMachine);
       
       const sendPromise = messageRouter.sendMessage({
-        type: 'SLOW_MESSAGE',
+        name: 'SLOW_MESSAGE',
         source: 'test',
         target: 'target',
         priority: 'normal',
@@ -386,7 +386,7 @@ describe('WaveReaderMessageRouter', () => {
       
       // Send a successful message to establish healthy state
       await messageRouter.sendMessage({
-        type: 'HEALTH_CHECK',
+        name: 'HEALTH_CHECK',
         source: 'test',
         target: 'target',
         priority: 'normal',
@@ -412,7 +412,7 @@ describe('WaveReaderMessageRouter', () => {
       // Send a failing message to create error state
       try {
         await messageRouter.sendMessage({
-          type: 'TEST',
+          name: 'TEST',
           source: 'test',
           target: 'target',
           priority: 'normal',
@@ -447,7 +447,7 @@ describe('WaveReaderMessageRouter', () => {
       mockSystem.getMachine.mockReturnValue(mockMachine);
       
       await messageRouter.sendMessage({
-        type: 'TEST_MESSAGE',
+        name: 'TEST_MESSAGE',
         source: 'test',
         target: 'target',
         priority: 'normal',
@@ -481,7 +481,7 @@ describe('WaveReaderMessageRouter', () => {
 
       // Send low priority first
       await messageRouter.sendMessage({
-        type: 'LOW_PRIORITY',
+        name: 'LOW_PRIORITY',
         source: 'test',
         target: 'target',
         priority: 'low',
@@ -490,7 +490,7 @@ describe('WaveReaderMessageRouter', () => {
 
       // Send high priority second
       await messageRouter.sendMessage({
-        type: 'HIGH_PRIORITY',
+        name: 'HIGH_PRIORITY',
         source: 'test',
         target: 'target',
         priority: 'high',
@@ -514,7 +514,7 @@ describe('WaveReaderMessageRouter', () => {
       // Send messages in random order
       await Promise.all(priorities.map(priority => 
         messageRouter.sendMessage({
-          type: 'PRIORITY_TEST',
+          name: 'PRIORITY_TEST',
           source: 'test',
           target: 'target',
           priority: priority as any,
@@ -536,7 +536,7 @@ describe('WaveReaderMessageRouter', () => {
       mockSystem.getMachine.mockReturnValue(null);
 
       const result = await messageRouter.sendMessage({
-        type: 'TEST_MESSAGE',
+        name: 'TEST_MESSAGE',
         source: 'test',
         target: 'target',
         priority: 'normal',
@@ -551,7 +551,7 @@ describe('WaveReaderMessageRouter', () => {
       mockSystem.getMachine.mockReturnValue(null);
       
       const result = await messageRouter.sendMessage({
-        type: '',
+        name: '',
         source: 'test',
         target: 'target',
         priority: 'normal',
@@ -566,7 +566,7 @@ describe('WaveReaderMessageRouter', () => {
       mockSystem.getMachine.mockReturnValue(null);
       
       const result = await messageRouter.sendMessage({
-        type: 'TEST_MESSAGE',
+        name: 'TEST_MESSAGE',
         source: 'test',
         target: '',
         priority: 'normal',

@@ -10,7 +10,7 @@ import WaveReaderStructuralConfig from './wave-reader-structural-config';
 
 export interface WaveReaderMessage {
   id: string;
-  type: string;
+  name: string;
   source: string;
   target: string;
   priority: 'low' | 'normal' | 'high' | 'critical';
@@ -64,7 +64,7 @@ export class WaveReaderMessageRouter {
       timestamp: Date.now()
     };
 
-    console.log(`🌊 Message Router: Sending message ${fullMessage.type} from ${fullMessage.source} to ${fullMessage.target}`);
+    console.log(`🌊 Message Router: Sending message ${fullMessage.name} from ${fullMessage.source} to ${fullMessage.target}`);
 
     try {
       // Add message to appropriate queue
@@ -102,10 +102,10 @@ export class WaveReaderMessageRouter {
   /**
    * Route a message based on the structural system configuration
    */
-  public async routeMessage(type: string, target: string, data?: any, priority: WaveReaderMessage['priority'] = 'normal'): Promise<MessageRoutingResult> {
+  public async routeMessage(name: string, target: string, data?: any, priority: WaveReaderMessage['priority'] = 'normal'): Promise<MessageRoutingResult> {
     const message: WaveReaderMessage = {
       id: this.generateMessageId(),
-      type,
+      name,
       source: 'message-router',
       target,
       priority,
@@ -120,18 +120,18 @@ export class WaveReaderMessageRouter {
    * Internal route resolution method
    */
   private async resolveRoute(message: WaveReaderMessage): Promise<string> {
-    const { type, source } = message;
+    const { name, source } = message;
     
-    // Simple routing based on message type
-    if (type.includes('WAVE_READER')) {
+    // Simple routing based on message name
+    if (name.includes('WAVE_READER')) {
       return 'wave-reader';
-    } else if (type.includes('TAB')) {
+    } else if (name.includes('TAB')) {
       return 'wave-tabs';
-    } else if (type.includes('SETTING')) {
+    } else if (name.includes('SETTING')) {
       return 'settings';
-    } else if (type.includes('SELECTOR')) {
+    } else if (name.includes('SELECTOR')) {
       return 'selector-input';
-    } else if (type.includes('BUTTON')) {
+    } else if (name.includes('BUTTON')) {
       return 'go-button';
     }
 
@@ -157,8 +157,9 @@ export class WaveReaderMessageRouter {
       }
 
       // Send the message to the target machine
+      // Note: XState machines require 'type' for events, so we use message.name as the event type
       const response = await targetMachine.send({
-        type: message.type,
+        type: message.name,
         ...message.data,
         source: message.source,
         priority: message.priority,

@@ -55832,38 +55832,35 @@ const DonateView = ({ donated, hasEasterEggs, donors }) => {
                     donor.crypto ? `(${donor.crypto})` : '')))))))));
 };
 const AboutPageComponentView = (donated, hasEasterEggs, donors, error) => {
-    return (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(AboutView, null,
-        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(AboutHeader, null,
-            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(AboutTitle, null, "\uD83C\uDF0A About Wave Reader")),
-        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(AboutContent, null,
-            error && (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(Section, null,
-                react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", { style: {
-                        background: '#f8d7da',
-                        color: '#721c24',
-                        padding: '16px',
-                        borderRadius: '8px',
-                        border: '1px solid #f5c6cb',
-                        marginBottom: '20px'
-                    } },
-                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h4", { style: { margin: '0 0 8px 0', color: '#721c24' } }, "\u26A0\uFE0F Error Loading Donation Status"),
-                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", { style: { margin: 0, fontSize: '14px' } }, error),
-                    react__WEBPACK_IMPORTED_MODULE_0___default().createElement("button", { onClick: () => {
-                            // This would trigger a retry
-                            console.log('Retry donation status loading');
-                        }, style: {
-                            marginTop: '8px',
-                            padding: '8px 16px',
-                            background: '#dc3545',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                        } }, "Retry")))),
-            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(AboutReadingDisabilityView, null),
-            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(AboutNielsonResearchView, null),
-            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(DonateView, { donated: donated, hasEasterEggs: hasEasterEggs, donors: donors }),
-            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(Section, null,
-                react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SectionText, { style: { textAlign: 'center', fontSize: '14px', color: '#6c757d' } }, "Version 1.0.0 \u2022 Made with \u2764\uFE0F for better reading")))));
+    return (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(AboutContent, null,
+        error && (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(Section, null,
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", { style: {
+                    background: '#f8d7da',
+                    color: '#721c24',
+                    padding: '16px',
+                    borderRadius: '8px',
+                    border: '1px solid #f5c6cb',
+                    marginBottom: '20px'
+                } },
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h4", { style: { margin: '0 0 8px 0', color: '#721c24' } }, "\u26A0\uFE0F Error Loading Donation Status"),
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", { style: { margin: 0, fontSize: '14px' } }, error),
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement("button", { onClick: () => {
+                        // This would trigger a retry
+                        console.log('Retry donation status loading');
+                    }, style: {
+                        marginTop: '8px',
+                        padding: '8px 16px',
+                        background: '#dc3545',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                    } }, "Retry")))),
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(AboutReadingDisabilityView, null),
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(AboutNielsonResearchView, null),
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(DonateView, { donated: donated, hasEasterEggs: hasEasterEggs, donors: donors }),
+        react__WEBPACK_IMPORTED_MODULE_0___default().createElement(Section, null,
+            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SectionText, { style: { textAlign: 'center', fontSize: '14px', color: '#6c757d' } }, "Version 1.0.0 \u2022 Made with \u2764\uFE0F for better reading"))));
 };
 // GraphQL queries and mutations for donation status
 const DONATION_STATUS_QUERY = `
@@ -56023,7 +56020,15 @@ const AboutTome = ({ children, donated = false, hasEasterEggs = false, donors = 
             `Timestamp: ${new Date().toISOString()}\n\n` +
             `Additional details:\n`);
         const mailtoLink = `mailto:john.gebhard.holland+epileptic@gmail.com?subject=${subject}&body=${body}`;
-        window.location.href = mailtoLink;
+        // Create and click an anchor element to maintain user gesture chain
+        // This is required by browsers for mailto links to work
+        const anchor = document.createElement('a');
+        anchor.href = mailtoLink;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
     }, []);
     (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
         // Get router from AppTome
@@ -57329,10 +57334,10 @@ const ErrorText = styled_components__WEBPACK_IMPORTED_MODULE_1__["default"].p `
 const DEFAULT_SETTINGS = {
     showNotifications: true,
     waveAnimationControl: 'CSS',
-    toggleKeys: { keyChord: [] },
+    toggleKeys: { keyChord: (0,_models_defaults__WEBPACK_IMPORTED_MODULE_8__.KeyChordDefaultFactory)(), hasSetKeyChord: false },
     textColor: 'initial',
     textSize: 'initial',
-    selector: 'p',
+    selector: 'body',
     cssTemplate: '',
     cssMouseTemplate: '',
     waveSpeed: 2.0,
@@ -57363,6 +57368,10 @@ const waveParameterKeys = [
     'axisRotationAmountYMin'
 ];
 const coerceNumber = (value, fallback) => {
+    // Allow empty strings to pass through
+    if (typeof value === 'string' && value.trim() === '') {
+        return '';
+    }
     if (typeof value === 'number' && Number.isFinite(value)) {
         return value;
     }
@@ -57372,11 +57381,35 @@ const coerceNumber = (value, fallback) => {
             return parsed;
         }
     }
-    return fallback;
+    // Ensure fallback is a number (not a string)
+    return typeof fallback === 'number' ? fallback : parseFloat(fallback) || 0;
 };
 const sanitizeToggleKeys = (value) => {
-    if (!value || !Array.isArray(value.keyChord)) {
-        return { keyChord: [] };
+    // Determine hasSetKeyChord:
+    // - If flag exists, use it
+    // - If flag doesn't exist (migration from old settings), infer it by comparing to defaults
+    let hasSetKeyChord;
+    if (value?.hasSetKeyChord !== undefined) {
+        hasSetKeyChord = value.hasSetKeyChord;
+    }
+    else {
+        // Migration: if keyChord exists and doesn't match defaults, assume user set it
+        const defaultKeyChord = (0,_components_util_user_input__WEBPACK_IMPORTED_MODULE_7__.sortKeyChord)((0,_models_defaults__WEBPACK_IMPORTED_MODULE_8__.KeyChordDefaultFactory)());
+        if (value?.keyChord && Array.isArray(value.keyChord) && value.keyChord.length > 0) {
+            const normalizedSaved = (0,_components_util_user_input__WEBPACK_IMPORTED_MODULE_7__.sortKeyChord)(value.keyChord.map(k => (0,_components_util_user_input__WEBPACK_IMPORTED_MODULE_7__.normalizeKey)(k)).filter((k) => k !== null));
+            hasSetKeyChord = !(0,_components_util_user_input__WEBPACK_IMPORTED_MODULE_7__.compareKeyChords)(normalizedSaved, defaultKeyChord);
+        }
+        else {
+            hasSetKeyChord = false;
+        }
+    }
+    if (!value || !Array.isArray(value.keyChord) || value.keyChord.length === 0) {
+        // If user hasn't set a keyChord, use defaults
+        if (!hasSetKeyChord) {
+            return { keyChord: (0,_models_defaults__WEBPACK_IMPORTED_MODULE_8__.KeyChordDefaultFactory)(), hasSetKeyChord: false };
+        }
+        // If user has set it but it's empty, return empty array
+        return { keyChord: [], hasSetKeyChord: true };
     }
     const sanitizedChord = value.keyChord
         .map(key => (typeof key === 'string' ? (0,_components_util_user_input__WEBPACK_IMPORTED_MODULE_7__.normalizeKey)(key) : null))
@@ -57387,8 +57420,18 @@ const sanitizeToggleKeys = (value) => {
         return KEY_OPTIONS_SET.has(key);
     })
         .slice(0, MAX_TOGGLE_KEYS);
+    // If sanitization resulted in empty array
+    if (sanitizedChord.length === 0) {
+        // If user hasn't set a keyChord, use defaults
+        if (!hasSetKeyChord) {
+            return { keyChord: (0,_models_defaults__WEBPACK_IMPORTED_MODULE_8__.KeyChordDefaultFactory)(), hasSetKeyChord: false };
+        }
+        // If user has set it but it's empty, return empty array
+        return { keyChord: [], hasSetKeyChord: true };
+    }
     return {
-        keyChord: sanitizedChord
+        keyChord: sanitizedChord,
+        hasSetKeyChord: hasSetKeyChord
     };
 };
 const sanitizeSettings = (overrides = {}) => {
@@ -57396,11 +57439,22 @@ const sanitizeSettings = (overrides = {}) => {
     return {
         ...merged,
         toggleKeys: sanitizeToggleKeys(merged.toggleKeys),
-        waveSpeed: coerceNumber(merged.waveSpeed, DEFAULT_SETTINGS.waveSpeed),
-        axisTranslateAmountXMax: coerceNumber(merged.axisTranslateAmountXMax, DEFAULT_SETTINGS.axisTranslateAmountXMax),
-        axisTranslateAmountXMin: coerceNumber(merged.axisTranslateAmountXMin, DEFAULT_SETTINGS.axisTranslateAmountXMin),
-        axisRotationAmountYMax: coerceNumber(merged.axisRotationAmountYMax, DEFAULT_SETTINGS.axisRotationAmountYMax),
-        axisRotationAmountYMin: coerceNumber(merged.axisRotationAmountYMin, DEFAULT_SETTINGS.axisRotationAmountYMin)
+        // Only coerce to number if value is not an empty string (allow empty strings to pass through)
+        waveSpeed: (typeof merged.waveSpeed === 'string' && merged.waveSpeed.trim() === '')
+            ? ''
+            : coerceNumber(merged.waveSpeed, DEFAULT_SETTINGS.waveSpeed),
+        axisTranslateAmountXMax: (typeof merged.axisTranslateAmountXMax === 'string' && merged.axisTranslateAmountXMax.trim() === '')
+            ? ''
+            : coerceNumber(merged.axisTranslateAmountXMax, DEFAULT_SETTINGS.axisTranslateAmountXMax),
+        axisTranslateAmountXMin: (typeof merged.axisTranslateAmountXMin === 'string' && merged.axisTranslateAmountXMin.trim() === '')
+            ? ''
+            : coerceNumber(merged.axisTranslateAmountXMin, DEFAULT_SETTINGS.axisTranslateAmountXMin),
+        axisRotationAmountYMax: (typeof merged.axisRotationAmountYMax === 'string' && merged.axisRotationAmountYMax.trim() === '')
+            ? ''
+            : coerceNumber(merged.axisRotationAmountYMax, DEFAULT_SETTINGS.axisRotationAmountYMax),
+        axisRotationAmountYMin: (typeof merged.axisRotationAmountYMin === 'string' && merged.axisRotationAmountYMin.trim() === '')
+            ? ''
+            : coerceNumber(merged.axisRotationAmountYMin, DEFAULT_SETTINGS.axisRotationAmountYMin)
     };
 };
 const generateCssFromSettings = (settings) => {
@@ -57411,17 +57465,33 @@ const generateCssFromSettings = (settings) => {
         settings.axisRotationAmountYMax,
         settings.axisRotationAmountYMin
     ];
-    if (numericParams.some(param => typeof param !== 'number' || Number.isNaN(param))) {
-        console.warn('⚙️ SettingsTomes: Skipping CSS generation due to invalid numeric parameters');
+    // Skip CSS generation if any parameter is empty string or invalid
+    if (numericParams.some(param => param === '' ||
+        param === null ||
+        param === undefined ||
+        (typeof param === 'string' && param.trim() === '') ||
+        (typeof param === 'number' && Number.isNaN(param)))) {
+        console.warn('⚙️ SettingsTomes: Skipping CSS generation due to invalid or empty numeric parameters');
+        return null;
+    }
+    // Convert string values to numbers for CSS generation
+    const waveSpeed = typeof settings.waveSpeed === 'string' ? parseFloat(settings.waveSpeed) : settings.waveSpeed;
+    const axisTranslateAmountXMax = typeof settings.axisTranslateAmountXMax === 'string' ? parseFloat(settings.axisTranslateAmountXMax) : settings.axisTranslateAmountXMax;
+    const axisTranslateAmountXMin = typeof settings.axisTranslateAmountXMin === 'string' ? parseFloat(settings.axisTranslateAmountXMin) : settings.axisTranslateAmountXMin;
+    const axisRotationAmountYMax = typeof settings.axisRotationAmountYMax === 'string' ? parseFloat(settings.axisRotationAmountYMax) : settings.axisRotationAmountYMax;
+    const axisRotationAmountYMin = typeof settings.axisRotationAmountYMin === 'string' ? parseFloat(settings.axisRotationAmountYMin) : settings.axisRotationAmountYMin;
+    // Double-check all are valid numbers after conversion
+    if ([waveSpeed, axisTranslateAmountXMax, axisTranslateAmountXMin, axisRotationAmountYMax, axisRotationAmountYMin].some(param => Number.isNaN(param))) {
+        console.warn('⚙️ SettingsTomes: Skipping CSS generation due to invalid numeric parameters after conversion');
         return null;
     }
     const wave = new _models_wave__WEBPACK_IMPORTED_MODULE_3__["default"]({
         selector: settings.selector,
-        waveSpeed: settings.waveSpeed,
-        axisTranslateAmountXMax: settings.axisTranslateAmountXMax,
-        axisTranslateAmountXMin: settings.axisTranslateAmountXMin,
-        axisRotationAmountYMax: settings.axisRotationAmountYMax,
-        axisRotationAmountYMin: settings.axisRotationAmountYMin,
+        waveSpeed: waveSpeed,
+        axisTranslateAmountXMax: axisTranslateAmountXMax,
+        axisTranslateAmountXMin: axisTranslateAmountXMin,
+        axisRotationAmountYMax: axisRotationAmountYMax,
+        axisRotationAmountYMin: axisRotationAmountYMin,
         cssGenerationMode: settings.cssGenerationMode || 'template',
         text: new _models_text__WEBPACK_IMPORTED_MODULE_4__["default"]({
             size: settings.textSize,
@@ -57540,7 +57610,16 @@ const SettingsTomes = ({ initialSettings = {}, domainPaths = [], currentDomain =
     const handleWaveSettingChange = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)((key, rawValue) => {
         console.log('⚙️ SettingsTomes: Updating wave setting:', key, rawValue);
         setSettings(prev => {
+            // Allow empty string to clear the field temporarily
+            if (rawValue === '' || rawValue === null || rawValue === undefined) {
+                const next = {
+                    ...prev,
+                    [key]: '' // Store empty string temporarily
+                };
+                return next;
+            }
             const numericValue = typeof rawValue === 'number' ? rawValue : parseFloat(rawValue);
+            // If not a valid number, keep the previous value
             if (Number.isNaN(numericValue)) {
                 return prev;
             }
@@ -57608,7 +57687,8 @@ const SettingsTomes = ({ initialSettings = {}, domainPaths = [], currentDomain =
             return {
                 ...prev,
                 toggleKeys: {
-                    keyChord: updatedChord
+                    keyChord: updatedChord,
+                    hasSetKeyChord: true // Mark that user has explicitly set the keyChord
                 }
             };
         });
@@ -57780,20 +57860,20 @@ const SettingsTomes = ({ initialSettings = {}, domainPaths = [], currentDomain =
                         react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingGroupTitle, null, "Wave Animation Parameters"),
                         react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingItem, null,
                             react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingLabel, null, "Wave Speed (seconds):"),
-                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingInput, { type: "number", className: "number", value: settings.waveSpeed, min: 0.1, max: 20, step: 0.1, onChange: (e) => handleWaveSettingChange('waveSpeed', e.target.value) }),
+                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingInput, { type: "number", className: "number", value: typeof settings.waveSpeed === 'string' ? settings.waveSpeed : settings.waveSpeed, min: 0.1, max: 20, step: 0.1, onChange: (e) => handleWaveSettingChange('waveSpeed', e.target.value) }),
                             react__WEBPACK_IMPORTED_MODULE_0___default().createElement(HelpText, null, "Duration of the wave animation cycle")),
                         react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingItem, null,
                             react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingLabel, null, "Axis Translation X Max:"),
-                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingInput, { type: "number", className: "number", value: settings.axisTranslateAmountXMax, onChange: (e) => handleWaveSettingChange('axisTranslateAmountXMax', e.target.value) })),
+                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingInput, { type: "number", className: "number", value: typeof settings.axisTranslateAmountXMax === 'string' ? settings.axisTranslateAmountXMax : settings.axisTranslateAmountXMax, onChange: (e) => handleWaveSettingChange('axisTranslateAmountXMax', e.target.value) })),
                         react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingItem, null,
                             react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingLabel, null, "Axis Translation X Min:"),
-                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingInput, { type: "number", className: "number", value: settings.axisTranslateAmountXMin, onChange: (e) => handleWaveSettingChange('axisTranslateAmountXMin', e.target.value) })),
+                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingInput, { type: "number", className: "number", value: typeof settings.axisTranslateAmountXMin === 'string' ? settings.axisTranslateAmountXMin : settings.axisTranslateAmountXMin, onChange: (e) => handleWaveSettingChange('axisTranslateAmountXMin', e.target.value) })),
                         react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingItem, null,
                             react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingLabel, null, "Axis Rotation Y Max:"),
-                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingInput, { type: "number", className: "number", value: settings.axisRotationAmountYMax, onChange: (e) => handleWaveSettingChange('axisRotationAmountYMax', e.target.value) })),
+                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingInput, { type: "number", className: "number", value: typeof settings.axisRotationAmountYMax === 'string' ? settings.axisRotationAmountYMax : settings.axisRotationAmountYMax, onChange: (e) => handleWaveSettingChange('axisRotationAmountYMax', e.target.value) })),
                         react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingItem, null,
                             react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingLabel, null, "Axis Rotation Y Min:"),
-                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingInput, { type: "number", className: "number", value: settings.axisRotationAmountYMin, onChange: (e) => handleWaveSettingChange('axisRotationAmountYMin', e.target.value) }))),
+                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingInput, { type: "number", className: "number", value: typeof settings.axisRotationAmountYMin === 'string' ? settings.axisRotationAmountYMin : settings.axisRotationAmountYMin, onChange: (e) => handleWaveSettingChange('axisRotationAmountYMin', e.target.value) }))),
                     react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingsActions, null,
                         react__WEBPACK_IMPORTED_MODULE_0___default().createElement(Button, { className: "btn btn-primary", onClick: handleSaveSettings }, "\uD83D\uDCBE Save Settings"),
                         react__WEBPACK_IMPORTED_MODULE_0___default().createElement(BackButton, { onClick: () => handleViewChange('general') }, "\u2190 Back")))),
@@ -57849,12 +57929,13 @@ const SettingsTomes = ({ initialSettings = {}, domainPaths = [], currentDomain =
                         react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingItem, null,
                             react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingLabel, null, "Toggle Keys:"),
                             react__WEBPACK_IMPORTED_MODULE_0___default().createElement(KeyboardInput, null, Array.from({ length: MAX_TOGGLE_KEYS }, (_, index) => {
-                                if (!settings.toggleKeys) {
-                                    console.warn('⚙️ SettingsTomes: No toggleKeys found, using default factory');
-                                }
-                                const keyChordDefaults = (0,_models_defaults__WEBPACK_IMPORTED_MODULE_8__.KeyChordDefaultFactory)();
-                                // Ensure toggleKeys.keyChord exists and is an array, default to empty array
-                                const keyChord = (settings.toggleKeys?.keyChord || keyChordDefaults);
+                                // Determine which keyChord to display:
+                                // - If user hasn't set a keyChord (hasSetKeyChord is false), show defaults
+                                // - If user has set a keyChord (hasSetKeyChord is true), show what they set (or None for empty slots)
+                                const hasSetKeyChord = settings.toggleKeys?.hasSetKeyChord ?? false;
+                                const keyChord = hasSetKeyChord
+                                    ? (settings.toggleKeys?.keyChord || [])
+                                    : (0,_models_defaults__WEBPACK_IMPORTED_MODULE_8__.KeyChordDefaultFactory)();
                                 // Get the key at this index, or undefined if index is out of bounds
                                 const selectedKey = keyChord[index];
                                 // First check if the stored key is already valid
@@ -57868,10 +57949,6 @@ const SettingsTomes = ({ initialSettings = {}, domainPaths = [], currentDomain =
                                     : normalizedIsValid
                                         ? normalizedValue
                                         : 'None';
-                                // Debug logging
-                                if (selectedKey) {
-                                    console.log(`⚙️ SettingsTomes: Keyboard shortcut ${index}: selectedKey=${selectedKey}, currentValue=${currentValue}, isKeyValid=${isKeyValid}, normalizedValue=${normalizedValue}, normalizedIsValid=${normalizedIsValid}`);
-                                }
                                 return (react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingSelect, { key: `toggle-key-${index}`, value: currentValue, onChange: (e) => handleToggleKeyChange(index, e.target.value) },
                                     react__WEBPACK_IMPORTED_MODULE_0___default().createElement("option", { value: "None", selected: currentValue === 'None' ? true : undefined }, "None"),
                                     KEY_OPTIONS.map((option) => (react__WEBPACK_IMPORTED_MODULE_0___default().createElement("option", { key: `${option}-${index}`, value: option, selected: currentValue === option ? true : undefined }, option)))));
@@ -57894,7 +57971,7 @@ const SettingsTomes = ({ initialSettings = {}, domainPaths = [], currentDomain =
                         react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingItem, null,
                             react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingLabel, null, "CSS Selector:"),
                             react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingInput, { type: "text", className: "text", value: settings.selector, onChange: (e) => handleSettingChange('selector', e.target.value) }),
-                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(HelpText, null, "CSS selector for target elements (e.g., 'p', '.content', '#main')"))),
+                            react__WEBPACK_IMPORTED_MODULE_0___default().createElement(HelpText, null, "CSS selector for target elements (e.g., 'body', 'p', '.content', '#main')"))),
                     react__WEBPACK_IMPORTED_MODULE_0___default().createElement(SettingsActions, null,
                         react__WEBPACK_IMPORTED_MODULE_0___default().createElement(Button, { className: "btn btn-primary", onClick: handleSaveSettings }, "\uD83D\uDCBE Save Settings"),
                         react__WEBPACK_IMPORTED_MODULE_0___default().createElement(BackButton, { onClick: () => handleViewChange('general') }, "\u2190 Back"))))))));
@@ -58165,7 +58242,7 @@ var SettingsMessageHandler = /*#__PURE__*/function () {
         },
         textColor: 'initial',
         textSize: 'initial',
-        selector: 'p',
+        selector: 'body',
         cssTemplate: '',
         cssMouseTemplate: '',
         waveSpeed: 2.0,

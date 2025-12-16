@@ -6,7 +6,7 @@ import Text from '../../models/text';
 import { MachineRouter } from 'log-view-machine';
 import EditorWrapper from '../../app/components/EditorWrapper';
 import { AppTome } from '../../app/tomes/AppTome';
-import { KeyChord, normalizeKey } from '../../components/util/user-input';
+import { KeyChord, normalizeKey, compareKeyChords, sortKeyChord } from '../../components/util/user-input';
 import { KeyChordDefaultFactory } from '../../models/defaults';
 
 // Styled components for the Tomes-based settings
@@ -375,17 +375,17 @@ const ErrorText = styled.p`
 interface Settings {
   showNotifications: boolean;
   waveAnimationControl: 'CSS' | 'MOUSE';
-  toggleKeys: { keyChord: string[] };
+  toggleKeys: { keyChord: string[]; hasSetKeyChord?: boolean };
   textColor: string;
   textSize: string;
   selector: string;
   cssTemplate: string;
   cssMouseTemplate: string;
-  waveSpeed: number;
-  axisTranslateAmountXMax: number;
-  axisTranslateAmountXMin: number;
-  axisRotationAmountYMax: number;
-  axisRotationAmountYMin: number;
+  waveSpeed: number | string; // Allow string for empty state
+  axisTranslateAmountXMax: number | string;
+  axisTranslateAmountXMin: number | string;
+  axisRotationAmountYMax: number | string;
+  axisRotationAmountYMin: number | string;
   autoGenerateCss: boolean;
   cssGenerationMode: 'template' | 'hardcoded';
 }
@@ -393,7 +393,7 @@ interface Settings {
 const DEFAULT_SETTINGS: Settings = {
   showNotifications: true,
   waveAnimationControl: 'CSS',
-  toggleKeys: { keyChord: [] },
+  toggleKeys: { keyChord: KeyChordDefaultFactory() as KeyChord, hasSetKeyChord: false },
   textColor: 'initial',
   textSize: 'initial',
   selector: 'body',
@@ -438,7 +438,12 @@ const waveParameterKeys: WaveNumericKey[] = [
   'axisRotationAmountYMin'
 ];
 
-const coerceNumber = (value: unknown, fallback: number): number => {
+const coerceNumber = (value: unknown, fallback: number | string): number | string => {
+  // Allow empty strings to pass through
+  if (typeof value === 'string' && value.trim() === '') {
+    return '';
+  }
+
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
   }
@@ -450,12 +455,35 @@ const coerceNumber = (value: unknown, fallback: number): number => {
     }
   }
 
-  return fallback;
+  // Ensure fallback is a number (not a string)
+  return typeof fallback === 'number' ? fallback : parseFloat(fallback) || 0;
 };
 
 const sanitizeToggleKeys = (value: Settings['toggleKeys'] | undefined): Settings['toggleKeys'] => {
-  if (!value || !Array.isArray(value.keyChord)) {
-    return { keyChord: [] };
+  // Determine hasSetKeyChord:
+  // - If flag exists, use it
+  // - If flag doesn't exist (migration from old settings), infer it by comparing to defaults
+  let hasSetKeyChord: boolean;
+  if (value?.hasSetKeyChord !== undefined) {
+    hasSetKeyChord = value.hasSetKeyChord;
+  } else {
+    // Migration: if keyChord exists and doesn't match defaults, assume user set it
+    const defaultKeyChord = sortKeyChord(KeyChordDefaultFactory() as KeyChord);
+    if (value?.keyChord && Array.isArray(value.keyChord) && value.keyChord.length > 0) {
+      const normalizedSaved = sortKeyChord(value.keyChord.map(k => normalizeKey(k)).filter((k): k is string => k !== null) as KeyChord);
+      hasSetKeyChord = !compareKeyChords(normalizedSaved, defaultKeyChord);
+    } else {
+      hasSetKeyChord = false;
+    }
+  }
+  
+  if (!value || !Array.isArray(value.keyChord) || value.keyChord.length === 0) {
+    // If user hasn't set a keyChord, use defaults
+    if (!hasSetKeyChord) {
+      return { keyChord: KeyChordDefaultFactory() as KeyChord, hasSetKeyChord: false };
+    }
+    // If user has set it but it's empty, return empty array
+    return { keyChord: [], hasSetKeyChord: true };
   }
 
   const sanitizedChord = value.keyChord
@@ -468,8 +496,19 @@ const sanitizeToggleKeys = (value: Settings['toggleKeys'] | undefined): Settings
     })
     .slice(0, MAX_TOGGLE_KEYS);
 
+  // If sanitization resulted in empty array
+  if (sanitizedChord.length === 0) {
+    // If user hasn't set a keyChord, use defaults
+    if (!hasSetKeyChord) {
+      return { keyChord: KeyChordDefaultFactory() as KeyChord, hasSetKeyChord: false };
+    }
+    // If user has set it but it's empty, return empty array
+    return { keyChord: [], hasSetKeyChord: true };
+  }
+
   return {
-    keyChord: sanitizedChord
+    keyChord: sanitizedChord,
+    hasSetKeyChord: hasSetKeyChord
   };
 };
 
@@ -478,11 +517,22 @@ const sanitizeSettings = (overrides: Partial<Settings> = {}): Settings => {
   return {
     ...merged,
     toggleKeys: sanitizeToggleKeys(merged.toggleKeys),
-    waveSpeed: coerceNumber(merged.waveSpeed, DEFAULT_SETTINGS.waveSpeed),
-    axisTranslateAmountXMax: coerceNumber(merged.axisTranslateAmountXMax, DEFAULT_SETTINGS.axisTranslateAmountXMax),
-    axisTranslateAmountXMin: coerceNumber(merged.axisTranslateAmountXMin, DEFAULT_SETTINGS.axisTranslateAmountXMin),
-    axisRotationAmountYMax: coerceNumber(merged.axisRotationAmountYMax, DEFAULT_SETTINGS.axisRotationAmountYMax),
-    axisRotationAmountYMin: coerceNumber(merged.axisRotationAmountYMin, DEFAULT_SETTINGS.axisRotationAmountYMin)
+    // Only coerce to number if value is not an empty string (allow empty strings to pass through)
+    waveSpeed: (typeof merged.waveSpeed === 'string' && merged.waveSpeed.trim() === '') 
+      ? '' 
+      : (coerceNumber(merged.waveSpeed, DEFAULT_SETTINGS.waveSpeed) as number | string),
+    axisTranslateAmountXMax: (typeof merged.axisTranslateAmountXMax === 'string' && merged.axisTranslateAmountXMax.trim() === '') 
+      ? '' 
+      : (coerceNumber(merged.axisTranslateAmountXMax, DEFAULT_SETTINGS.axisTranslateAmountXMax) as number | string),
+    axisTranslateAmountXMin: (typeof merged.axisTranslateAmountXMin === 'string' && merged.axisTranslateAmountXMin.trim() === '') 
+      ? '' 
+      : (coerceNumber(merged.axisTranslateAmountXMin, DEFAULT_SETTINGS.axisTranslateAmountXMin) as number | string),
+    axisRotationAmountYMax: (typeof merged.axisRotationAmountYMax === 'string' && merged.axisRotationAmountYMax.trim() === '') 
+      ? '' 
+      : (coerceNumber(merged.axisRotationAmountYMax, DEFAULT_SETTINGS.axisRotationAmountYMax) as number | string),
+    axisRotationAmountYMin: (typeof merged.axisRotationAmountYMin === 'string' && merged.axisRotationAmountYMin.trim() === '') 
+      ? '' 
+      : (coerceNumber(merged.axisRotationAmountYMin, DEFAULT_SETTINGS.axisRotationAmountYMin) as number | string)
   };
 };
 
@@ -495,18 +545,38 @@ const generateCssFromSettings = (settings: Settings) => {
     settings.axisRotationAmountYMin
   ];
 
-  if (numericParams.some(param => typeof param !== 'number' || Number.isNaN(param))) {
-    console.warn('⚙️ SettingsTomes: Skipping CSS generation due to invalid numeric parameters');
+  // Skip CSS generation if any parameter is empty string or invalid
+  if (numericParams.some(param => 
+    param === '' || 
+    param === null || 
+    param === undefined || 
+    (typeof param === 'string' && param.trim() === '') ||
+    (typeof param === 'number' && Number.isNaN(param))
+  )) {
+    console.warn('⚙️ SettingsTomes: Skipping CSS generation due to invalid or empty numeric parameters');
+    return null;
+  }
+
+  // Convert string values to numbers for CSS generation
+  const waveSpeed = typeof settings.waveSpeed === 'string' ? parseFloat(settings.waveSpeed) : settings.waveSpeed;
+  const axisTranslateAmountXMax = typeof settings.axisTranslateAmountXMax === 'string' ? parseFloat(settings.axisTranslateAmountXMax) : settings.axisTranslateAmountXMax;
+  const axisTranslateAmountXMin = typeof settings.axisTranslateAmountXMin === 'string' ? parseFloat(settings.axisTranslateAmountXMin) : settings.axisTranslateAmountXMin;
+  const axisRotationAmountYMax = typeof settings.axisRotationAmountYMax === 'string' ? parseFloat(settings.axisRotationAmountYMax) : settings.axisRotationAmountYMax;
+  const axisRotationAmountYMin = typeof settings.axisRotationAmountYMin === 'string' ? parseFloat(settings.axisRotationAmountYMin) : settings.axisRotationAmountYMin;
+
+  // Double-check all are valid numbers after conversion
+  if ([waveSpeed, axisTranslateAmountXMax, axisTranslateAmountXMin, axisRotationAmountYMax, axisRotationAmountYMin].some(param => Number.isNaN(param))) {
+    console.warn('⚙️ SettingsTomes: Skipping CSS generation due to invalid numeric parameters after conversion');
     return null;
   }
 
   const wave = new Wave({
     selector: settings.selector,
-    waveSpeed: settings.waveSpeed,
-    axisTranslateAmountXMax: settings.axisTranslateAmountXMax,
-    axisTranslateAmountXMin: settings.axisTranslateAmountXMin,
-    axisRotationAmountYMax: settings.axisRotationAmountYMax,
-    axisRotationAmountYMin: settings.axisRotationAmountYMin,
+    waveSpeed: waveSpeed,
+    axisTranslateAmountXMax: axisTranslateAmountXMax,
+    axisTranslateAmountXMin: axisTranslateAmountXMin,
+    axisRotationAmountYMax: axisRotationAmountYMax,
+    axisRotationAmountYMin: axisRotationAmountYMin,
     cssGenerationMode: settings.cssGenerationMode || 'template',
     text: new Text({
       size: settings.textSize,
@@ -673,9 +743,19 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
     console.log('⚙️ SettingsTomes: Updating wave setting:', key, rawValue);
 
     setSettings(prev => {
+      // Allow empty string to clear the field temporarily
+      if (rawValue === '' || rawValue === null || rawValue === undefined) {
+        const next: Settings = {
+          ...prev,
+          [key]: '' // Store empty string temporarily
+        };
+        return next;
+      }
+
       const numericValue =
         typeof rawValue === 'number' ? rawValue : parseFloat(rawValue);
 
+      // If not a valid number, keep the previous value
       if (Number.isNaN(numericValue)) {
         return prev;
       }
@@ -760,7 +840,8 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
       return {
         ...prev,
         toggleKeys: {
-          keyChord: updatedChord
+          keyChord: updatedChord,
+          hasSetKeyChord: true // Mark that user has explicitly set the keyChord
         }
       };
     });
@@ -1087,7 +1168,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                 <SettingInput
                   type="number"
                   className="number"
-                  value={settings.waveSpeed}
+                  value={typeof settings.waveSpeed === 'string' ? settings.waveSpeed : settings.waveSpeed}
                   min={0.1}
                   max={20}
                   step={0.1}
@@ -1101,7 +1182,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                 <SettingInput
                   type="number"
                   className="number"
-                  value={settings.axisTranslateAmountXMax}
+                  value={typeof settings.axisTranslateAmountXMax === 'string' ? settings.axisTranslateAmountXMax : settings.axisTranslateAmountXMax}
                   onChange={(e) => handleWaveSettingChange('axisTranslateAmountXMax', e.target.value)}
                 />
               </SettingItem>
@@ -1111,7 +1192,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                 <SettingInput
                   type="number"
                   className="number"
-                  value={settings.axisTranslateAmountXMin}
+                  value={typeof settings.axisTranslateAmountXMin === 'string' ? settings.axisTranslateAmountXMin : settings.axisTranslateAmountXMin}
                   onChange={(e) => handleWaveSettingChange('axisTranslateAmountXMin', e.target.value)}
                 />
               </SettingItem>
@@ -1121,7 +1202,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                 <SettingInput
                   type="number"
                   className="number"
-                  value={settings.axisRotationAmountYMax}
+                  value={typeof settings.axisRotationAmountYMax === 'string' ? settings.axisRotationAmountYMax : settings.axisRotationAmountYMax}
                   onChange={(e) => handleWaveSettingChange('axisRotationAmountYMax', e.target.value)}
                 />
               </SettingItem>
@@ -1131,7 +1212,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                 <SettingInput
                   type="number"
                   className="number"
-                  value={settings.axisRotationAmountYMin}
+                  value={typeof settings.axisRotationAmountYMin === 'string' ? settings.axisRotationAmountYMin : settings.axisRotationAmountYMin}
                   onChange={(e) => handleWaveSettingChange('axisRotationAmountYMin', e.target.value)}
                 />
               </SettingItem>
@@ -1271,12 +1352,14 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                 <SettingLabel>Toggle Keys:</SettingLabel>
                 <KeyboardInput>
                   {Array.from({ length: MAX_TOGGLE_KEYS }, (_, index) => {
-                    if (!settings.toggleKeys) {
-                      console.warn('⚙️ SettingsTomes: No toggleKeys found, using default factory');
-                    }
-                    const keyChordDefaults = KeyChordDefaultFactory() as KeyChord;
-                    // Ensure toggleKeys.keyChord exists and is an array, default to empty array
-                    const keyChord = (settings.toggleKeys?.keyChord || keyChordDefaults);
+                    // Determine which keyChord to display:
+                    // - If user hasn't set a keyChord (hasSetKeyChord is false), show defaults
+                    // - If user has set a keyChord (hasSetKeyChord is true), show what they set (or None for empty slots)
+                    const hasSetKeyChord = settings.toggleKeys?.hasSetKeyChord ?? false;
+                    const keyChord = hasSetKeyChord
+                      ? (settings.toggleKeys?.keyChord || [])
+                      : (KeyChordDefaultFactory() as KeyChord);
+                    
                     // Get the key at this index, or undefined if index is out of bounds
                     const selectedKey = keyChord[index];
                     // First check if the stored key is already valid
@@ -1290,11 +1373,6 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                       : normalizedIsValid
                         ? normalizedValue
                         : 'None';
-                    
-                    // Debug logging
-                    if (selectedKey) {
-                      console.log(`⚙️ SettingsTomes: Keyboard shortcut ${index}: selectedKey=${selectedKey}, currentValue=${currentValue}, isKeyValid=${isKeyValid}, normalizedValue=${normalizedValue}, normalizedIsValid=${normalizedIsValid}`);
-                    }
                     
                     return (
                       <SettingSelect
