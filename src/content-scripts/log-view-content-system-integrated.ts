@@ -142,9 +142,12 @@ export class LogViewContentSystemIntegrated {
       console.log("🌊 Integrated System: Coalesced nested message:", normalizedMessage);
     }
     
-    // Normalize message name: handle both 'type' and 'name' fields, and convert to lowercase
+    // Normalize message name: convert legacy 'type' field to 'name' if needed, and convert to lowercase
+    // We only use 'name' field now - 'type' is legacy and should be migrated
     if (!normalizedMessage.name && normalizedMessage.type) {
       normalizedMessage.name = normalizedMessage.type.toLowerCase();
+      // Remove type field since we're standardizing on name
+      delete normalizedMessage.type;
     } else if (normalizedMessage.name && typeof normalizedMessage.name === 'string') {
       normalizedMessage.name = normalizedMessage.name.toLowerCase();
     }
@@ -254,11 +257,28 @@ export class LogViewContentSystemIntegrated {
     
     // Extract options from the start message
     if (message.options) {
-      this.latestOptions = message.options;
-      console.log("🌊 Integrated System: Options extracted and set", { 
-        latestOptions: this.latestOptions,
-        hasWave: !!this.latestOptions?.wave 
-      });
+      // Ensure options are properly rehydrated as Options instance
+      try {
+        const Options = (await import('../models/options')).default;
+        // If it's already an Options instance, use it; otherwise create one
+        if (message.options instanceof Options) {
+          this.latestOptions = message.options;
+        } else {
+          this.latestOptions = new Options(message.options);
+        }
+        console.log("🌊 Integrated System: Options extracted and rehydrated", { 
+          latestOptions: this.latestOptions,
+          hasWave: !!this.latestOptions?.wave,
+          hasCssTemplate: !!this.latestOptions?.wave?.cssTemplate
+        });
+      } catch (error: any) {
+        console.warn("🌊 Integrated System: Failed to rehydrate options, using as-is", error);
+        this.latestOptions = message.options;
+        console.log("🌊 Integrated System: Options extracted (not rehydrated)", { 
+          latestOptions: this.latestOptions,
+          hasWave: !!this.latestOptions?.wave 
+        });
+      }
     } else {
       console.warn("🌊 Integrated System: No options found in start message, loading defaults");
       this.messageService.logMessage('start-warning', 'No options in start message, using defaults');
@@ -266,17 +286,55 @@ export class LogViewContentSystemIntegrated {
       // Load default options if none provided
       try {
         const Options = (await import('../models/options')).default;
-        this.latestOptions = Options.getDefaultOptions();
-        console.log("🌊 Integrated System: Using default options", this.latestOptions);
-      } catch (error: any) {
-        console.error("🌊 Integrated System: Failed to load default options", error);
-        // Try to load from Chrome storage as fallback
+        // Try to load from Chrome storage first
         if (typeof chrome !== 'undefined' && chrome.storage) {
           try {
             const result = await chrome.storage.local.get(['waveReaderSettings']);
             if (result.waveReaderSettings) {
+              // Create Options instance from stored data to properly rehydrate wave property
+              this.latestOptions = new Options(result.waveReaderSettings);
+              console.log("🌊 Integrated System: Loaded options from Chrome storage and rehydrated", {
+                hasOptions: !!this.latestOptions,
+                hasWave: !!this.latestOptions?.wave,
+                hasCssTemplate: !!this.latestOptions?.wave?.cssTemplate
+              });
+            } else {
+              // Try sync storage
+              const syncResult = await chrome.storage.sync.get(['waveReaderSettings']);
+              if (syncResult.waveReaderSettings) {
+                this.latestOptions = new Options(syncResult.waveReaderSettings);
+                console.log("🌊 Integrated System: Loaded options from Chrome sync storage and rehydrated", {
+                  hasOptions: !!this.latestOptions,
+                  hasWave: !!this.latestOptions?.wave,
+                  hasCssTemplate: !!this.latestOptions?.wave?.cssTemplate
+                });
+              } else {
+                // Use defaults if nothing in storage
+                this.latestOptions = Options.getDefaultOptions();
+                console.log("🌊 Integrated System: Using default options", this.latestOptions);
+              }
+            }
+          } catch (storageError) {
+            console.error("🌊 Integrated System: Failed to load from storage", storageError);
+            // Fall back to defaults
+            this.latestOptions = Options.getDefaultOptions();
+            console.log("🌊 Integrated System: Using default options after storage error", this.latestOptions);
+          }
+        } else {
+          // No Chrome storage available, use defaults
+          this.latestOptions = Options.getDefaultOptions();
+          console.log("🌊 Integrated System: Using default options (no Chrome storage)", this.latestOptions);
+        }
+      } catch (error: any) {
+        console.error("🌊 Integrated System: Failed to load default options", error);
+        // Last resort: try to use whatever is in storage as-is
+        if (typeof chrome !== 'undefined' && chrome.storage) {
+          try {
+            const result = await chrome.storage.local.get(['waveReaderSettings']);
+            if (result.waveReaderSettings) {
+              // Even if Options constructor fails, try to use the raw data
               this.latestOptions = result.waveReaderSettings;
-              console.log("🌊 Integrated System: Loaded options from Chrome storage", this.latestOptions);
+              console.warn("🌊 Integrated System: Using raw storage data (Options constructor failed)", this.latestOptions);
             }
           } catch (storageError) {
             console.error("🌊 Integrated System: Failed to load from storage", storageError);
@@ -428,20 +486,40 @@ export class LogViewContentSystemIntegrated {
     console.log("🌊 Integrated System: Syncing going state with background", { going: this.going });
     
     if (typeof chrome !== 'undefined' && chrome.runtime) {
-      chrome.runtime.sendMessage({
-        from: 'integrated-content-system',
-        name: 'update-going-state',
-        going: this.going,
-        timestamp: Date.now(),
-        sessionId: this.sessionId
-      }, (response) => {
-        if (chrome.runtime.lastError) {
-          console.warn("🌊 Integrated System: Failed to sync going state with background:", chrome.runtime.lastError.message);
+      try {
+        chrome.runtime.sendMessage({
+          from: 'integrated-content-system',
+          name: 'update-going-state',
+          going: this.going,
+          timestamp: Date.now(),
+          sessionId: this.sessionId
+        }, (response) => {
+          // Check for extension context invalidation or other errors
+          if (chrome.runtime.lastError) {
+            const errorMessage = chrome.runtime.lastError.message || '';
+            // Extension context invalidated is a common development-time error
+            // when the extension is reloaded while pages are still open
+            if (errorMessage.includes('Extension context invalidated') || 
+                errorMessage.includes('message port closed')) {
+              console.warn("🌊 Integrated System: Extension context invalidated (extension was reloaded). This is normal during development.");
+            } else {
+              console.warn("🌊 Integrated System: Failed to sync going state with background:", errorMessage);
+            }
+          } else {
+            // Only update lastSyncedGoingState on successful send
+            this.lastSyncedGoingState = this.going;
+          }
+        });
+      } catch (error: any) {
+        // Handle cases where chrome.runtime might throw synchronously
+        const errorMessage = error?.message || String(error);
+        if (errorMessage.includes('Extension context invalidated') || 
+            errorMessage.includes('message port closed')) {
+          console.warn("🌊 Integrated System: Extension context invalidated (extension was reloaded). This is normal during development.");
         } else {
-          // Only update lastSyncedGoingState on successful send
-          this.lastSyncedGoingState = this.going;
+          console.warn("🌊 Integrated System: Error syncing going state with background:", errorMessage);
         }
-      });
+      }
     }
   }
 
