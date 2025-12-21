@@ -257,11 +257,20 @@ export class LogViewContentSystemIntegrated {
     this.going = true;
     
     // Ensure keyboard shortcut callback is properly set when starting from popup
+    // This ensures the shortcut can stop the wave even if it was started from popup
     if (message.from === 'popup' || message.from === 'background') {
-      console.log('⌨️ Integrated System: Starting from popup/background, ensuring keyboard shortcut callback is set');
+      console.log('⌨️ Integrated System: Starting from popup/background, ensuring keyboard shortcut callback is set', {
+        currentGoingState: this.going,
+        messageFrom: message.from
+      });
       const { setToggleCallback } = await import('../services/keychord-content-integration');
       setToggleCallback(() => {
-        console.log('⌨️ Integrated System: Keyboard shortcut triggered during wave, calling handleToggle');
+        // Use arrow function to capture 'this' and ensure we check current state
+        const currentGoingState = this.going;
+        console.log('⌨️ Integrated System: Keyboard shortcut triggered', {
+          currentGoingState,
+          timestamp: new Date().toISOString()
+        });
         this.handleToggle({
           name: 'toggle',
           from: 'keyboard-shortcut',
@@ -269,7 +278,10 @@ export class LogViewContentSystemIntegrated {
           options: this.latestOptions
         });
       });
-      console.log('⌨️ Integrated System: Keyboard shortcut callback re-established');
+      console.log('⌨️ Integrated System: Keyboard shortcut callback re-established', {
+        currentGoingState: this.going,
+        hasCallback: true
+      });
     }
     
     // Extract options from the start message
@@ -360,6 +372,28 @@ export class LogViewContentSystemIntegrated {
       }
     }
     
+    // Ensure keyboard shortcut callback is always properly set after state change
+    // This ensures the shortcut can always toggle regardless of how the wave was started
+    const { setToggleCallback } = await import('../services/keychord-content-integration');
+    setToggleCallback(() => {
+      // Use arrow function to capture 'this' and ensure we check current state at execution time
+      const currentGoingState = this.going;
+      console.log('⌨️ Integrated System: Keyboard shortcut triggered', {
+        currentGoingState,
+        timestamp: new Date().toISOString()
+      });
+      this.handleToggle({
+        name: 'toggle',
+        from: 'keyboard-shortcut',
+        timestamp: Date.now(),
+        options: this.latestOptions
+      });
+    });
+    console.log('⌨️ Integrated System: Keyboard shortcut callback ensured after start', {
+      currentGoingState: this.going,
+      messageFrom: message.from
+    });
+    
     // Route message to both Tomes
     this.routeMessageToTomes('start', message);
     
@@ -376,10 +410,35 @@ export class LogViewContentSystemIntegrated {
     this.logMessage('start', 'Integrated system started');
   }
 
-  private handleStop(message: any) {
-    console.log("🌊 Integrated System: Handling stop message");
+  private async handleStop(message: any) {
+    console.log("🌊 Integrated System: Handling stop message", {
+      currentGoingState: this.going,
+      messageFrom: message.from
+    });
     
     this.going = false;
+    
+    // Ensure keyboard shortcut callback is always properly set after state change
+    // This ensures the shortcut can always toggle regardless of how the wave was stopped
+    const { setToggleCallback } = await import('../services/keychord-content-integration');
+    setToggleCallback(() => {
+      // Use arrow function to capture 'this' and ensure we check current state at execution time
+      const currentGoingState = this.going;
+      console.log('⌨️ Integrated System: Keyboard shortcut triggered', {
+        currentGoingState,
+        timestamp: new Date().toISOString()
+      });
+      this.handleToggle({
+        name: 'toggle',
+        from: 'keyboard-shortcut',
+        timestamp: Date.now(),
+        options: this.latestOptions
+      });
+    });
+    console.log('⌨️ Integrated System: Keyboard shortcut callback ensured after stop', {
+      currentGoingState: this.going,
+      messageFrom: message.from
+    });
     
     // Route message to both Tomes
     this.routeMessageToTomes('stop', message);
@@ -398,11 +457,24 @@ export class LogViewContentSystemIntegrated {
   }
 
   private handleToggle(message: any) {
-    console.log("🌊 Integrated System: Handling toggle message");
+    console.log("🌊 Integrated System: Handling toggle message", {
+      currentGoingState: this.going,
+      messageFrom: message.from,
+      timestamp: new Date().toISOString()
+    });
     
-    if (this.going) {
+    // Always check current state at execution time
+    const currentState = this.going;
+    console.log("🌊 Integrated System: Toggle decision", {
+      currentState,
+      action: currentState ? 'STOP' : 'START'
+    });
+    
+    if (currentState) {
+      console.log("🌊 Integrated System: Current state is going=true, calling handleStop");
       this.handleStop(message);
     } else {
+      console.log("🌊 Integrated System: Current state is going=false, calling handleStart");
       this.handleStart(message);
     }
   }

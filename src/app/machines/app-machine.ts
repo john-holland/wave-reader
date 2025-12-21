@@ -11,6 +11,30 @@ interface ServiceMeta {
 }
 
 /**
+ * Get a log function for XState actions
+ * ViewStateMachine doesn't provide log to actions (only to services),
+ * so we use console.log directly without warnings
+ */
+function getActionLog(meta: any, machineName: string): (msg: string, data?: any) => void {
+    // Try to get log from meta if available (for future compatibility)
+    if (meta?.log) {
+        return meta.log;
+    }
+    
+    // Try to get log from ViewStateMachine instance if accessible
+    const machine = meta?.state?.machine;
+    if (machine?.log) {
+        return machine.log;
+    }
+    
+    // Fallback: use console.log directly without warnings
+    // This is expected behavior since ViewStateMachine doesn't wrap actions
+    return (msg: string, data?: any) => {
+        console.log(`[${machineName}] ${msg}`, data);
+    };
+}
+
+/**
  * App Machine
  * 
  * Main application state machine that orchestrates:
@@ -168,12 +192,7 @@ export const createAppMachine = (router?: MachineRouter) => {
                 // Async actions moved to services section (initializeService, startService, stopService, toggleService)
                 updateWaveState: {
                     exec: async (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: Updating wave state from Chrome API', event);
                         // The wave state is already updated in the AppTome, just log it
                         log('🌊 App Machine: Wave state updated to', context.viewModel.going);
@@ -181,12 +200,7 @@ export const createAppMachine = (router?: MachineRouter) => {
                 },
                 toggleWaveState: {
                     exec: async (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: Toggling wave state from Chrome API', event);
                         // The wave state is already toggled in the AppTome, just log it
                         log('🌊 App Machine: Wave state toggled to', context.viewModel.going);
@@ -194,12 +208,8 @@ export const createAppMachine = (router?: MachineRouter) => {
                 },
                 handleKeyboardToggle: {
                     exec: async (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
                         const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         const send = meta?.send || machine?.send?.bind(machine) || ((evt: any) => console.warn('send not available:', evt));
                         log('🌊 App Machine: Handle keyboard toggle');
                         // Delegate to toggle action
@@ -215,12 +225,8 @@ export const createAppMachine = (router?: MachineRouter) => {
                 },
                 updateSelector: {
                     exec: async (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
                         const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         const send = meta?.send || machine?.send?.bind(machine) || ((evt: any) => console.warn('send not available:', evt));
                         log('🌊 App Machine: Update selector', event);
                         if (event.selector) {
@@ -233,12 +239,8 @@ export const createAppMachine = (router?: MachineRouter) => {
                 },
                 updateSettings: {
                     exec: async (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
                         const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         const send = meta?.send || machine?.send?.bind(machine) || ((evt: any) => console.warn('send not available:', evt));
                         log('🌊 App Machine: Update settings', event);
                         if (event.settings) {
@@ -250,12 +252,7 @@ export const createAppMachine = (router?: MachineRouter) => {
                 },
                 changeTab: {
                     exec: (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: Change tab', event);
                         if (event.tab) {
                             context.currentTab = event.tab;
@@ -264,12 +261,8 @@ export const createAppMachine = (router?: MachineRouter) => {
                 },
                 handleSelectionMade: {
                     exec: (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
                         const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         const send = meta?.send || machine?.send?.bind(machine) || ((evt: any) => console.warn('send not available:', evt));
                         log('🌊 App Machine: Selection made', event);
                         
@@ -287,12 +280,7 @@ export const createAppMachine = (router?: MachineRouter) => {
                 },
                 handleTabActivated: {
                     exec: (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: Tab activated', event);
                         
                         const tabId = event.tabId;
@@ -305,24 +293,15 @@ export const createAppMachine = (router?: MachineRouter) => {
                 },
                 toggleCollapse: {
                     exec: (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: Toggle collapse');
                         context.isCollapsed = !context.isCollapsed;
                     }
                 },
                 refreshStateFromContentScript: {
                     exec: async (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
                         const machine = meta?.state?.machine || null;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         const send = meta?.send || machine?.send?.bind(machine) || ((evt: any) => console.warn('send not available:', evt));
                         log('🌊 App Machine: Performing heartbeat sync...');
                         
@@ -344,34 +323,19 @@ export const createAppMachine = (router?: MachineRouter) => {
                 },
                 logStateRefresh: {
                     exec: (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: State refreshed', event);
                     }
                 },
                 logStateRefreshError: {
                     exec: (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: Failed to refresh state', event.error);
                     }
                 },
                 handleError: {
                     exec: (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: Error handled', event);
                         context.viewModel.error = event.error || 'Unknown error';
                         context.viewModel.saved = false;
@@ -379,60 +343,28 @@ export const createAppMachine = (router?: MachineRouter) => {
                 },
                 handleInitError: {
                     exec: (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: Initialization error', event);
                         context.viewModel.error = event.error || 'Initialization failed';
                     }
                 },
                 handleStartError: {
                     exec: (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: Start error', event);
                         context.viewModel.error = event.error || 'Failed to start';
                     }
                 },
                 handleStopError: {
                     exec: (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: Stop error', event);
                         context.viewModel.error = event.error || 'Failed to stop';
                     }
                 },
                 markInitialized: {
                     exec: (context: any, event: any, meta: any) => {
-                        // Debug: Log meta structure to understand what's available
-                        if (!meta?.log && !meta?.state?.machine?.log) {
-                            console.log('🔍 markInitialized meta structure:', {
-                                hasMeta: !!meta,
-                                hasState: !!meta?.state,
-                                hasMachine: !!meta?.state?.machine,
-                                metaKeys: meta ? Object.keys(meta) : [],
-                                stateKeys: meta?.state ? Object.keys(meta?.state) : [],
-                                machineKeys: meta?.state?.machine ? Object.keys(meta?.state?.machine) : []
-                            });
-                        }
-                        
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: Marked as initialized', event);
                         if (event.viewModel) {
                             context.viewModel = { ...context.viewModel, ...event.viewModel };
@@ -441,60 +373,35 @@ export const createAppMachine = (router?: MachineRouter) => {
                 },
                 completeStart: {
                     exec: (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: Start completed');
                         context.viewModel.saved = true;
                     }
                 },
                 completeStop: {
                     exec: (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: Stop completed');
                         context.viewModel.saved = true;
                     }
                 },
                 completeToggle: {
                     exec: (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: Toggle completed');
                         context.viewModel.saved = true;
                     }
                 },
                 completeToggleWaving: {
                     exec: (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: Toggle to waving completed');
                         context.viewModel.saved = true;
                     }
                 },
                 completeKeyboardToggle: {
                     exec: (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: Keyboard toggle completed');
                         if (event.viewModel) {
                             context.viewModel = { ...context.viewModel, ...event.viewModel };
@@ -503,24 +410,15 @@ export const createAppMachine = (router?: MachineRouter) => {
                 },
                 completeSelectorUpdate: {
                     exec: (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: Selector update completed');
                         context.viewModel.saved = true;
                     }
                 },
                 completeSettingsUpdate: {
                     exec: async (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
                         const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         const send = meta?.send || machine?.send?.bind(machine) || ((evt: any) => console.warn('send not available:', evt));
                         log('🌊 App Machine: Settings update completed');
                         context.viewModel.saved = true;
@@ -531,12 +429,7 @@ export const createAppMachine = (router?: MachineRouter) => {
                 },
                 cancelSettingsUpdate: {
                     exec: (context: any, event: any, meta: any) => {
-                        // Extract log and send from meta.state.machine if available
-                        const machine = meta?.state?.machine;
-                        const log = meta?.log || machine?.log || ((msg: string, data?: any) => {
-                            console.warn(`log not available for message "app-machine": ${msg}`, data);
-                            console.log(msg, data);
-                        });
+                        const log = getActionLog(meta, 'app-machine');
                         log('🌊 App Machine: Settings update cancelled');
                     }
                 },

@@ -219,7 +219,7 @@ describe('useWaveReaderMessageRouter', () => {
       await waitFor(() => {
         expect(mockMessageRouter.sendMessage).toHaveBeenCalledWith(
           expect.objectContaining({
-            name: 'TEST_NAME',
+            name: 'TEST_TYPE',
             target: 'target',
             source: 'test-component',
             data: { data: 'test' },
@@ -237,7 +237,7 @@ describe('useWaveReaderMessageRouter', () => {
       await waitFor(() => {
         expect(mockMessageRouter.sendMessageWithRetry).toHaveBeenCalledWith(
           expect.objectContaining({
-            name: 'RETRY_NAME',
+            name: 'RETRY_TYPE',
             target: 'target',
             source: 'test-component',
             data: { data: 'retry' },
@@ -256,7 +256,7 @@ describe('useWaveReaderMessageRouter', () => {
       await waitFor(() => {
         expect(mockMessageRouter.broadcastMessage).toHaveBeenCalledWith(
           expect.objectContaining({
-            name: 'BROADCAST_NAME',
+            name: 'BROADCAST_TYPE',
             source: 'test-component',
             data: { message: 'hello' },
             priority: 'normal'
