@@ -352,11 +352,23 @@ export class KeyChordService {
      * Handle toggle action when shortcut is pressed
      */
     private handleToggle(): void {
-        console.log('⌨️ KeyChordService: Toggle triggered by keyboard shortcut');
+        console.log('⌨️ KeyChordService: Toggle triggered by keyboard shortcut', {
+            hasOnToggle: !!this.onToggle,
+            onToggleType: typeof this.onToggle,
+            isActive: this.isActive,
+            currentKeyChord: this.currentKeyChord.join(' + ')
+        });
         
         if (this.onToggle) {
-            this.onToggle();
+            console.log('⌨️ KeyChordService: Calling onToggle callback');
+            try {
+                this.onToggle();
+                console.log('⌨️ KeyChordService: onToggle callback executed successfully');
+            } catch (error) {
+                console.error('⌨️ KeyChordService: Error executing onToggle callback', error);
+            }
         } else {
+            console.warn('⌨️ KeyChordService: No onToggle callback available - falling back to sending message to background');
             // Default behavior: send message to background script
             this.sendToggleMessage();
         }

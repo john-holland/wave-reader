@@ -250,10 +250,27 @@ export class LogViewContentSystemIntegrated {
   private async handleStart(message: any) {
     console.log("🌊 Integrated System: Handling start message", { 
       message, 
-      hasOptions: !!message.options 
+      hasOptions: !!message.options,
+      from: message.from || 'unknown'
     });
     
     this.going = true;
+    
+    // Ensure keyboard shortcut callback is properly set when starting from popup
+    if (message.from === 'popup' || message.from === 'background') {
+      console.log('⌨️ Integrated System: Starting from popup/background, ensuring keyboard shortcut callback is set');
+      const { setToggleCallback } = await import('../services/keychord-content-integration');
+      setToggleCallback(() => {
+        console.log('⌨️ Integrated System: Keyboard shortcut triggered during wave, calling handleToggle');
+        this.handleToggle({
+          name: 'toggle',
+          from: 'keyboard-shortcut',
+          timestamp: Date.now(),
+          options: this.latestOptions
+        });
+      });
+      console.log('⌨️ Integrated System: Keyboard shortcut callback re-established');
+    }
     
     // Extract options from the start message
     if (message.options) {
@@ -539,19 +556,41 @@ export class LogViewContentSystemIntegrated {
     const wave = this.latestOptions.wave;
     const css = wave.cssTemplate;
 
-    console.log("🌊 Integrated System: Wave CSS template", {
-      css,
-      cssLength: css ? css.length : 0,
-      cssPreview: css ? css.substring(0, 200) + '...' : 'NO_CSS'
+    // Enhanced logging for CSS animation update - output entire wave object
+    console.log("🌊 Integrated System: Updating CSS animation", {
+      waveObject: wave,
+      waveSpeed: wave.waveSpeed,
+      axisTranslateAmountXMax: wave.axisTranslateAmountXMax,
+      axisTranslateAmountXMin: wave.axisTranslateAmountXMin,
+      axisRotationAmountYMax: wave.axisRotationAmountYMax,
+      axisRotationAmountYMin: wave.axisRotationAmountYMin,
+      selector: wave.selector,
+      cssGenerationMode: wave.cssGenerationMode,
+      cssTemplateLength: css ? css.length : 0,
+      cssTemplatePreview: css ? (css.length > 300 ? 'TOO_LONG' : css) : 'NO_CSS',
+      hasCssTemplate: !!css,
+      fullWaveObject: JSON.parse(JSON.stringify(wave)) // Deep clone to avoid circular references
     });
 
     if (css) {
       console.log("🌊 Integrated System: Calling DOM service to apply CSS animation...");
+      const beforeTime = performance.now();
       this.domService.applyWaveAnimation(css);
+      const afterTime = performance.now();
+      const duration = afterTime - beforeTime;
+      
+      console.log("🌊 Integrated System: CSS animation updated successfully", {
+        cssLength: css.length,
+        applicationDuration: `${duration.toFixed(2)}ms`,
+        timestamp: new Date().toISOString()
+      });
       this.messageService.logMessage('wave-animation-applied', 'Wave animation applied');
-      console.log("🌊 Integrated System: Wave animation CSS applied to DOM");
     } else {
-      console.warn("🌊 Integrated System: No CSS template available in wave");
+      console.warn("🌊 Integrated System: No CSS template available in wave", {
+        wave: wave,
+        hasWave: !!wave,
+        waveKeys: wave ? Object.keys(wave) : []
+      });
       this.messageService.logMessage('wave-animation-failed', 'No CSS template available');
     }
   }

@@ -196,29 +196,62 @@ export class ContentSystemDOMService {
    * Apply wave animation styles to main document
    */
   public applyWaveAnimation(cssTemplate: string): void {
-    console.log("🌊 ContentSystemDOMService: applyWaveAnimation called with CSS template", {
+    const startTime = performance.now();
+    console.log("🌊 ContentSystemDOMService: Updating CSS animation", {
       hasCssTemplate: !!cssTemplate,
       cssLength: cssTemplate ? cssTemplate.length : 0,
-      cssPreview: cssTemplate ? cssTemplate.substring(0, 200) + '...' : 'NO_CSS',
+      cssPreview: cssTemplate ? (cssTemplate.length > 200 ? 'TOO_LONG' : cssTemplate) : 'NO_CSS',
       hasMainDocumentStyleElement: !!this.state.mainDocumentStyleElement,
-      stateKeys: Object.keys(this.state)
+      timestamp: new Date().toISOString()
     });
     
     if (!this.state.mainDocumentStyleElement) {
-      console.warn("🌊 ContentSystemDOMService: Main document style element not available");
+      console.warn("🌊 ContentSystemDOMService: Main document style element not available - cannot update CSS animation");
       return;
     }
 
     try {
-      console.log("🌊 ContentSystemDOMService: Setting style element textContent...");
-      this.state.mainDocumentStyleElement.textContent = cssTemplate;
-      console.log("🌊 ContentSystemDOMService: Wave animation styles applied successfully");
-      console.log("🌊 ContentSystemDOMService: Style element now contains:", {
-        textContentLength: this.state.mainDocumentStyleElement.textContent?.length || 0,
-        textContentPreview: this.state.mainDocumentStyleElement.textContent?.substring(0, 200) + '...' || 'EMPTY'
+      const previousLength = this.state.mainDocumentStyleElement.textContent?.length || 0;
+      const isUpdate = previousLength > 0;
+      
+      console.log("🌊 ContentSystemDOMService: Applying CSS to DOM", {
+        operation: isUpdate ? 'UPDATE' : 'INITIAL_APPLY',
+        previousCssLength: previousLength,
+        newCssLength: cssTemplate.length,
+        cssChanged: previousLength !== cssTemplate.length
       });
+      
+      this.state.mainDocumentStyleElement.textContent = cssTemplate;
+      
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+      
+      console.log("🌊 ContentSystemDOMService: CSS animation updated successfully", {
+        operation: isUpdate ? 'UPDATE' : 'INITIAL_APPLY',
+        cssLength: cssTemplate.length,
+        applicationDuration: `${duration.toFixed(2)}ms`,
+        styleElementId: this.state.mainDocumentStyleElement.id || 'no-id',
+        styleElementType: this.state.mainDocumentStyleElement.tagName,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Verify the update was successful
+      const actualLength = this.state.mainDocumentStyleElement.textContent?.length || 0;
+      if (actualLength !== cssTemplate.length) {
+        console.warn("🌊 ContentSystemDOMService: CSS length mismatch after update", {
+          expected: cssTemplate.length,
+          actual: actualLength
+        });
+      }
     } catch (error) {
-      console.error("🌊 ContentSystemDOMService: Failed to apply wave animation:", error);
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+      console.error("🌊 ContentSystemDOMService: Failed to update CSS animation", {
+        error,
+        duration: `${duration.toFixed(2)}ms`,
+        cssLength: cssTemplate.length,
+        timestamp: new Date().toISOString()
+      });
       throw error;
     }
   }
