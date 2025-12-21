@@ -256,34 +256,6 @@ export class LogViewContentSystemIntegrated {
     
     this.going = true;
     
-    // Ensure keyboard shortcut callback is properly set when starting from popup
-    // This ensures the shortcut can stop the wave even if it was started from popup
-    if (message.from === 'popup' || message.from === 'background') {
-      console.log('⌨️ Integrated System: Starting from popup/background, ensuring keyboard shortcut callback is set', {
-        currentGoingState: this.going,
-        messageFrom: message.from
-      });
-      const { setToggleCallback } = await import('../services/keychord-content-integration');
-      setToggleCallback(() => {
-        // Use arrow function to capture 'this' and ensure we check current state
-        const currentGoingState = this.going;
-        console.log('⌨️ Integrated System: Keyboard shortcut triggered', {
-          currentGoingState,
-          timestamp: new Date().toISOString()
-        });
-        this.handleToggle({
-          name: 'toggle',
-          from: 'keyboard-shortcut',
-          timestamp: Date.now(),
-          options: this.latestOptions
-        });
-      });
-      console.log('⌨️ Integrated System: Keyboard shortcut callback re-established', {
-        currentGoingState: this.going,
-        hasCallback: true
-      });
-    }
-    
     // Extract options from the start message
     if (message.options) {
       // Ensure options are properly rehydrated as Options instance
@@ -372,28 +344,6 @@ export class LogViewContentSystemIntegrated {
       }
     }
     
-    // Ensure keyboard shortcut callback is always properly set after state change
-    // This ensures the shortcut can always toggle regardless of how the wave was started
-    const { setToggleCallback } = await import('../services/keychord-content-integration');
-    setToggleCallback(() => {
-      // Use arrow function to capture 'this' and ensure we check current state at execution time
-      const currentGoingState = this.going;
-      console.log('⌨️ Integrated System: Keyboard shortcut triggered', {
-        currentGoingState,
-        timestamp: new Date().toISOString()
-      });
-      this.handleToggle({
-        name: 'toggle',
-        from: 'keyboard-shortcut',
-        timestamp: Date.now(),
-        options: this.latestOptions
-      });
-    });
-    console.log('⌨️ Integrated System: Keyboard shortcut callback ensured after start', {
-      currentGoingState: this.going,
-      messageFrom: message.from
-    });
-    
     // Route message to both Tomes
     this.routeMessageToTomes('start', message);
     
@@ -405,6 +355,31 @@ export class LogViewContentSystemIntegrated {
     
     // Sync state with background script
     this.syncGoingStateWithBackground();
+    
+    // CRITICAL: Ensure keyboard shortcut callback is set AFTER all state is initialized
+    // This ensures the shortcut can stop the wave even if it was started from popup
+    // The callback must be set last so it captures the final state
+    const { setToggleCallback } = await import('../services/keychord-content-integration');
+    await setToggleCallback(() => {
+      // Use arrow function to capture 'this' and ensure we check current state at execution time
+      const currentGoingState = this.going;
+      console.log('⌨️ Integrated System: Keyboard shortcut triggered in callback', {
+        currentGoingState,
+        hasLatestOptions: !!this.latestOptions,
+        timestamp: new Date().toISOString()
+      });
+      this.handleToggle({
+        name: 'toggle',
+        from: 'keyboard-shortcut',
+        timestamp: Date.now(),
+        options: this.latestOptions
+      });
+    });
+    console.log('⌨️ Integrated System: Keyboard shortcut callback set after start', {
+      currentGoingState: this.going,
+      messageFrom: message.from,
+      hasLatestOptions: !!this.latestOptions
+    });
     
     this.messageService.logMessage('start', 'Integrated system started');
     this.logMessage('start', 'Integrated system started');
@@ -421,7 +396,7 @@ export class LogViewContentSystemIntegrated {
     // Ensure keyboard shortcut callback is always properly set after state change
     // This ensures the shortcut can always toggle regardless of how the wave was stopped
     const { setToggleCallback } = await import('../services/keychord-content-integration');
-    setToggleCallback(() => {
+    await setToggleCallback(() => {
       // Use arrow function to capture 'this' and ensure we check current state at execution time
       const currentGoingState = this.going;
       console.log('⌨️ Integrated System: Keyboard shortcut triggered', {

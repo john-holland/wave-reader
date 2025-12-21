@@ -82,24 +82,27 @@ async function sendToggleToBackground(): Promise<void> {
 /**
  * Update the toggle callback
  */
-export function setToggleCallback(onToggle: () => void): void {
+export async function setToggleCallback(onToggle: () => void): Promise<void> {
     console.log('⌨️ KeyChordContentIntegration: Setting toggle callback', {
         hasKeyChordService: !!keyChordService,
         hasCallback: !!onToggle,
         callbackType: typeof onToggle
     });
     
-    if (keyChordService) {
-        const wasActive = keyChordService.getIsActive();
-        keyChordService.setOnToggle(onToggle);
-        console.log('⌨️ KeyChordContentIntegration: Toggle callback set', {
-            wasActive,
-            isActive: keyChordService.getIsActive(),
-            hasCallback: !!keyChordService.getOnToggle()
-        });
-    } else {
-        console.warn('⌨️ KeyChordContentIntegration: Cannot set toggle callback - keyChordService is null');
+    // If service isn't initialized, initialize it now
+    if (!keyChordService) {
+        console.log('⌨️ KeyChordContentIntegration: Service not initialized, initializing now');
+        await initializeKeyChordService(onToggle);
+        return;
     }
+    
+    const wasActive = keyChordService.getIsActive();
+    keyChordService.setOnToggle(onToggle);
+    console.log('⌨️ KeyChordContentIntegration: Toggle callback set', {
+        wasActive,
+        isActive: keyChordService.getIsActive(),
+        hasCallback: !!keyChordService.getOnToggle()
+    });
 }
 
 /**
