@@ -170,13 +170,12 @@ export class LogViewContentSystemIntegrated {
           });
           break;
         case 'stop':
-          try {
-            this.handleStop(normalizedMessage);
+          this.handleStop(normalizedMessage).then(() => {
             sendResponse({ success: true, state: this.proxyState });
-          } catch (error: any) {
+          }).catch((error: any) => {
             console.error("🌊 Integrated System: Error in handleStop", error);
             sendResponse({ success: false, error: error.message });
-          }
+          });
           break;
         case 'toggle':
         case 'toggle-wave-reader':
@@ -230,7 +229,9 @@ export class LogViewContentSystemIntegrated {
           });
           break;
         case 'stop':
-          this.handleStop(normalizedMessage);
+          this.handleStop(normalizedMessage).catch((error: any) => {
+            console.error("🌊 Integrated System: Error in handleStop (window)", error);
+          });
           break;
         case 'toggle':
         case 'toggle-wave-reader':
@@ -359,27 +360,33 @@ export class LogViewContentSystemIntegrated {
     // CRITICAL: Ensure keyboard shortcut callback is set AFTER all state is initialized
     // This ensures the shortcut can stop the wave even if it was started from popup
     // The callback must be set last so it captures the final state
-    const { setToggleCallback } = await import('../services/keychord-content-integration');
-    await setToggleCallback(() => {
-      // Use arrow function to capture 'this' and ensure we check current state at execution time
-      const currentGoingState = this.going;
-      console.log('⌨️ Integrated System: Keyboard shortcut triggered in callback', {
-        currentGoingState,
-        hasLatestOptions: !!this.latestOptions,
-        timestamp: new Date().toISOString()
+    // Wrap in try-catch to ensure errors don't prevent start from completing
+    try {
+      const { setToggleCallback } = await import('../services/keychord-content-integration');
+      await setToggleCallback(() => {
+        // Use arrow function to capture 'this' and ensure we check current state at execution time
+        const currentGoingState = this.going;
+        console.log('⌨️ Integrated System: Keyboard shortcut triggered in callback', {
+          currentGoingState,
+          hasLatestOptions: !!this.latestOptions,
+          timestamp: new Date().toISOString()
+        });
+        this.handleToggle({
+          name: 'toggle',
+          from: 'keyboard-shortcut',
+          timestamp: Date.now(),
+          options: this.latestOptions
+        });
       });
-      this.handleToggle({
-        name: 'toggle',
-        from: 'keyboard-shortcut',
-        timestamp: Date.now(),
-        options: this.latestOptions
+      console.log('⌨️ Integrated System: Keyboard shortcut callback set after start', {
+        currentGoingState: this.going,
+        messageFrom: message.from,
+        hasLatestOptions: !!this.latestOptions
       });
-    });
-    console.log('⌨️ Integrated System: Keyboard shortcut callback set after start', {
-      currentGoingState: this.going,
-      messageFrom: message.from,
-      hasLatestOptions: !!this.latestOptions
-    });
+    } catch (error: any) {
+      console.warn('⌨️ Integrated System: Failed to set keyboard shortcut callback after start', error);
+      // Don't throw - allow start to complete even if callback setup fails
+    }
     
     this.messageService.logMessage('start', 'Integrated system started');
     this.logMessage('start', 'Integrated system started');
@@ -393,28 +400,6 @@ export class LogViewContentSystemIntegrated {
     
     this.going = false;
     
-    // Ensure keyboard shortcut callback is always properly set after state change
-    // This ensures the shortcut can always toggle regardless of how the wave was stopped
-    const { setToggleCallback } = await import('../services/keychord-content-integration');
-    await setToggleCallback(() => {
-      // Use arrow function to capture 'this' and ensure we check current state at execution time
-      const currentGoingState = this.going;
-      console.log('⌨️ Integrated System: Keyboard shortcut triggered', {
-        currentGoingState,
-        timestamp: new Date().toISOString()
-      });
-      this.handleToggle({
-        name: 'toggle',
-        from: 'keyboard-shortcut',
-        timestamp: Date.now(),
-        options: this.latestOptions
-      });
-    });
-    console.log('⌨️ Integrated System: Keyboard shortcut callback ensured after stop', {
-      currentGoingState: this.going,
-      messageFrom: message.from
-    });
-    
     // Route message to both Tomes
     this.routeMessageToTomes('stop', message);
     
@@ -426,6 +411,30 @@ export class LogViewContentSystemIntegrated {
     
     // Sync state with background script
     this.syncGoingStateWithBackground();
+    
+    // Ensure keyboard shortcut callback is set after all stop operations complete
+    // This ensures the shortcut can start a new wave after stopping
+    // Do this asynchronously and non-blocking so it doesn't interfere with stop flow
+    import('../services/keychord-content-integration').then(({ setToggleCallback }) => {
+      setToggleCallback(() => {
+        // Use arrow function to capture 'this' and ensure we check current state at execution time
+        const currentGoingState = this.going;
+        console.log('⌨️ Integrated System: Keyboard shortcut triggered', {
+          currentGoingState,
+          timestamp: new Date().toISOString()
+        });
+        this.handleToggle({
+          name: 'toggle',
+          from: 'keyboard-shortcut',
+          timestamp: Date.now(),
+          options: this.latestOptions
+        });
+      }).catch((error: any) => {
+        console.warn('⌨️ Integrated System: Failed to set keyboard shortcut callback after stop', error);
+      });
+    }).catch((error: any) => {
+      console.warn('⌨️ Integrated System: Failed to import keychord service after stop', error);
+    });
     
     this.messageService.logMessage('stop', 'Integrated system stopped');
     this.logMessage('stop', 'Integrated system stopped');
