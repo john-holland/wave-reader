@@ -417,19 +417,37 @@ const AboutPageComponent = createViewStateMachine({
     }
   }
 }).withState('idle', async ({ context, event, send, log, transition, machine, view, clear }: any) => {
-  // Clear any existing views first
-  //if (clear) clear();
+  // CRITICAL: Clear any existing views first
+  if (clear) {
+    clear();
+  }
   
-  // Auto-load donation status on idle if not already loaded
+  // Render the view immediately (don't wait for donation status)
+  const renderedView = AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error);
+  console.log('🌊 AboutTome: Rendering idle view', { hasView: !!renderedView, donated: context.donated });
+  
+  // Push view to ViewStateMachine's viewStack immediately
+  view(renderedView);
+  
+  // Auto-load donation status on idle if not already loaded (non-blocking)
   if (!context.donated && !context.isLoading) {
     await log('Loading donation status...');
     send({ type: 'LOAD_DONATION_STATUS' });
   }
   
+  // Return the view (ViewStateMachine pattern)
+  return renderedView;
+}).withState('loading', async ({ context, event, send, log, transition, machine, view, clear, graphql }: any) => {
+  // CRITICAL: Render view immediately even while loading
+  // This ensures content is visible while donation status loads
   const renderedView = AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error);
-  console.log('🌊 AboutTome: Rendering idle view', { hasView: !!renderedView, donated: context.donated });
-  return view(renderedView);
-}).withState('loading', async ({ context, event, send, log, transition, machine, view, graphql }: any) => {
+  console.log('🌊 AboutTome: Rendering loading view', { hasView: !!renderedView, donated: context.donated });
+  
+  if (clear) {
+    clear();
+  }
+  view(renderedView);
+  
   try {
     await log('Fetching donation status from GraphQL...');
     
@@ -454,6 +472,10 @@ const AboutPageComponent = createViewStateMachine({
       
       // todo: review: maybe cache this, or defer this rather than load always?
       await log('Donation status loaded successfully', { donationData, backendDisabled });
+      
+      // Re-render with updated donation data
+      const updatedView = AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error);
+      view(updatedView);
       
       // Start subscription for real-time updates
       if (!context.subscription) {
@@ -485,16 +507,31 @@ const AboutPageComponent = createViewStateMachine({
       send({ type: 'DONATION_STATUS_LOADED', payload: donationData });
     } else {
       await log("Failed to load update.data", [...context.log]);
+      // Still render view even if data load failed
+      const fallbackView = AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error);
+      view(fallbackView);
     }
   } catch (error) {
     await log('Failed to load donation status', error);
     context.error = error instanceof Error ? error.message : 'Unknown error occurred';
     context.isLoading = false;
+    // Render view with error state
+    const errorView = AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error);
+    view(errorView);
     send({ type: 'DONATION_STATUS_ERROR', payload: error });
   }
   
-  return view(AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error));
+  // Return the view (ViewStateMachine pattern)
+  return renderedView;
 }).withState('error', ({ context, event, send, log, transition, machine, view, clear }: any) => {
+  // CRITICAL: Always render view in error state
+  if (clear) {
+    clear();
+  }
+  const errorView = AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error);
+  console.log('🌊 AboutTome: Rendering error view', { hasView: !!errorView, error: context.error });
+  view(errorView);
+  return errorView;
   if (clear) clear();
   return view(AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error));
 });
@@ -634,7 +671,7 @@ const AboutTome: FunctionComponent<AboutTomeProps> = ({
         key={renderKey}
         onError={(error) => console.error('About Editor Error:', error)}
       >
-        {(() => {
+        {(showPuppies || !showPuppies) && (() => {
           const rendered = aboutPageComponent.render();
           console.log('🌊 AboutTome: Render result:', {
             hasRendered: !!rendered,
@@ -653,7 +690,8 @@ const AboutTome: FunctionComponent<AboutTomeProps> = ({
             return <div>Loading About content...</div>;
           }
           return rendered;
-        })()}
+  })()}
+        
         {showPuppies && (
           <div style={{ marginTop: '24px' }}>
             <PuppyTome skipWrapper={true} />
