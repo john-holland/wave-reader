@@ -219,10 +219,6 @@ const AboutNielsonResearchView = () => {
     <Section>
       <SectionTitle>📊 Research Foundation</SectionTitle>
       <SectionText>
-        {/* todo: substantiate (i think so): Wave Reader is based on research into how people read and scan web content. Studies have shown 
-        that eye movement patterns can be improved through subtle visual cues and animations. */}
-      </SectionText>
-      <SectionText>
         The theoretical foundation draws from Nielsen Research findings on how the average reader scans 
         webpages uniformly, which we use to support the approach of assisting those with tracking 
         problems through gentle page animations.
@@ -402,7 +398,8 @@ const AboutPageComponent = createViewStateMachine({
     states: {
       idle: {
         on: {
-          LOAD_DONATION_STATUS: 'loading'
+          LOAD_DONATION_STATUS: 'loading',
+          INITIALIZE: 'loading'
         }
       },
       loading: {
@@ -419,14 +416,19 @@ const AboutPageComponent = createViewStateMachine({
       }
     }
   }
-}).withState('idle', async ({ context, event, send, log, transition, machine, view }: any) => {
+}).withState('idle', async ({ context, event, send, log, transition, machine, view, clear }: any) => {
+  // Clear any existing views first
+  //if (clear) clear();
+  
   // Auto-load donation status on idle if not already loaded
   if (!context.donated && !context.isLoading) {
     await log('Loading donation status...');
     send({ type: 'LOAD_DONATION_STATUS' });
   }
   
-  return view(AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error));
+  const renderedView = AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error);
+  console.log('🌊 AboutTome: Rendering idle view', { hasView: !!renderedView, donated: context.donated });
+  return view(renderedView);
 }).withState('loading', async ({ context, event, send, log, transition, machine, view, graphql }: any) => {
   try {
     await log('Fetching donation status from GraphQL...');
@@ -450,6 +452,7 @@ const AboutPageComponent = createViewStateMachine({
       context.donors = donationData.donors || context.donors;
       context.isLoading = false;
       
+      // todo: review: maybe cache this, or defer this rather than load always?
       await log('Donation status loaded successfully', { donationData, backendDisabled });
       
       // Start subscription for real-time updates
@@ -481,7 +484,7 @@ const AboutPageComponent = createViewStateMachine({
       
       send({ type: 'DONATION_STATUS_LOADED', payload: donationData });
     } else {
-      throw new Error('Invalid GraphQL response format');
+      await log("Failed to load update.data", [...context.log]);
     }
   } catch (error) {
     await log('Failed to load donation status', error);
@@ -491,7 +494,8 @@ const AboutPageComponent = createViewStateMachine({
   }
   
   return view(AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error));
-}).withState('error', ({ context, event, send, log, transition, machine, view }: any) => {
+}).withState('error', ({ context, event, send, log, transition, machine, view, clear }: any) => {
+  if (clear) clear();
   return view(AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error));
 });
 
@@ -569,14 +573,31 @@ const AboutTome: FunctionComponent<AboutTomeProps> = ({
     
     setAboutPageComponent(component);
     component.start();
-    component.send({ type: 'INITIALIZE' });
-
+    
     // Observe view key changes to trigger re-renders (if method exists)
+    // This must be set up BEFORE sending INITIALIZE to catch the initial render
     let unsubscribe: (() => void) | null = null;
     const componentAny = component as any;
     if (componentAny && typeof componentAny.observeViewKey === 'function') {
-      unsubscribe = componentAny.observeViewKey(setRenderKey);
+      unsubscribe = componentAny.observeViewKey((key: number) => {
+        console.log('🌊 AboutTome: View key updated:', key);
+        setRenderKey(key);
+      });
+    } else {
+      // Fallback: manually update renderKey when state changes
+      const stateSubscription = component.subscribe?.((state: any) => {
+        console.log('🌊 AboutTome: State changed, updating renderKey', state.value);
+        setRenderKey(prev => prev + 1);
+      });
+      if (stateSubscription && typeof stateSubscription === 'function') {
+        unsubscribe = stateSubscription;
+      } else if (stateSubscription && typeof stateSubscription === 'object' && 'unsubscribe' in stateSubscription) {
+        unsubscribe = () => (stateSubscription as any).unsubscribe();
+      }
     }
+    
+    // Send INITIALIZE after setting up observers
+    component.send({ type: 'INITIALIZE' }); 
 
     // Cleanup: unregister on unmount
     return () => {
@@ -613,7 +634,26 @@ const AboutTome: FunctionComponent<AboutTomeProps> = ({
         key={renderKey}
         onError={(error) => console.error('About Editor Error:', error)}
       >
-        {aboutPageComponent.render()}
+        {(() => {
+          const rendered = aboutPageComponent.render();
+          console.log('🌊 AboutTome: Render result:', {
+            hasRendered: !!rendered,
+            renderKey,
+            machineState: aboutPageComponent.getState?.()?.value,
+            viewStackSize: (aboutPageComponent as any).viewStack?.length || 0
+          });
+          
+          if (!rendered) {
+            console.warn('🌊 AboutTome: render() returned null/undefined, checking viewStack');
+            const viewStack = (aboutPageComponent as any).getViewStack?.();
+            if (viewStack && viewStack.length > 0) {
+              console.log('🌊 AboutTome: ViewStack has content, composing...');
+              return (aboutPageComponent as any).viewStack?.compose?.() || <div>ViewStack has content but compose failed</div>;
+            }
+            return <div>Loading About content...</div>;
+          }
+          return rendered;
+        })()}
         {showPuppies && (
           <div style={{ marginTop: '24px' }}>
             <PuppyTome skipWrapper={true} />
@@ -638,3 +678,4 @@ const AboutTome: FunctionComponent<AboutTomeProps> = ({
 };
 
 export default AboutTome;
+export { AboutPageComponent }; // Export for testing
