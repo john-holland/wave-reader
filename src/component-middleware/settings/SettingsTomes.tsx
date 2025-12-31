@@ -633,6 +633,17 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
   // Refs
   const settingsRef = useRef<Settings>(settings);
 
+  // Load blacklist function
+  const loadBlacklist = useCallback(async () => {
+    try {
+      await EpilepticBlacklistService.initialize();
+      const blacklistedUrls = EpilepticBlacklistService.getBlacklistedUrls();
+      setEpilepticBlacklist(blacklistedUrls.join('\n'));
+    } catch (error) {
+      console.warn('Failed to load epileptic blacklist:', error);
+    }
+  }, []);
+
   // Initialize component
   useEffect(() => {
     const initializeComponent = async () => {
@@ -673,16 +684,32 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
         }
         
         // Load epileptic blacklist
-        await EpilepticBlacklistService.initialize();
-        const blacklistedUrls = EpilepticBlacklistService.getBlacklistedUrls();
-        setEpilepticBlacklist(blacklistedUrls.join('\n'));
+        await loadBlacklist();
       }
       
       console.log('⚙️ SettingsTomes: Initialized for Chrome extension context');
     };
 
     initializeComponent();
-  }, []);
+  }, [loadBlacklist]);
+
+  // Listen for storage changes to refresh blacklist
+  useEffect(() => {
+    if (typeof chrome !== 'undefined' && chrome.storage) {
+      const listener = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
+        if (areaName === 'local' && changes['epileptic_blacklist']) {
+          // Blacklist was updated, reload it
+          loadBlacklist();
+        }
+      };
+      
+      chrome.storage.onChanged.addListener(listener);
+      
+      return () => {
+        chrome.storage.onChanged.removeListener(listener);
+      };
+    }
+  }, [loadBlacklist]);
 
   // Update settings ref when settings change
   useEffect(() => {
@@ -1115,30 +1142,43 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                     console.log('🚨 Epileptic animation reported');
                     
                     try {
-                      // This would integrate with the GraphQL mutation from AboutTome
-                      // For now, we'll show a confirmation dialog
-                      const confirmed = window.confirm(
-                        'Report this animation as potentially triggering epileptic symptoms?\n\n' +
-                        'This will send a report to our accessibility team for investigation.'
-                      );
+                      await EpilepticBlacklistService.initialize();
                       
-                      if (confirmed) {
-                        // TODO: Integrate with GraphQL mutation
-                        // await graphql.mutation(DONATION_REPORT_MUTATION, {
-                        //   report: {
-                        //     userId: 'anonymous',
-                        //     timestamp: new Date().toISOString(),
-                        //     description: 'Epileptic animation reported from settings',
-                        //     severity: 'medium',
-                        //     url: window.location.href
-                        //   }
-                        // });
-                        
-                        alert('Thank you for reporting this. We take accessibility seriously and will investigate this animation.');
+                      // Get the current tab URL
+                      let currentUrl = window.location.href;
+                      if (typeof chrome !== 'undefined' && chrome.tabs) {
+                        try {
+                          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+                          if (tabs[0]?.url) {
+                            currentUrl = tabs[0].url;
+                          }
+                        } catch (e) {
+                          console.warn('Could not get tab URL:', e);
+                        }
                       }
+                      
+                      // Add URL to blacklist
+                      if (currentUrl) {
+                        await EpilepticBlacklistService.addUrl(currentUrl);
+                        // Reload blacklist to update the textarea
+                        await loadBlacklist();
+                        console.log('🌊 Added URL to epileptic blacklist:', currentUrl);
+                      }
+                      
+                      // Create mailto link
+                      const subject = encodeURIComponent('Epileptic Animation Report - Wave Reader');
+                      const body = encodeURIComponent(
+                        `I am reporting an animation that may trigger epileptic symptoms.\n\n` +
+                        `URL: ${currentUrl}\n` +
+                        `Timestamp: ${new Date().toISOString()}\n\n` +
+                        `Additional details:\n`
+                      );
+                      const mailtoLink = `mailto:john.gebhard.holland+epileptic@gmail.com?subject=${subject}&body=${body}`;
+                      
+                      // Open mailto link
+                      window.location.href = mailtoLink;
                     } catch (error) {
                       console.error('Failed to report epileptic animation:', error);
-                      alert('Failed to submit report. Please try again or contact support.');
                     }
                   }}
                   title="Report epileptic triggering animation"

@@ -573,6 +573,9 @@ const AboutTome: FunctionComponent<AboutTomeProps> = ({
   // Handler for epileptic animation report
   const handleReportEpileptic = useCallback(async () => {
     try {
+      const { EpilepticBlacklistService } = await import('../../services/epileptic-blacklist');
+      await EpilepticBlacklistService.initialize();
+      
       // Get the current tab URL if we're in an extension context
       let currentUrl = window.location.href;
       
@@ -587,6 +590,12 @@ const AboutTome: FunctionComponent<AboutTomeProps> = ({
           // If we can't get the tab URL, use the current location
           console.warn('Could not get tab URL:', e);
         }
+      }
+      
+      // Add URL to blacklist
+      if (currentUrl) {
+        await EpilepticBlacklistService.addUrl(currentUrl);
+        console.log('🌊 Added URL to epileptic blacklist:', currentUrl);
       }
       
       const subject = encodeURIComponent('Epileptic Animation Report - Wave Reader');
