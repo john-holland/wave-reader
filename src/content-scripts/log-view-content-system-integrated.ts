@@ -61,15 +61,25 @@ export class LogViewContentSystemIntegrated {
     console.log("🌊 Log-View-Machine Integrated Content System initialized successfully");
   }
 
-  private init() {
+  private async init() {
     // Wait for document.body to be available
     if (!document.body) {
       setTimeout(() => this.init(), 100);
       return;
     }
 
+    console.log("🌊 Integrated System: Starting initialization...");
+    
     // Initialize DOM service
     this.domService.initialize();
+    
+    // Load settings from storage proactively so they're available when wave starts
+    console.log("🌊 Integrated System: Loading settings from storage...");
+    await this.loadSettingsFromStorage();
+    console.log("🌊 Integrated System: Settings loading complete", {
+      hasLatestOptions: !!this.latestOptions,
+      waveSpeed: this.latestOptions?.wave?.waveSpeed
+    });
     
     // Set up message routing
     this.setupMessageRouting();
@@ -79,6 +89,128 @@ export class LogViewContentSystemIntegrated {
     
     // Log system initialization
     this.logMessage('system-init', 'Integrated content system initialized successfully');
+    console.log("🌊 Integrated System: Initialization complete");
+  }
+
+  /**
+   * Load settings from Chrome storage proactively
+   * This ensures settings are available even before a start message is received
+   */
+  private async loadSettingsFromStorage(): Promise<void> {
+    console.log("🌊 Integrated System: loadSettingsFromStorage called", {
+      hasChrome: typeof chrome !== 'undefined',
+      hasStorage: typeof chrome !== 'undefined' && !!chrome.storage,
+      hasLocal: typeof chrome !== 'undefined' && !!chrome.storage?.local
+    });
+    
+    try {
+      const Options = (await import('../models/options')).default;
+      const Wave = (await import('../models/wave')).default;
+      
+      if (typeof chrome !== 'undefined' && chrome.storage) {
+        try {
+          // Try local storage first
+          console.log("🌊 Integrated System: Attempting to read from chrome.storage.local...");
+          const result = await chrome.storage.local.get(['waveReaderSettings']);
+          console.log("🌊 Integrated System: Storage read result", {
+            hasResult: !!result,
+            hasSettings: !!result.waveReaderSettings,
+            settingsKeys: result.waveReaderSettings ? Object.keys(result.waveReaderSettings) : []
+          });
+          
+          if (result.waveReaderSettings) {
+            const storedSettings = result.waveReaderSettings;
+            
+            // Convert flat Settings format to nested Options format if needed
+            let optionsData = storedSettings;
+            if (storedSettings.waveSpeed !== undefined || storedSettings.axisRotationAmountYMax !== undefined) {
+              // Flat Settings format - convert to nested Options format
+              const waveProps: any = {
+                ...(storedSettings.wave || {}),
+                waveSpeed: storedSettings.waveSpeed,
+                axisTranslateAmountXMax: storedSettings.axisTranslateAmountXMax,
+                axisTranslateAmountXMin: storedSettings.axisTranslateAmountXMin,
+                axisRotationAmountYMax: storedSettings.axisRotationAmountYMax,
+                axisRotationAmountYMin: storedSettings.axisRotationAmountYMin,
+                selector: storedSettings.selector,
+                cssGenerationMode: storedSettings.cssGenerationMode,
+                cssTemplate: storedSettings.cssTemplate,
+                cssMouseTemplate: storedSettings.cssMouseTemplate
+              };
+              optionsData = {
+                ...storedSettings,
+                wave: new Wave(waveProps) // Create Wave instance to regenerate CSS templates
+              };
+            }
+            
+            this.latestOptions = new Options(optionsData);
+            console.log("🌊 Integrated System: Proactively loaded settings from storage on init", {
+              hasOptions: !!this.latestOptions,
+              hasWave: !!this.latestOptions?.wave,
+              waveSpeed: this.latestOptions?.wave?.waveSpeed,
+              storedWaveSpeed: storedSettings.waveSpeed,
+              cssTemplateLength: this.latestOptions?.wave?.cssTemplate?.length || 0
+            });
+            return;
+          }
+          
+          // Try sync storage
+          const syncResult = await chrome.storage.sync.get(['waveReaderSettings']);
+          if (syncResult.waveReaderSettings) {
+            const storedSettings = syncResult.waveReaderSettings;
+            
+            // Convert flat Settings format to nested Options format if needed
+            let optionsData = storedSettings;
+            if (storedSettings.waveSpeed !== undefined || storedSettings.axisRotationAmountYMax !== undefined) {
+              const waveProps: any = {
+                ...(storedSettings.wave || {}),
+                waveSpeed: storedSettings.waveSpeed,
+                axisTranslateAmountXMax: storedSettings.axisTranslateAmountXMax,
+                axisTranslateAmountXMin: storedSettings.axisTranslateAmountXMin,
+                axisRotationAmountYMax: storedSettings.axisRotationAmountYMax,
+                axisRotationAmountYMin: storedSettings.axisRotationAmountYMin,
+                selector: storedSettings.selector,
+                cssGenerationMode: storedSettings.cssGenerationMode,
+                cssTemplate: storedSettings.cssTemplate,
+                cssMouseTemplate: storedSettings.cssMouseTemplate
+              };
+              optionsData = {
+                ...storedSettings,
+                wave: new Wave(waveProps)
+              };
+            }
+            
+            this.latestOptions = new Options(optionsData);
+            console.log("🌊 Integrated System: Proactively loaded settings from sync storage on init", {
+              hasOptions: !!this.latestOptions,
+              hasWave: !!this.latestOptions?.wave,
+              waveSpeed: this.latestOptions?.wave?.waveSpeed,
+              storedWaveSpeed: storedSettings.waveSpeed
+            });
+            return;
+          }
+          
+          console.log("🌊 Integrated System: No settings found in storage on init, will use defaults when wave starts");
+        } catch (storageError) {
+          console.error("🌊 Integrated System: Failed to load settings from storage on init", {
+            error: storageError,
+            errorMessage: storageError instanceof Error ? storageError.message : String(storageError),
+            errorStack: storageError instanceof Error ? storageError.stack : undefined
+          });
+        }
+      } else {
+        console.warn("🌊 Integrated System: chrome.storage not available", {
+          hasChrome: typeof chrome !== 'undefined',
+          hasStorage: typeof chrome !== 'undefined' && !!chrome.storage
+        });
+      }
+    } catch (error) {
+      console.error("🌊 Integrated System: Error loading settings on init", {
+        error: error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined
+      });
+    }
   }
 
   private async setupKeyboardShortcuts() {
@@ -337,22 +469,79 @@ export class LogViewContentSystemIntegrated {
           try {
             const result = await chrome.storage.local.get(['waveReaderSettings']);
             if (result.waveReaderSettings) {
+              // Stored settings might be in flat Settings format - convert to Options format
+              const storedSettings = result.waveReaderSettings;
+              const Wave = (await import('../models/wave')).default;
+              
+              // If stored settings have flat wave properties, construct wave object
+              let optionsData = storedSettings;
+              if (storedSettings.waveSpeed !== undefined || storedSettings.axisRotationAmountYMax !== undefined) {
+                // Flat Settings format - convert to nested Options format
+                const waveProps: any = {
+                  ...(storedSettings.wave || {}),
+                  waveSpeed: storedSettings.waveSpeed,
+                  axisTranslateAmountXMax: storedSettings.axisTranslateAmountXMax,
+                  axisTranslateAmountXMin: storedSettings.axisTranslateAmountXMin,
+                  axisRotationAmountYMax: storedSettings.axisRotationAmountYMax,
+                  axisRotationAmountYMin: storedSettings.axisRotationAmountYMin,
+                  selector: storedSettings.selector,
+                  cssGenerationMode: storedSettings.cssGenerationMode,
+                  cssTemplate: storedSettings.cssTemplate,
+                  cssMouseTemplate: storedSettings.cssMouseTemplate
+                };
+                optionsData = {
+                  ...storedSettings,
+                  wave: new Wave(waveProps) // Create Wave instance to regenerate CSS templates
+                };
+              }
+              
               // Create Options instance from stored data to properly rehydrate wave property
-              this.latestOptions = new Options(result.waveReaderSettings);
+              this.latestOptions = new Options(optionsData);
               console.log("🌊 Integrated System: Loaded options from Chrome storage and rehydrated", {
                 hasOptions: !!this.latestOptions,
                 hasWave: !!this.latestOptions?.wave,
-                hasCssTemplate: !!this.latestOptions?.wave?.cssTemplate
+                hasCssTemplate: !!this.latestOptions?.wave?.cssTemplate,
+                waveSpeed: this.latestOptions?.wave?.waveSpeed,
+                storedWaveSpeed: storedSettings.waveSpeed,
+                storedHasWave: !!storedSettings.wave
               });
             } else {
               // Try sync storage
               const syncResult = await chrome.storage.sync.get(['waveReaderSettings']);
               if (syncResult.waveReaderSettings) {
-                this.latestOptions = new Options(syncResult.waveReaderSettings);
+                // Stored settings might be in flat Settings format - convert to Options format
+                const storedSettings = syncResult.waveReaderSettings;
+                const Wave = (await import('../models/wave')).default;
+                
+                // If stored settings have flat wave properties, construct wave object
+                let optionsData = storedSettings;
+                if (storedSettings.waveSpeed !== undefined || storedSettings.axisRotationAmountYMax !== undefined) {
+                  // Flat Settings format - convert to nested Options format
+                  const waveProps: any = {
+                    ...(storedSettings.wave || {}),
+                    waveSpeed: storedSettings.waveSpeed,
+                    axisTranslateAmountXMax: storedSettings.axisTranslateAmountXMax,
+                    axisTranslateAmountXMin: storedSettings.axisTranslateAmountXMin,
+                    axisRotationAmountYMax: storedSettings.axisRotationAmountYMax,
+                    axisRotationAmountYMin: storedSettings.axisRotationAmountYMin,
+                    selector: storedSettings.selector,
+                    cssGenerationMode: storedSettings.cssGenerationMode,
+                    cssTemplate: storedSettings.cssTemplate,
+                    cssMouseTemplate: storedSettings.cssMouseTemplate
+                  };
+                  optionsData = {
+                    ...storedSettings,
+                    wave: new Wave(waveProps) // Create Wave instance to regenerate CSS templates
+                  };
+                }
+                
+                this.latestOptions = new Options(optionsData);
                 console.log("🌊 Integrated System: Loaded options from Chrome sync storage and rehydrated", {
                   hasOptions: !!this.latestOptions,
                   hasWave: !!this.latestOptions?.wave,
-                  hasCssTemplate: !!this.latestOptions?.wave?.cssTemplate
+                  hasCssTemplate: !!this.latestOptions?.wave?.cssTemplate,
+                  waveSpeed: this.latestOptions?.wave?.waveSpeed,
+                  storedWaveSpeed: storedSettings.waveSpeed
                 });
               } else {
                 // Use defaults if nothing in storage
@@ -645,20 +834,69 @@ export class LogViewContentSystemIntegrated {
       hasOptions: !!message.options,
       options: message.options,
       currentGoingState: this.going,
-      hasLatestOptions: !!this.latestOptions
+      hasLatestOptions: !!this.latestOptions,
+      incomingWaveSpeed: message.options?.waveSpeed,
+      incomingWave: message.options?.wave
     });
     
     try {
       // Update latestOptions with new settings
       if (message.options) {
         const Options = (await import('../models/options')).default;
+        const Wave = (await import('../models/wave')).default;
+        
         // Merge with existing options if we have them, otherwise create new
         if (this.latestOptions) {
-          // Merge new settings into existing options
-          const mergedOptions = { ...this.latestOptions, ...message.options };
+          // Deep merge: properly merge wave properties
+          const existingWave = this.latestOptions.wave || {};
+          const incomingWave = message.options.wave || {};
+          
+          // Extract wave properties from flat settings structure (if they exist at top level)
+          const waveProps: any = {
+            ...existingWave,
+            ...incomingWave,
+            // Also check for flat properties in message.options (from Settings interface)
+            waveSpeed: message.options.waveSpeed !== undefined ? message.options.waveSpeed : (incomingWave.waveSpeed ?? existingWave.waveSpeed),
+            axisTranslateAmountXMax: message.options.axisTranslateAmountXMax !== undefined ? message.options.axisTranslateAmountXMax : (incomingWave.axisTranslateAmountXMax ?? existingWave.axisTranslateAmountXMax),
+            axisTranslateAmountXMin: message.options.axisTranslateAmountXMin !== undefined ? message.options.axisTranslateAmountXMin : (incomingWave.axisTranslateAmountXMin ?? existingWave.axisTranslateAmountXMin),
+            axisRotationAmountYMax: message.options.axisRotationAmountYMax !== undefined ? message.options.axisRotationAmountYMax : (incomingWave.axisRotationAmountYMax ?? existingWave.axisRotationAmountYMax),
+            axisRotationAmountYMin: message.options.axisRotationAmountYMin !== undefined ? message.options.axisRotationAmountYMin : (incomingWave.axisRotationAmountYMin ?? existingWave.axisRotationAmountYMin),
+            selector: message.options.selector !== undefined ? message.options.selector : (incomingWave.selector ?? existingWave.selector),
+            cssGenerationMode: message.options.cssGenerationMode !== undefined ? message.options.cssGenerationMode : (incomingWave.cssGenerationMode ?? existingWave.cssGenerationMode),
+            cssTemplate: incomingWave.cssTemplate ?? existingWave.cssTemplate,
+            cssMouseTemplate: incomingWave.cssMouseTemplate ?? existingWave.cssMouseTemplate
+          };
+          
+          // Merge all other options (non-wave properties)
+          const mergedOptions = {
+            ...this.latestOptions,
+            ...message.options,
+            wave: new Wave(waveProps) // Create new Wave instance with merged properties
+          };
+          
           this.latestOptions = new Options(mergedOptions);
         } else {
-          this.latestOptions = new Options(message.options);
+          // No existing options, create new from message
+          // If message.options has flat wave properties, construct wave object
+          if (message.options.waveSpeed !== undefined || message.options.axisRotationAmountYMax !== undefined) {
+            const waveProps: any = {
+              ...(message.options.wave || {}),
+              waveSpeed: message.options.waveSpeed,
+              axisTranslateAmountXMax: message.options.axisTranslateAmountXMax,
+              axisTranslateAmountXMin: message.options.axisTranslateAmountXMin,
+              axisRotationAmountYMax: message.options.axisRotationAmountYMax,
+              axisRotationAmountYMin: message.options.axisRotationAmountYMin,
+              selector: message.options.selector,
+              cssGenerationMode: message.options.cssGenerationMode
+            };
+            const optionsWithWave = {
+              ...message.options,
+              wave: new Wave(waveProps)
+            };
+            this.latestOptions = new Options(optionsWithWave);
+          } else {
+            this.latestOptions = new Options(message.options);
+          }
         }
         
         console.log('🚨🚨🚨 CONTENT: Updated latestOptions', {
@@ -667,7 +905,8 @@ export class LogViewContentSystemIntegrated {
           waveSpeed: this.latestOptions?.wave?.waveSpeed,
           axisRotationAmountYMax: this.latestOptions?.wave?.axisRotationAmountYMax,
           axisRotationAmountYMin: this.latestOptions?.wave?.axisRotationAmountYMin,
-          cssTemplateLength: this.latestOptions?.wave?.cssTemplate?.length || 0
+          cssTemplateLength: this.latestOptions?.wave?.cssTemplate?.length || 0,
+          incomingWaveSpeed: message.options?.waveSpeed
         });
       }
       
