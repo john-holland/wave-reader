@@ -248,7 +248,7 @@ const AppComponent: FunctionComponent = () => {
         </div>
         
         {/* Debug info */}
-        {process.env.NODE_ENV === 'development' && (
+        {showDevConsole && (
           <div style={{
             marginTop: '20px',
             padding: '10px',
