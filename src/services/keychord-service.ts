@@ -351,13 +351,42 @@ export class KeyChordService {
     /**
      * Handle toggle action when shortcut is pressed
      */
-    private handleToggle(): void {
+    private async handleToggle(): Promise<void> {
         console.log('⌨️ KeyChordService: Toggle triggered by keyboard shortcut', {
             hasOnToggle: !!this.onToggle,
             onToggleType: typeof this.onToggle,
             isActive: this.isActive,
             currentKeyChord: this.currentKeyChord.join(' + ')
         });
+        
+        // Check epileptic blacklist before toggling
+        try {
+            const { EpilepticBlacklistService } = await import('./epileptic-blacklist');
+            await EpilepticBlacklistService.initialize();
+            
+            // Get current URL
+            let currentUrl: string | null = null;
+            if (typeof chrome !== 'undefined' && chrome.tabs) {
+                try {
+                    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+                    currentUrl = tabs[0]?.url || null;
+                } catch (e) {
+                    // Fallback to window.location if available
+                    if (typeof window !== 'undefined' && window.location) {
+                        currentUrl = window.location.href;
+                    }
+                }
+            } else if (typeof window !== 'undefined' && window.location) {
+                currentUrl = window.location.href;
+            }
+            
+            if (currentUrl && EpilepticBlacklistService.isBlacklisted(currentUrl)) {
+                console.log('⌨️ KeyChordService: Site is blacklisted, ignoring keyboard shortcut', currentUrl);
+                return; // Don't toggle if site is blacklisted
+            }
+        } catch (error) {
+            console.warn('⌨️ KeyChordService: Error checking blacklist, proceeding with toggle', error);
+        }
         
         if (this.onToggle) {
             console.log('⌨️ KeyChordService: Calling onToggle callback');

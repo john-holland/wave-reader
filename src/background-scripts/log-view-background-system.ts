@@ -159,12 +159,13 @@ export class LogViewBackgroundSystem {
         this.logMessage('tab-removed', `Tab removed`, { tabId });
     }
 
-    private handleToggleWaveReader() {
+    private async handleToggleWaveReader() {
         console.log("🌊 Log-View-Machine: Toggle wave reader command received");
         this.logMessage('toggle-requested', 'Toggle wave reader requested');
         
-        // Get the active tab and send toggle message to content script
-        this.getActiveTab().then((tab) => {
+        try {
+            // Get the active tab and send toggle message to content script
+            const tab = await this.getActiveTab();
             if (!tab) {
                 this.logMessage('toggle-error', 'No active tab found for toggle command');
                 return;
@@ -176,13 +177,27 @@ export class LogViewBackgroundSystem {
                 return;
             }
             
+            // Check epileptic blacklist
+            try {
+                const { EpilepticBlacklistService } = await import('../services/epileptic-blacklist');
+                await EpilepticBlacklistService.initialize();
+                
+                if (tab.url && EpilepticBlacklistService.isBlacklisted(tab.url)) {
+                    console.log("🌊 Log-View-Machine: Site is blacklisted, ignoring toggle command", tab.url);
+                    this.logMessage('toggle-skipped', `Skipping toggle for blacklisted URL: ${tab.url}`);
+                    return; // Don't toggle if site is blacklisted
+                }
+            } catch (error) {
+                console.warn('🌊 Log-View-Machine: Error checking blacklist, proceeding with toggle', error);
+            }
+            
             this.logMessage('toggle-sending', `Sending toggle command to tab: ${tab.url}`);
             
             // Send toggle message to content script via chrome.tabs.sendMessage
             this.injectToggleCommand(tab.id);
-        }).catch((error) => {
+        } catch (error: any) {
             this.logMessage('toggle-error', `Error getting active tab: ${error.message}`);
-        });
+        }
     }
 
     private async getActiveTab(): Promise<any> {

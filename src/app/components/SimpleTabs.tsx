@@ -15,12 +15,26 @@ interface SimpleTabsProps {
 export const SimpleTabs: React.FC<SimpleTabsProps> = ({ activeTab, tabs, onTabChange }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Tab Headers */}
+      {/* Tab Content */}
+      <div style={{
+        flex: 1,
+        overflow: 'auto',
+        backgroundColor: 'white',
+        borderRadius: '8px 8px 0 0'
+      }}>
+        {tabs.find(tab => tab.id === activeTab)?.content || (
+          <div style={{ padding: '20px', textAlign: 'center' }}>
+            No content available for this tab
+          </div>
+        )}
+      </div>
+      
+      {/* Tab Headers - Now at the bottom */}
       <div style={{
         display: 'flex',
-        borderBottom: '1px solid #ddd',
+        borderTop: '1px solid #ddd',
         backgroundColor: '#f8f9fa',
-        borderRadius: '8px 8px 0 0'
+        borderRadius: '0 0 8px 8px'
       }}>
         {tabs.map(tab => (
           <button
@@ -36,26 +50,12 @@ export const SimpleTabs: React.FC<SimpleTabsProps> = ({ activeTab, tabs, onTabCh
               fontSize: '14px',
               fontWeight: activeTab === tab.id ? 'bold' : 'normal',
               transition: 'all 0.2s ease',
-              borderRadius: activeTab === tab.id ? '8px 8px 0 0' : '0'
+              borderRadius: activeTab === tab.id ? '0 0 8px 8px' : '0'
             }}
           >
             {tab.name}
           </button>
         ))}
-      </div>
-      
-      {/* Tab Content */}
-      <div style={{
-        flex: 1,
-        overflow: 'auto',
-        backgroundColor: 'white',
-        borderRadius: '0 0 8px 8px'
-      }}>
-        {tabs.find(tab => tab.id === activeTab)?.content || (
-          <div style={{ padding: '20px', textAlign: 'center' }}>
-            No content available for this tab
-          </div>
-        )}
       </div>
     </div>
   );

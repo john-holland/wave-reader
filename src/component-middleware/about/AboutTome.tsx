@@ -1,6 +1,7 @@
 import React, { FunctionComponent, useEffect, useState, useCallback } from 'react';
 import styled from 'styled-components';
 import { createViewStateMachine, MachineRouter } from 'log-view-machine';
+import { QRCodeSVG } from 'qrcode.react';
 import EditorWrapper from '../../app/components/EditorWrapper';
 import { AppTome } from '../../app/tomes/AppTome';
 import { safeGraphQLRequest } from '../../utils/backend-api-wrapper';
@@ -46,6 +47,7 @@ const SectionTitle = styled.h4`
   margin-bottom: 16px;
   font-size: 1.2rem;
   font-weight: 600;
+  margin-top: 0;
 `;
 
 const SectionText = styled.p`
@@ -90,11 +92,21 @@ const QRCodeItem = styled.div`
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 `;
 
-const QRCodeImage = styled.img`
+const QRCodeWrapper = styled.div`
   width: 150px;
   height: 150px;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin-bottom: 8px;
+  background: white;
+  padding: 8px;
+  border-radius: 4px;
+  
+  svg {
+    width: 100%;
+    height: 100%;
+  }
 `;
 
 const CryptoLabel = styled.span`
@@ -239,19 +251,27 @@ const DonateView = ({donated, hasEasterEggs, donors}: {donated: boolean, hasEast
         
         <QRCodeContainer>
           <QRCodeItem>
-            <QRCodeImage 
-              src="receive_eth.jpg" 
-              alt="Ethereum QR Code" 
-            />
+            <QRCodeWrapper>
+              <QRCodeSVG 
+                value="ethereum:0x30c599E83Afc27Fc7b2bCdaF400E5c15a31C6148"
+                size={134}
+                level="M"
+                includeMargin={false}
+              />
+            </QRCodeWrapper>
             <CryptoLabel>Ethereum (ETH)</CryptoLabel>
             <AddressText>0x30c599E83Afc27Fc7b2bCdaF400E5c15a31C6148</AddressText>
           </QRCodeItem>
           
           <QRCodeItem>
-            <QRCodeImage 
-              src="receive_btc.jpg" 
-              alt="Bitcoin QR Code" 
-            />
+            <QRCodeWrapper>
+              <QRCodeSVG 
+                value="bitcoin:bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
+                size={134}
+                level="M"
+                includeMargin={false}
+              />
+            </QRCodeWrapper>
             <CryptoLabel>Bitcoin (BTC)</CryptoLabel>
             <AddressText>bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh</AddressText>
           </QRCodeItem>
@@ -424,7 +444,6 @@ const AboutPageComponent = createViewStateMachine({
   
   // Render the view immediately (don't wait for donation status)
   const renderedView = AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error);
-  console.log('🌊 AboutTome: Rendering idle view', { hasView: !!renderedView, donated: context.donated });
   
   // Push view to ViewStateMachine's viewStack immediately
   view(renderedView);
@@ -441,7 +460,6 @@ const AboutPageComponent = createViewStateMachine({
   // CRITICAL: Render view immediately even while loading
   // This ensures content is visible while donation status loads
   const renderedView = AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error);
-  console.log('🌊 AboutTome: Rendering loading view', { hasView: !!renderedView, donated: context.donated });
   
   if (clear) {
     clear();
@@ -529,7 +547,6 @@ const AboutPageComponent = createViewStateMachine({
     clear();
   }
   const errorView = AboutPageComponentView(context.donated, context.hasEasterEggs, context.donors, context.error);
-  console.log('🌊 AboutTome: Rendering error view', { hasView: !!errorView, error: context.error });
   view(errorView);
   return errorView;
   if (clear) clear();
@@ -554,25 +571,55 @@ const AboutTome: FunctionComponent<AboutTomeProps> = ({
   const [showPuppies, setShowPuppies] = useState(false);
   
   // Handler for epileptic animation report
-  const handleReportEpileptic = useCallback(() => {
-    const subject = encodeURIComponent('Epileptic Animation Report - Wave Reader');
-    const body = encodeURIComponent(
-      `I am reporting an animation that may trigger epileptic symptoms.\n\n` +
-      `URL: ${window.location.href}\n` +
-      `Timestamp: ${new Date().toISOString()}\n\n` +
-      `Additional details:\n`
-    );
-    const mailtoLink = `mailto:john.gebhard.holland+epileptic@gmail.com?subject=${subject}&body=${body}`;
-    
-    // Create and click an anchor element to maintain user gesture chain
-    // This is required by browsers for mailto links to work
-    const anchor = document.createElement('a');
-    anchor.href = mailtoLink;
-    anchor.target = '_blank';
-    anchor.rel = 'noopener noreferrer';
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
+  const handleReportEpileptic = useCallback(async () => {
+    try {
+      // Get the current tab URL if we're in an extension context
+      let currentUrl = window.location.href;
+      
+      // Try to get the actual page URL from the active tab if we're in a popup
+      if (typeof chrome !== 'undefined' && chrome.tabs) {
+        try {
+          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+          if (tabs[0]?.url) {
+            currentUrl = tabs[0].url;
+          }
+        } catch (e) {
+          // If we can't get the tab URL, use the current location
+          console.warn('Could not get tab URL:', e);
+        }
+      }
+      
+      const subject = encodeURIComponent('Epileptic Animation Report - Wave Reader');
+      const body = encodeURIComponent(
+        `I am reporting an animation that may trigger epileptic symptoms.\n\n` +
+        `URL: ${currentUrl}\n` +
+        `Timestamp: ${new Date().toISOString()}\n\n` +
+        `Additional details:\n`
+      );
+      const mailtoLink = `mailto:john.gebhard.holland+epileptic@gmail.com?subject=${subject}&body=${body}`;
+      
+      // Use window.location for mailto links - this is the proper way in extensions
+      // Don't use target="_blank" as it causes issues with mailto links
+      window.location.href = mailtoLink;
+    } catch (error) {
+      console.error('Error opening mailto link:', error);
+      // Fallback: try creating an anchor element
+      const subject = encodeURIComponent('Epileptic Animation Report - Wave Reader');
+      const body = encodeURIComponent(
+        `I am reporting an animation that may trigger epileptic symptoms.\n\n` +
+        `URL: ${window.location.href}\n` +
+        `Timestamp: ${new Date().toISOString()}\n\n` +
+        `Additional details:\n`
+      );
+      const mailtoLink = `mailto:john.gebhard.holland+epileptic@gmail.com?subject=${subject}&body=${body}`;
+      
+      const anchor = document.createElement('a');
+      anchor.href = mailtoLink;
+      // Don't set target for mailto links
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+    }
   }, []);
  
   useEffect(() => {
@@ -609,21 +656,17 @@ const AboutTome: FunctionComponent<AboutTomeProps> = ({
     }
     
     setAboutPageComponent(component);
-    component.start();
     
     // Observe view key changes to trigger re-renders (if method exists)
-    // This must be set up BEFORE sending INITIALIZE to catch the initial render
     let unsubscribe: (() => void) | null = null;
     const componentAny = component as any;
     if (componentAny && typeof componentAny.observeViewKey === 'function') {
       unsubscribe = componentAny.observeViewKey((key: number) => {
-        console.log('🌊 AboutTome: View key updated:', key);
         setRenderKey(key);
       });
     } else {
       // Fallback: manually update renderKey when state changes
       const stateSubscription = component.subscribe?.((state: any) => {
-        console.log('🌊 AboutTome: State changed, updating renderKey', state.value);
         setRenderKey(prev => prev + 1);
       });
       if (stateSubscription && typeof stateSubscription === 'function') {
@@ -633,8 +676,33 @@ const AboutTome: FunctionComponent<AboutTomeProps> = ({
       }
     }
     
-    // Send INITIALIZE after setting up observers
-    component.send({ type: 'INITIALIZE' }); 
+    // Test: Check state handlers before start
+    const stateHandlers = (componentAny as any).stateHandlers;
+    const stateHandlersIsMap = stateHandlers instanceof Map;
+    console.log('TEST: Before start()', {
+      hasStateHandlers: !!stateHandlers,
+      isMap: stateHandlersIsMap,
+      handlers: stateHandlersIsMap 
+        ? Array.from(stateHandlers.keys())
+        : (stateHandlers ? Object.keys(stateHandlers) : []),
+      hasIdle: stateHandlersIsMap 
+        ? stateHandlers.has('idle')
+        : (stateHandlers && 'idle' in stateHandlers)
+    });
+    
+    // Test: Call start() and check what happens
+    console.log('TEST: Calling start()...');
+    component.start();
+    
+    // Test: Check state and viewStack after start
+    const stateAfterStart = component.getState?.();
+    const viewStackAfterStart = (componentAny as any).viewStack;
+    console.log('TEST: After start()', {
+      stateValue: stateAfterStart?.value,
+      viewStackLength: Array.isArray(viewStackAfterStart) ? viewStackAfterStart.length : 'not array',
+      viewStackType: typeof viewStackAfterStart,
+      renderResult: component.render?.()
+    }); 
 
     // Cleanup: unregister on unmount
     return () => {
@@ -656,6 +724,7 @@ const AboutTome: FunctionComponent<AboutTomeProps> = ({
           router={router || undefined}
           key={renderKey}
           onError={(error) => console.error('About Editor Error:', error)}
+          hideHeader={true}
         >
           <div>Loading...</div>
         </EditorWrapper>
@@ -670,27 +739,24 @@ const AboutTome: FunctionComponent<AboutTomeProps> = ({
         router={router || undefined}
         key={renderKey}
         onError={(error) => console.error('About Editor Error:', error)}
+        hideHeader={true}
       >
-        {(showPuppies || !showPuppies) && (() => {
+        {(() => {
           const rendered = aboutPageComponent.render();
-          console.log('🌊 AboutTome: Render result:', {
-            hasRendered: !!rendered,
-            renderKey,
-            machineState: aboutPageComponent.getState?.()?.value,
-            viewStackSize: (aboutPageComponent as any).viewStack?.length || 0
-          });
           
           if (!rendered) {
-            console.warn('🌊 AboutTome: render() returned null/undefined, checking viewStack');
             const viewStack = (aboutPageComponent as any).getViewStack?.();
             if (viewStack && viewStack.length > 0) {
-              console.log('🌊 AboutTome: ViewStack has content, composing...');
               return (aboutPageComponent as any).viewStack?.compose?.() || <div>ViewStack has content but compose failed</div>;
             }
             return <div>Loading About content...</div>;
           }
-          return rendered;
-  })()}
+          console.log('WOOHOO about tome rendered', rendered);
+          // return null in the mean time
+          return null;
+        })()}
+
+       {(showPuppies || !showPuppies) && AboutPageComponentView(false, false, [], null)}
         
         {showPuppies && (
           <div style={{ marginTop: '24px' }}>

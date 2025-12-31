@@ -38,9 +38,11 @@ export class WaveReaderMessageRouter {
   private messageHistory: WaveReaderMessage[] = [];
   private errorCount: Map<string, number> = new Map();
   private performanceMetrics: Map<string, number[]> = new Map();
+  private debugMode: boolean;
 
-  constructor() {
+  constructor(debugMode: boolean = true) {
     this.structuralSystem = new StructuralSystem(WaveReaderStructuralConfig);
+    this.debugMode = debugMode;
     this.initializeMessageQueues();
   }
 
@@ -64,7 +66,14 @@ export class WaveReaderMessageRouter {
       timestamp: Date.now()
     };
 
-    console.log(`🌊 Message Router: Sending message ${fullMessage.name} from ${fullMessage.source} to ${fullMessage.target}`);
+    // Always log in browser console - useful for debugging message routing
+    if (this.debugMode || typeof window !== 'undefined') {
+      console.log(`🌊 Message Router: Sending message ${fullMessage.name} from ${fullMessage.source} to ${fullMessage.target}`, {
+        messageId: fullMessage.id,
+        priority: fullMessage.priority,
+        data: fullMessage.data
+      });
+    }
 
     try {
       // Add message to appropriate queue
@@ -82,7 +91,12 @@ export class WaveReaderMessageRouter {
       return result;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`🌊 Message Router: Error processing message ${fullMessage.id}:`, errorMessage);
+      // Always log errors - critical for debugging
+      console.error(`🌊 Message Router: Error processing message ${fullMessage.id}:`, errorMessage, {
+        message: fullMessage,
+        target: fullMessage.target,
+        source: fullMessage.source
+      });
       
       // Record error
       this.recordError(fullMessage.target);
@@ -149,6 +163,10 @@ export class WaveReaderMessageRouter {
       // Route the message to the appropriate component
       const targetComponent = await this.resolveRoute(message);
       
+      if (this.debugMode || typeof window !== 'undefined') {
+        console.log(`🌊 Message Router: Routing message ${message.name} to ${targetComponent}`);
+      }
+      
       // Get the target machine from the structural system
       const targetMachine = this.structuralSystem.getMachine(targetComponent);
       
@@ -168,6 +186,10 @@ export class WaveReaderMessageRouter {
 
       const processingTime = Date.now() - startTime;
 
+      if (this.debugMode || typeof window !== 'undefined') {
+        console.log(`🌊 Message Router: Successfully processed message ${message.id} to ${targetComponent} in ${processingTime}ms`);
+      }
+
       return {
         success: true,
         targetComponent,
@@ -179,6 +201,8 @@ export class WaveReaderMessageRouter {
       };
     } catch (error) {
       const processingTime = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`🌊 Message Router: Failed to process message ${message.id} after ${processingTime}ms:`, errorMessage);
       throw error;
     }
   }

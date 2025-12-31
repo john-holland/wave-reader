@@ -17,6 +17,8 @@ import SettingsTomes from '../../component-middleware/settings/SettingsTomes';
 import SettingsService from '../../services/settings';
 import Options, { WaveToggleConfig } from '../../models/options';
 import AboutTome from '../../component-middleware/about/AboutTome';
+import { DevConsole } from './DevConsole';
+import { FeatureToggleService } from '../../config/feature-toggles';
 
 
 const settingsService = new SettingsService();
@@ -36,6 +38,7 @@ const AppComponent: FunctionComponent = () => {
   
   // Tab state
   const [activeTab, setActiveTab] = useState<'how-to' | 'settings' | 'about'>('how-to');
+  const [showDevConsole, setShowDevConsole] = useState(false);
   
   useEffect(() => {
     settingsService.getCurrentSettings().then((settings) => {
@@ -50,6 +53,24 @@ const AppComponent: FunctionComponent = () => {
       .then(() => {
         console.log('🌊 App Component: AppTome initialized successfully');
         setIsInitialized(true);
+        
+        // Check developer mode feature toggle
+        const checkDeveloperMode = async () => {
+          try {
+            const appTomeRouter = AppTome.getRouter();
+            const bgProxyMachine = appTomeRouter?.resolve('BackgroundProxyMachine');
+            const robotCopy = bgProxyMachine?.robotCopy || null;
+            
+            const toggleService = new FeatureToggleService(robotCopy);
+            const enabled = await toggleService.isEnabled('DEVELOPER_MODE');
+            setShowDevConsole(enabled);
+          } catch (error) {
+            console.warn('Failed to check developer mode feature toggle, defaulting to disabled', error);
+            setShowDevConsole(false);
+          }
+        };
+        
+        checkDeveloperMode();
       })
       .catch((err) => {
         console.error('🌊 App Component: Failed to initialize AppTome', err);
@@ -130,6 +151,7 @@ const AppComponent: FunctionComponent = () => {
           description="Information about Wave Reader and its features"
           componentId="about-component"
           onError={(error: Error) => console.error('About Editor Error:', error)}
+          hideHeader={true}
         >
           <AboutTome />
         </EditorWrapper>
@@ -145,6 +167,7 @@ const AppComponent: FunctionComponent = () => {
   
   return (
     <ErrorBoundary>
+      {showDevConsole && <DevConsole />}
       <ModalContainer>
         <ModalHeader>
           <HeaderTitle>Wave Reader</HeaderTitle>

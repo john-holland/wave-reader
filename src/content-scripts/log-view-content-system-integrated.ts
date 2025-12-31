@@ -84,8 +84,39 @@ export class LogViewContentSystemIntegrated {
     console.log('⌨️ Integrated System: Setting up keyboard shortcuts');
     
     // Initialize KeyChordService with toggle callback that uses integrated system's handleToggle
-    await initializeKeyChordService(() => {
-      console.log('⌨️ Integrated System: Keyboard shortcut triggered, calling handleToggle');
+    await initializeKeyChordService(async () => {
+      console.log('⌨️ Integrated System: Keyboard shortcut triggered, checking blacklist');
+      
+      // Check epileptic blacklist before toggling
+      try {
+        const { EpilepticBlacklistService } = await import('../services/epileptic-blacklist');
+        await EpilepticBlacklistService.initialize();
+        
+        // Get current URL
+        let currentUrl: string | null = null;
+        if (typeof chrome !== 'undefined' && chrome.tabs) {
+          try {
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            currentUrl = tabs[0]?.url || null;
+          } catch (e) {
+            // Fallback to window.location if available
+            if (typeof window !== 'undefined' && window.location) {
+              currentUrl = window.location.href;
+            }
+          }
+        } else if (typeof window !== 'undefined' && window.location) {
+          currentUrl = window.location.href;
+        }
+        
+        if (currentUrl && EpilepticBlacklistService.isBlacklisted(currentUrl)) {
+          console.log('⌨️ Integrated System: Site is blacklisted, ignoring keyboard shortcut', currentUrl);
+          return; // Don't toggle if site is blacklisted
+        }
+      } catch (error) {
+        console.warn('⌨️ Integrated System: Error checking blacklist, proceeding with toggle', error);
+      }
+      
+      console.log('⌨️ Integrated System: Calling handleToggle');
       // Use the integrated system's toggle handler which properly routes to start/stop
       this.handleToggle({
         name: 'toggle',

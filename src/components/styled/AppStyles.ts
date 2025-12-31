@@ -187,7 +187,7 @@ export const ModalContainer = styled.div`
   width: 400px;
   max-height: 600px;
   background: white;
-  border-radius: 12px;
+  border-radius: 0;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
   overflow: hidden;
   display: flex;
@@ -202,6 +202,7 @@ export const ModalHeader = styled.div`
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
 `;
 
 export const HeaderTitle = styled.h1`

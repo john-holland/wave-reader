@@ -28,7 +28,8 @@ const createCommonConfig = (options = {}) => {
         },
         output: {
             path: path.resolve(__dirname, `./${outputDir}`),
-            filename: "[name].js"
+            filename: "[name].js",
+            publicPath: ""
         },
         resolve: {
             extensions: [".tsx", ".ts", ".js", ".jsx", ".*"],

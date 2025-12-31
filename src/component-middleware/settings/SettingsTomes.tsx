@@ -8,6 +8,7 @@ import EditorWrapper from '../../app/components/EditorWrapper';
 import { AppTome } from '../../app/tomes/AppTome';
 import { KeyChord, normalizeKey, compareKeyChords, sortKeyChord } from '../../components/util/user-input';
 import { KeyChordDefaultFactory } from '../../models/defaults';
+import { EpilepticBlacklistService } from '../../services/epileptic-blacklist';
 
 // Styled components for the Tomes-based settings
 const SettingsContainer = styled.div`
@@ -627,6 +628,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
   const [isExtension, setIsExtension] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [router, setRouter] = useState<MachineRouter | null>(null);
+  const [epilepticBlacklist, setEpilepticBlacklist] = useState<string>('');
 
   // Refs
   const settingsRef = useRef<Settings>(settings);
@@ -669,6 +671,11 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
             console.warn('Failed to load settings from Chrome storage:', error);
           }
         }
+        
+        // Load epileptic blacklist
+        await EpilepticBlacklistService.initialize();
+        const blacklistedUrls = EpilepticBlacklistService.getBlacklistedUrls();
+        setEpilepticBlacklist(blacklistedUrls.join('\n'));
       }
       
       console.log('⚙️ SettingsTomes: Initialized for Chrome extension context');
@@ -852,6 +859,13 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
     setCurrentView('saving');
     
     try {
+      // Save epileptic blacklist
+      const blacklistUrls = epilepticBlacklist
+        .split('\n')
+        .map(url => url.trim())
+        .filter(url => url.length > 0);
+      await EpilepticBlacklistService.setBlacklist(blacklistUrls);
+      console.log('⚙️ SettingsTomes: Saved epileptic blacklist', blacklistUrls.length, 'URLs');
       // Save to storage
       if (isExtension) {
         await sendExtensionMessage({
@@ -884,7 +898,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
       setError(error instanceof Error ? error.message : 'Unknown error');
       setCurrentView('error');
     }
-  }, [isExtension, localDomainPaths, onUpdateSettings]);
+  }, [isExtension, localDomainPaths, onUpdateSettings, epilepticBlacklist]);
 
   const handleResetSettings = useCallback(async () => {
     console.log('⚙️ SettingsTomes: Resetting settings');
@@ -1139,6 +1153,30 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
                 <HelpText>
                   If any animation triggers epileptic symptoms or seizures, please report it immediately. 
                   We prioritize accessibility and will investigate all reports.
+                </HelpText>
+              </SettingItem>
+              
+            </SettingGroup>
+            
+            <SettingGroup>
+              <SettingGroupTitle>Epileptic Blacklist</SettingGroupTitle>
+              
+              <SettingItem>
+                <SettingLabel>
+                  Blacklisted URLs (one per line)
+                </SettingLabel>
+                <SettingTextarea
+                  value={epilepticBlacklist}
+                  onChange={(e) => {
+                    setEpilepticBlacklist(e.target.value);
+                    setSaved(false);
+                  }}
+                  placeholder="https://example.com&#10;https://another-site.com"
+                  style={{ minHeight: '150px', fontFamily: 'monospace', fontSize: '12px' }}
+                />
+                <HelpText>
+                  URLs listed here will prevent Wave Reader from activating via keyboard shortcuts.
+                  One URL per line. Changes are saved when you click "Save Settings".
                 </HelpText>
               </SettingItem>
               

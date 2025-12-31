@@ -15,11 +15,57 @@
  */
 
 import React from 'react';
+import { render } from '@testing-library/react';
 import { createViewStateMachine } from 'log-view-machine';
+// Import the actual AboutPageComponent to test the real implementation
+import { AboutPageComponent } from './AboutTome';
+
+// Helper function to convert JSX element to HTML string
+// Since we're in a jsdom environment, we'll render to a container and get innerHTML
+function jsxToHtml(element: React.ReactElement): string {
+  const { container } = render(element);
+  return container.innerHTML;
+}
 
 // Mock safeGraphQLRequest
 jest.mock('../../utils/backend-api-wrapper', () => ({
   safeGraphQLRequest: jest.fn()
+}));
+
+// Mock AppTome to avoid TomeBase dependency
+jest.mock('../../app/tomes/AppTome', () => ({
+  AppTome: {
+    getRouter: jest.fn(() => ({
+      register: jest.fn(),
+      unregister: jest.fn(),
+      resolve: jest.fn(() => ({
+        robotCopy: null
+      }))
+    }))
+  }
+}));
+
+// Mock EditorWrapper to avoid dependency issues when importing AboutPageComponent
+// This must be before the import of AboutTome
+jest.mock('../../app/components/EditorWrapper', () => {
+  return {
+    __esModule: true,
+    default: ({ children, title, description }: any) => {
+      return (
+        <div data-testid="editor-wrapper">
+          {children}
+        </div>
+      );
+    }
+  };
+});
+
+// Mock FeatureToggleService
+jest.mock('../../config/feature-toggles', () => ({
+  FeatureToggleService: jest.fn().mockImplementation(() => ({
+    isEnabled: jest.fn().mockResolvedValue(false)
+  })),
+  FEATURE_TOGGLES: {}
 }));
 
 // Mock graphql subscription
@@ -698,6 +744,91 @@ describe('AboutPageComponent - withState with Send Messages', () => {
       // Verify DONATION_STATUS_LOADED was sent
       expect(sentEvents.length).toBe(1);
       expect(sentEvents[0].type).toBe('DONATION_STATUS_LOADED');
+    });
+  });
+
+  describe('JSX to HTML conversion', () => {
+    test('should print HTML tree from actual AboutPageComponent loading state', async () => {
+      const { safeGraphQLRequest } = require('../../utils/backend-api-wrapper');
+      
+      // Mock successful GraphQL response
+      safeGraphQLRequest.mockResolvedValue({
+        data: {
+          donationStatus: {
+            donated: true,
+            hasEasterEggs: true,
+            donors: [{ name: 'Test Donor', amount: '1 ETH', crypto: 'ETH' }]
+          }
+        },
+        backendDisabled: false
+      });
+      
+      // Use the ACTUAL AboutPageComponent machine, not a test version
+      const actualMachine = AboutPageComponent;
+      const viewStack: React.ReactElement[] = [];
+      let capturedView: React.ReactElement | null = null;
+      
+      // Get the actual loading state handler from the real machine
+      const stateHandlers = (actualMachine as any).stateHandlers as Record<string, any>;
+      const loadingHandler = stateHandlers?.get?.('loading') || stateHandlers?.['loading'];
+      
+      if (!loadingHandler) {
+        throw new Error('Loading handler not found in actual AboutPageComponent');
+      }
+      
+      // Set up context matching the actual machine's initial context
+      const context = {
+        donated: false,
+        hasEasterEggs: false,
+        donors: [
+          { name: "Anonymous Supporter", amount: "0.1 ETH", crypto: "ETH" },
+          { name: "Beta Tester", amount: "0.05 BTC", crypto: "BTC" },
+          { name: "Reading Enthusiast", amount: "0.2 ETH", crypto: "ETH" }
+        ],
+        isLoading: true,
+        error: null,
+        userId: 'test-user',
+        subscription: null
+      };
+      
+      // Create view function that captures the actual rendered view
+      const view = (component: React.ReactElement) => {
+        viewStack.push(component);
+        capturedView = component;
+        return component;
+      };
+      const clear = () => {
+        viewStack.length = 0;
+      };
+      const send = (event: any) => {};
+      const log = async (msg: string, data?: any) => {};
+      const graphql = {
+        subscription: async () => mockSubscription
+      };
+      
+      // Call the ACTUAL loading handler with real context
+      await loadingHandler({ context, event: {}, send, log, view, clear, graphql, transition: () => {}, machine: actualMachine });
+      
+      // The viewStack should contain the views that were rendered by the actual handler
+      expect(viewStack.length).toBeGreaterThan(0);
+      
+      // Convert the actual rendered view to HTML
+      if (capturedView) {
+        const htmlString = jsxToHtml(capturedView);
+        
+        // Print the HTML tree from the ACTUAL implementation
+        console.log('\n=== Actual AboutPageComponent Loading State JSX to HTML Tree ===');
+        console.log(htmlString);
+        console.log('=== End Actual HTML Tree ===\n');
+        
+        // Verify the HTML contains expected elements from the real AboutPageComponentView
+        // The actual view should contain sections about Wave Reader, donation info, etc.
+        expect(htmlString.length).toBeGreaterThan(0);
+        // The actual view uses styled components, so we check for content that should be present
+        expect(htmlString).toMatch(/Wave Reader|donation|support|donor/i);
+      } else {
+        throw new Error('No view was captured from actual AboutPageComponent loading handler');
+      }
     });
   });
 });
