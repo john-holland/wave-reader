@@ -7,6 +7,7 @@ import { SelectorHierarchy } from '../services/selector-hierarchy';
 import { SimpleColorServiceAdapter } from '../services/simple-color-service';
 import Options from '../models/options';
 import { initializeKeyChordService, cleanupKeyChordService, setToggleCallback } from '../services/keychord-content-integration';
+import { replaceKeyframePlaceholders } from '../models/wave';
 
 /**
  * Integrated Content System with Proxy State Machine
@@ -225,6 +226,18 @@ export class LogViewContentSystemIntegrated {
         case 'get-status':
           this.handleGetStatus(normalizedMessage);
           sendResponse({ success: true, status: this.getCurrentState() });
+          break;
+        case 'settings_updated':
+          console.log('🚨🚨🚨 CONTENT: Received SETTINGS_UPDATED message', {
+            hasOptions: !!normalizedMessage.options,
+            options: normalizedMessage.options
+          });
+          this.handleSettingsUpdated(normalizedMessage).then(() => {
+            sendResponse({ success: true, state: this.proxyState });
+          }).catch((error: any) => {
+            console.error("🌊 Integrated System: Error in handleSettingsUpdated", error);
+            sendResponse({ success: false, error: error.message });
+          });
           break;
         default:
           console.log("🌊 Integrated System: Unknown runtime message type:", normalizedMessage.name);
@@ -627,6 +640,53 @@ export class LogViewContentSystemIntegrated {
     }
   }
 
+  private async handleSettingsUpdated(message: any) {
+    console.log('🚨🚨🚨 CONTENT: handleSettingsUpdated called', {
+      hasOptions: !!message.options,
+      options: message.options,
+      currentGoingState: this.going,
+      hasLatestOptions: !!this.latestOptions
+    });
+    
+    try {
+      // Update latestOptions with new settings
+      if (message.options) {
+        const Options = (await import('../models/options')).default;
+        // Merge with existing options if we have them, otherwise create new
+        if (this.latestOptions) {
+          // Merge new settings into existing options
+          const mergedOptions = { ...this.latestOptions, ...message.options };
+          this.latestOptions = new Options(mergedOptions);
+        } else {
+          this.latestOptions = new Options(message.options);
+        }
+        
+        console.log('🚨🚨🚨 CONTENT: Updated latestOptions', {
+          hasOptions: !!this.latestOptions,
+          hasWave: !!this.latestOptions?.wave,
+          waveSpeed: this.latestOptions?.wave?.waveSpeed,
+          axisRotationAmountYMax: this.latestOptions?.wave?.axisRotationAmountYMax,
+          axisRotationAmountYMin: this.latestOptions?.wave?.axisRotationAmountYMin,
+          cssTemplateLength: this.latestOptions?.wave?.cssTemplate?.length || 0
+        });
+      }
+      
+      // If wave is currently active, reapply animation with new settings
+      if (this.going) {
+        console.log('🚨🚨🚨 CONTENT: Wave is active, reapplying animation with new settings');
+        this.applyWaveAnimation();
+      } else {
+        console.log('🚨🚨🚨 CONTENT: Wave is not active, settings updated but animation not applied');
+      }
+      
+      this.messageService.logMessage('settings-updated', 'Settings updated and applied');
+      this.logMessage('settings-updated', 'Settings updated and applied');
+    } catch (error: any) {
+      console.error('🚨🚨🚨 CONTENT: Error in handleSettingsUpdated', error);
+      this.messageService.logMessage('settings-update-failed', `Failed to update settings: ${error.message}`);
+    }
+  }
+
   private applyWaveAnimation() {
     console.log("🌊 Integrated System: Applying wave animation", {
       hasOptions: !!this.latestOptions,
@@ -641,7 +701,7 @@ export class LogViewContentSystemIntegrated {
     }
 
     const wave = this.latestOptions.wave;
-    const css = wave.cssTemplate;
+    let css = wave.cssTemplate;
 
     // Enhanced logging for CSS animation update - output entire wave object
     console.log("🌊 Integrated System: Updating CSS animation", {
@@ -660,6 +720,22 @@ export class LogViewContentSystemIntegrated {
     });
 
     if (css) {
+      // Replace keyframe placeholders if using template mode
+      if (wave.cssGenerationMode === 'template') {
+        console.log("🚨🚨🚨 CONTENT: Replacing keyframe placeholders in CSS template", {
+          beforeLength: css.length,
+          axisTranslateAmountXMin: wave.axisTranslateAmountXMin,
+          axisTranslateAmountXMax: wave.axisTranslateAmountXMax,
+          axisRotationAmountYMin: wave.axisRotationAmountYMin,
+          axisRotationAmountYMax: wave.axisRotationAmountYMax
+        });
+        css = replaceKeyframePlaceholders(css, wave);
+        console.log("🚨🚨🚨 CONTENT: After replacing placeholders", {
+          afterLength: css.length,
+          cssPreview: css.substring(0, 500)
+        });
+      }
+      
       console.log("🌊 Integrated System: Calling DOM service to apply CSS animation...");
       const beforeTime = performance.now();
       this.domService.applyWaveAnimation(css);

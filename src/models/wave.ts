@@ -102,6 +102,20 @@ export const replaceAnimationVariablesWithDuration = (wave: Wave, translateX: st
     return css;
 }
 
+/**
+ * Replaces keyframe animation placeholders in CSS template with actual values
+ * Used when cssGenerationMode is 'template' to replace placeholders at runtime
+ */
+export const replaceKeyframePlaceholders = (cssTemplate: string, wave: Wave): string => {
+    let css = cssTemplate;
+    css = css.replaceAll(ANIMATION_DURATION, (wave.waveSpeed || 2).toString());
+    css = css.replaceAll(TRANSLATE_X_MIN, (wave.axisTranslateAmountXMin || 0).toString());
+    css = css.replaceAll(TRANSLATE_X_MAX, (wave.axisTranslateAmountXMax || 0).toString());
+    css = css.replaceAll(ROTATE_Y_MIN, (wave.axisRotationAmountYMin || 0).toString());
+    css = css.replaceAll(ROTATE_Y_MAX, (wave.axisRotationAmountYMax || 0).toString());
+    return css;
+}
+
 const enum WaveShape {
     AUTO, // based on the wave shape options, choose best fit
     F_SHAPED, // left to right (per orientation, like an ocean wave

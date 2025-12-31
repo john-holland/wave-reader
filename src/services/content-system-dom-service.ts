@@ -193,35 +193,47 @@ export class ContentSystemDOMService {
   }
 
   /**
-   * Apply wave animation styles to main document
+   * Apply wave animation styles to shadow DOM
    */
   public applyWaveAnimation(cssTemplate: string): void {
     const startTime = performance.now();
+
     console.log("🌊 ContentSystemDOMService: Updating CSS animation", {
       hasCssTemplate: !!cssTemplate,
       cssLength: cssTemplate ? cssTemplate.length : 0,
-      cssPreview: cssTemplate ? (cssTemplate.length > 200 ? 'TOO_LONG' : cssTemplate) : 'NO_CSS',
+      cssPreview: cssTemplate ? (cssTemplate.length > 300 ? cssTemplate.substring(0, 300) + '...' : cssTemplate) : 'NO_CSS',
+      hasShadowStyleElement: !!this.state.shadowStyleElement,
       hasMainDocumentStyleElement: !!this.state.mainDocumentStyleElement,
       timestamp: new Date().toISOString()
     });
     
-    if (!this.state.mainDocumentStyleElement) {
-      console.warn("🌊 ContentSystemDOMService: Main document style element not available - cannot update CSS animation");
+    if (!this.state.shadowStyleElement) {
+      console.warn("🌊 ContentSystemDOMService: Shadow style element not available - cannot update CSS animation");
       return;
     }
 
     try {
-      const previousLength = this.state.mainDocumentStyleElement.textContent?.length || 0;
+      // Get default shadow styles and append wave animation CSS
+      const defaultShadowStyles = this.getDefaultShadowStyles();
+      const previousLength = this.state.shadowStyleElement.textContent?.length || 0;
       const isUpdate = previousLength > 0;
       
-      console.log("🌊 ContentSystemDOMService: Applying CSS to DOM", {
+      console.log("🌊 ContentSystemDOMService: Applying CSS to Shadow DOM", {
         operation: isUpdate ? 'UPDATE' : 'INITIAL_APPLY',
         previousCssLength: previousLength,
         newCssLength: cssTemplate.length,
-        cssChanged: previousLength !== cssTemplate.length
+        defaultShadowStylesLength: defaultShadowStyles.length,
+        cssChanged: previousLength !== (defaultShadowStyles.length + cssTemplate.length)
       });
       
-      this.state.mainDocumentStyleElement.textContent = cssTemplate;
+      // Apply default shadow styles + wave animation CSS to shadow DOM
+      this.state.shadowStyleElement.textContent = defaultShadowStyles + cssTemplate;
+      
+      // Also apply to main document for text elements that need it
+      if (this.state.mainDocumentStyleElement) {
+        this.state.mainDocumentStyleElement.textContent = this.getDefaultMainStyles() + cssTemplate;
+        console.log("🌊 ContentSystemDOMService: Also applied CSS to main document for text elements");
+      }
       
       const endTime = performance.now();
       const duration = endTime - startTime;
@@ -229,17 +241,19 @@ export class ContentSystemDOMService {
       console.log("🌊 ContentSystemDOMService: CSS animation updated successfully", {
         operation: isUpdate ? 'UPDATE' : 'INITIAL_APPLY',
         cssLength: cssTemplate.length,
+        totalShadowCssLength: this.state.shadowStyleElement.textContent?.length || 0,
         applicationDuration: `${duration.toFixed(2)}ms`,
-        styleElementId: this.state.mainDocumentStyleElement.id || 'no-id',
-        styleElementType: this.state.mainDocumentStyleElement.tagName,
+        styleElementId: this.state.shadowStyleElement.id || 'no-id',
+        styleElementType: this.state.shadowStyleElement.tagName,
         timestamp: new Date().toISOString()
       });
       
       // Verify the update was successful
-      const actualLength = this.state.mainDocumentStyleElement.textContent?.length || 0;
-      if (actualLength !== cssTemplate.length) {
+      const actualLength = this.state.shadowStyleElement.textContent?.length || 0;
+      const expectedLength = defaultShadowStyles.length + cssTemplate.length;
+      if (actualLength !== expectedLength) {
         console.warn("🌊 ContentSystemDOMService: CSS length mismatch after update", {
-          expected: cssTemplate.length,
+          expected: expectedLength,
           actual: actualLength
         });
       }
@@ -260,9 +274,16 @@ export class ContentSystemDOMService {
    * Remove wave animation styles
    */
   public removeWaveAnimation(): void {
+    // Remove from shadow DOM
+    if (this.state.shadowStyleElement) {
+      this.state.shadowStyleElement.textContent = this.getDefaultShadowStyles();
+      console.log("🌊 ContentSystemDOMService: Wave animation styles removed from shadow DOM");
+    }
+    
+    // Remove from main document
     if (this.state.mainDocumentStyleElement) {
       this.state.mainDocumentStyleElement.textContent = this.getDefaultMainStyles();
-      console.log("🌊 ContentSystemDOMService: Wave animation styles removed");
+      console.log("🌊 ContentSystemDOMService: Wave animation styles removed from main document");
     }
   }
 

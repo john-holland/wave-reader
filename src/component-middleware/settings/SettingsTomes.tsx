@@ -882,6 +882,13 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
 
   const handleSaveSettings = useCallback(async () => {
     console.log('⚙️ SettingsTomes: Saving settings');
+    console.log('🚨🚨🚨 SETTINGS SAVE: handleSaveSettings called with settings:', {
+      cssTemplate: settingsRef.current.cssTemplate?.substring(0, 100) + '...',
+      cssTemplateLength: settingsRef.current.cssTemplate?.length || 0,
+      cssMouseTemplate: settingsRef.current.cssMouseTemplate?.substring(0, 100) + '...',
+      cssMouseTemplateLength: settingsRef.current.cssMouseTemplate?.length || 0,
+      fullSettings: settingsRef.current
+    });
     
     setCurrentView('saving');
     
@@ -895,7 +902,15 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
       console.log('⚙️ SettingsTomes: Saved epileptic blacklist', blacklistUrls.length, 'URLs');
       // Save to storage
       if (isExtension) {
-        await sendExtensionMessage({
+        console.log('🚨🚨🚨 SETTINGS SAVE: About to send SETTINGS_SAVED message to background', {
+          type: 'SETTINGS_SAVED',
+          hasSettings: !!settingsRef.current,
+          hasCssTemplate: !!settingsRef.current.cssTemplate,
+          cssTemplateLength: settingsRef.current.cssTemplate?.length || 0,
+          target: 'background'
+        });
+        
+        const result = await sendExtensionMessage({
           type: 'SETTINGS_SAVED',
           settings: settingsRef.current,
           source: 'settings',
@@ -903,12 +918,59 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
           traceId: Date.now().toString()
         });
         
+        console.log('🚨🚨🚨 SETTINGS SAVE: sendExtensionMessage result:', result);
+        
         // Save to Chrome storage
         if (chrome.storage && chrome.storage.local) {
+          console.log('🚨🚨🚨 SETTINGS SAVE: Saving to chrome.storage.local', {
+            hasCssTemplate: !!settingsRef.current.cssTemplate,
+            cssTemplateLength: settingsRef.current.cssTemplate?.length || 0
+          });
+          
           await chrome.storage.local.set({ 
             waveReaderSettings: settingsRef.current,
             waveReaderDomainPaths: localDomainPaths
           });
+          
+          console.log('🚨🚨🚨 SETTINGS SAVE: Successfully saved to chrome.storage.local');
+        }
+        
+        // Send settings to content script for CSS consumption
+        console.log('🚨🚨🚨 SETTINGS SAVE: Sending settings to content script for CSS consumption', {
+          cssTemplate: settingsRef.current.cssTemplate?.substring(0, 200),
+          cssTemplateLength: settingsRef.current.cssTemplate?.length || 0,
+          cssMouseTemplate: settingsRef.current.cssMouseTemplate?.substring(0, 200),
+          waveSpeed: settingsRef.current.waveSpeed,
+          axisRotationAmountYMax: settingsRef.current.axisRotationAmountYMax,
+          axisRotationAmountYMin: settingsRef.current.axisRotationAmountYMin,
+          axisTranslateAmountXMax: settingsRef.current.axisTranslateAmountXMax,
+          axisTranslateAmountXMin: settingsRef.current.axisTranslateAmountXMin,
+          fullSettings: settingsRef.current
+        });
+        
+        try {
+          // Send to content script via message handler - send directly to content
+          // Use settingsRef.current directly (plain object)
+          console.log('🚨🚨🚨 SETTINGS SAVE: Sending settings to content script', {
+            settings: settingsRef.current,
+            waveSpeed: settingsRef.current.waveSpeed,
+            cssTemplateLength: settingsRef.current.cssTemplate?.length || 0
+          });
+          
+          if (isExtension && messageHandler) {
+            const contentResult = await messageHandler.sendMessage('content', {
+              type: 'SETTINGS_UPDATED',
+              options: settingsRef.current,
+              source: 'settings',
+              traceId: Date.now().toString()
+            });
+            
+            console.log('🚨🚨🚨 SETTINGS SAVE: Sent SETTINGS_UPDATED to content script, result:', contentResult);
+          } else {
+            console.warn('🚨🚨🚨 SETTINGS SAVE: Cannot send to content script - not in extension context or message handler not ready');
+          }
+        } catch (contentError) {
+          console.error('🚨🚨🚨 SETTINGS SAVE: Failed to send settings to content script:', contentError);
         }
       }
       
