@@ -122,7 +122,7 @@ export class EpilepticBlacklistService {
   private static normalizeUrl(url: string): string {
     try {
       const urlObj = new URL(url);
-      // Remove trailing slash, normalize protocol
+      // Remove trailing slash, normalize protocol to just host
       return `${urlObj.host}`;
     } catch (e) {
       // If URL parsing fails, return as-is
