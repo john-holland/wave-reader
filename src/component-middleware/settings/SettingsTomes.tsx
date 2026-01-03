@@ -656,6 +656,13 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
       setIsExtension(Boolean(extensionContext));
 
       if (extensionContext) {
+        console.log('⚙️ SettingsTomes: Extension context detected, initializing...', {
+          hasChrome: typeof chrome !== 'undefined',
+          hasStorage: typeof chrome !== 'undefined' && !!chrome.storage,
+          hasLocal: typeof chrome !== 'undefined' && !!chrome.storage?.local,
+          runtimeId: chrome.runtime?.id
+        });
+        
         // Initialize Chrome extension message handler
         const handler = new SettingsMessageHandler();
         setMessageHandler(handler);
@@ -663,31 +670,76 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
         // Load saved settings from Chrome storage
         if (chrome.storage && chrome.storage.local) {
           try {
+            console.log('⚙️ SettingsTomes: Attempting to read from chrome.storage.local...');
             const result = await chrome.storage.local.get(['waveReaderSettings', 'waveReaderDomainPaths']);
+            console.log('⚙️ SettingsTomes: Storage read result', {
+              hasResult: !!result,
+              hasSettings: !!result.waveReaderSettings,
+              hasDomainPaths: !!result.waveReaderDomainPaths,
+              settingsKeys: result.waveReaderSettings ? Object.keys(result.waveReaderSettings) : [],
+              waveSpeed: result.waveReaderSettings?.waveSpeed,
+              cssTemplateLength: result.waveReaderSettings?.cssTemplate?.length || 0
+            });
             
             if (result.waveReaderSettings) {
-              console.log('⚙️ SettingsTomes: Loading settings from storage:', result.waveReaderSettings);
+              console.log('⚙️ SettingsTomes: Loading settings from storage:', {
+                waveSpeed: result.waveReaderSettings.waveSpeed,
+                axisRotationAmountYMax: result.waveReaderSettings.axisRotationAmountYMax,
+                cssTemplateLength: result.waveReaderSettings.cssTemplate?.length || 0,
+                fullSettings: result.waveReaderSettings
+              });
               setSettings(prev => {
                 const sanitized = sanitizeSettings({ ...prev, ...result.waveReaderSettings });
-                console.log('⚙️ SettingsTomes: Sanitized settings, toggleKeys:', sanitized.toggleKeys);
+                console.log('⚙️ SettingsTomes: Sanitized settings', {
+                  toggleKeys: sanitized.toggleKeys,
+                  waveSpeed: sanitized.waveSpeed,
+                  axisRotationAmountYMax: sanitized.axisRotationAmountYMax,
+                  cssTemplateLength: sanitized.cssTemplate?.length || 0
+                });
                 return sanitized;
               });
               setSaved(true);
+              console.log('⚙️ SettingsTomes: Settings loaded and state updated');
+            } else {
+              console.warn('⚙️ SettingsTomes: No settings found in storage');
             }
             
             if (result.waveReaderDomainPaths) {
               setLocalDomainPaths(result.waveReaderDomainPaths);
+              console.log('⚙️ SettingsTomes: Domain paths loaded:', result.waveReaderDomainPaths);
             }
           } catch (error) {
-            console.warn('Failed to load settings from Chrome storage:', error);
+            console.error('⚙️ SettingsTomes: Failed to load settings from Chrome storage', {
+              error: error,
+              errorMessage: error instanceof Error ? error.message : String(error),
+              errorStack: error instanceof Error ? error.stack : undefined
+            });
           }
+        } else {
+          console.warn('⚙️ SettingsTomes: chrome.storage.local not available', {
+            hasChrome: typeof chrome !== 'undefined',
+            hasStorage: typeof chrome !== 'undefined' && !!chrome.storage,
+            hasLocal: typeof chrome !== 'undefined' && !!chrome.storage?.local
+          });
         }
         
         // Load epileptic blacklist
+        console.log('⚙️ SettingsTomes: Loading epileptic blacklist...');
         await loadBlacklist();
+        console.log('⚙️ SettingsTomes: Epileptic blacklist loaded');
+      } else {
+        console.warn('⚙️ SettingsTomes: Not running in extension context', {
+          hasChrome: typeof chrome !== 'undefined',
+          hasRuntime: typeof chrome !== 'undefined' && !!chrome.runtime,
+          runtimeId: typeof chrome !== 'undefined' && chrome.runtime?.id
+        });
       }
       
-      console.log('⚙️ SettingsTomes: Initialized for Chrome extension context');
+      console.log('⚙️ SettingsTomes: Initialization complete', {
+        isExtension,
+        hasMessageHandler: !!messageHandler,
+        currentSettings: settings
+      });
     };
 
     initializeComponent();

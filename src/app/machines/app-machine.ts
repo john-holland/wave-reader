@@ -505,17 +505,59 @@ export const createAppMachine = (router?: MachineRouter) => {
                     // Load settings to include as options
                     let options = null;
                     try {
+                        const Options = (await import('../../models/options')).default;
+                        const Wave = (await import('../../models/wave')).default;
+                        
                         // First try to get settings from context
                         if (context.viewModel.settings) {
                             options = context.viewModel.settings;
-                            log('🌊 App Machine: Using settings from context', options);
+                            log('🌊 App Machine: Using settings from context', {
+                                hasOptions: !!options,
+                                waveSpeed: options?.waveSpeed || options?.wave?.waveSpeed
+                            });
                         } else {
                             // Load from Chrome storage
                             if (typeof chrome !== 'undefined' && chrome.storage) {
                                 const storageResult = await chrome.storage.local.get(['waveReaderSettings']);
                                 if (storageResult.waveReaderSettings) {
-                                    options = storageResult.waveReaderSettings;
-                                    log('🌊 App Machine: Loaded settings from Chrome storage', options);
+                                    const storedSettings = storageResult.waveReaderSettings;
+                                    log('🌊 App Machine: Loaded settings from Chrome storage', {
+                                        hasSettings: !!storedSettings,
+                                        waveSpeed: storedSettings.waveSpeed,
+                                        hasWave: !!storedSettings.wave
+                                    });
+                                    
+                                    // Convert flat Settings format to nested Options format if needed
+                                    let optionsData = storedSettings;
+                                    if (storedSettings.waveSpeed !== undefined || storedSettings.axisRotationAmountYMax !== undefined) {
+                                        // Flat Settings format - convert to nested Options format
+                                        const waveProps: any = {
+                                            ...(storedSettings.wave || {}),
+                                            waveSpeed: storedSettings.waveSpeed,
+                                            axisTranslateAmountXMax: storedSettings.axisTranslateAmountXMax,
+                                            axisTranslateAmountXMin: storedSettings.axisTranslateAmountXMin,
+                                            axisRotationAmountYMax: storedSettings.axisRotationAmountYMax,
+                                            axisRotationAmountYMin: storedSettings.axisRotationAmountYMin,
+                                            selector: storedSettings.selector,
+                                            cssGenerationMode: storedSettings.cssGenerationMode,
+                                            cssTemplate: storedSettings.cssTemplate,
+                                            cssMouseTemplate: storedSettings.cssMouseTemplate
+                                        };
+                                        optionsData = {
+                                            ...storedSettings,
+                                            wave: new Wave(waveProps) // Create Wave instance to regenerate CSS templates
+                                        };
+                                    }
+                                    
+                                    // Create Options instance to ensure proper structure
+                                    options = new Options(optionsData);
+                                    log('🌊 App Machine: Converted settings to Options format', {
+                                        hasOptions: !!options,
+                                        hasWave: !!options?.wave,
+                                        waveSpeed: options?.wave?.waveSpeed,
+                                        cssTemplateLength: options?.wave?.cssTemplate?.length || 0
+                                    });
+                                    
                                     // Store in context for future use
                                     context.viewModel.settings = options;
                                 }
@@ -526,17 +568,48 @@ export const createAppMachine = (router?: MachineRouter) => {
                         if (!options && typeof chrome !== 'undefined' && chrome.storage) {
                             const syncResult = await chrome.storage.sync.get(['waveReaderSettings']);
                             if (syncResult.waveReaderSettings) {
-                                options = syncResult.waveReaderSettings;
-                                log('🌊 App Machine: Loaded settings from Chrome sync storage', options);
+                                const storedSettings = syncResult.waveReaderSettings;
+                                log('🌊 App Machine: Loaded settings from Chrome sync storage', {
+                                    hasSettings: !!storedSettings,
+                                    waveSpeed: storedSettings.waveSpeed
+                                });
+                                
+                                // Convert flat Settings format to nested Options format if needed
+                                let optionsData = storedSettings;
+                                if (storedSettings.waveSpeed !== undefined || storedSettings.axisRotationAmountYMax !== undefined) {
+                                    const waveProps: any = {
+                                        ...(storedSettings.wave || {}),
+                                        waveSpeed: storedSettings.waveSpeed,
+                                        axisTranslateAmountXMax: storedSettings.axisTranslateAmountXMax,
+                                        axisTranslateAmountXMin: storedSettings.axisTranslateAmountXMin,
+                                        axisRotationAmountYMax: storedSettings.axisRotationAmountYMax,
+                                        axisRotationAmountYMin: storedSettings.axisRotationAmountYMin,
+                                        selector: storedSettings.selector,
+                                        cssGenerationMode: storedSettings.cssGenerationMode,
+                                        cssTemplate: storedSettings.cssTemplate,
+                                        cssMouseTemplate: storedSettings.cssMouseTemplate
+                                    };
+                                    optionsData = {
+                                        ...storedSettings,
+                                        wave: new Wave(waveProps)
+                                    };
+                                }
+                                
+                                options = new Options(optionsData);
+                                log('🌊 App Machine: Converted sync settings to Options format', {
+                                    hasOptions: !!options,
+                                    waveSpeed: options?.wave?.waveSpeed
+                                });
                                 context.viewModel.settings = options;
                             }
                         }
                         
                         // If still no settings, use defaults
                         if (!options) {
-                            const Options = (await import('../../models/options')).default;
                             options = Options.getDefaultOptions();
-                            log('🌊 App Machine: Using default options', options);
+                            log('🌊 App Machine: Using default options', {
+                                waveSpeed: options?.wave?.waveSpeed
+                            });
                         }
                     } catch (error: any) {
                         log('🌊 App Machine: Failed to load settings, using defaults', error.message);
