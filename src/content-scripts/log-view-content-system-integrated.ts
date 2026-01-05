@@ -319,7 +319,13 @@ export class LogViewContentSystemIntegrated {
   }
 
   private handleRuntimeMessage(message: any, sender: any, sendResponse: any) {
-    console.log("🌊 Integrated System: Handling runtime message", message);
+    console.log("🌊 Integrated System: Handling runtime message", {
+      message,
+      messageType: typeof message,
+      messageKeys: message ? Object.keys(message) : [],
+      hasNestedMessage: !!(message && message.message),
+      senderTabId: sender?.tab?.id
+    });
     
     // Coalesce nested message objects - check if message has an embedded message property
     let normalizedMessage = message;

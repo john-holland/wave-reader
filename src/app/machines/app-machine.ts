@@ -358,7 +358,10 @@ export const createAppMachine = (router?: MachineRouter) => {
                 handleStartError: {
                     exec: (context: any, event: any, meta: any) => {
                         const log = getActionLog(meta, 'app-machine');
-                        const errorMsg = event?.error?.message || event?.error || event?.type === 'xstate.after(10000)#app-machine.starting' ? 'Start timeout - service did not respond within 10 seconds' : 'Failed to start';
+                        const errorMsg = event?.error?.message || event?.error || 
+                            (event?.type === 'xstate.after(10000)#app-machine.starting' 
+                                ? 'Start timeout - service did not respond within 10 seconds' 
+                                : 'Failed to start');
                         log('🌊 App Machine: Start error', { event, errorMsg });
                         context.viewModel.error = errorMsg;
                         context.viewModel.going = false; // Ensure going is false on error

@@ -3,6 +3,7 @@ import { MessageFactory } from '../models/messages/simplified-messages';
 import { MLSettingsService } from '../services/ml-settings-service';
 import { safeFetch, safeGraphQLRequest, setBackendRequestOverride } from '../utils/backend-api-wrapper';
 import { getDefaultBackendRequestState } from '../config/feature-toggles';
+import { EpilepticBlacklistService } from '../services/epileptic-blacklist';
 
 // Log-View-Machine Background System
 export class LogViewBackgroundSystem {
@@ -205,7 +206,9 @@ export class LogViewBackgroundSystem {
             throw new Error('Chrome tabs API not available');
         }
         
-        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        // Use lastFocusedWindow instead of currentWindow because when the popup is open,
+        // currentWindow refers to the popup window (which has no tabs), not the browser window
+        const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
         if (!tabs || tabs.length === 0) {
             throw new Error('No active tabs found');
         }
@@ -365,9 +368,16 @@ export class LogViewBackgroundSystem {
                     
                 case 'start':
                     console.log("BACKGROUND->CONTENT: Processing start message");
+                    // Note: handleStart now uses safeSendResponse internally to prevent multiple calls
                     this.handleStart(message, sender, sendResponse).catch((error: any) => {
                         console.error('🌊 Log-View-Machine: Unhandled error in handleStart:', error);
-                        sendResponse({ success: false, error: error?.message || 'Unknown error' });
+                        // Only send response if handleStart didn't already send one
+                        // This is a fallback for truly unhandled errors
+                        try {
+                            sendResponse({ success: false, error: error?.message || 'Unknown error' });
+                        } catch (e) {
+                            console.error('🌊 Log-View-Machine: Failed to send error response (channel may be closed):', e);
+                        }
                     });
                     return true; // Keep message channel open for async handler
                     
@@ -747,6 +757,22 @@ export class LogViewBackgroundSystem {
         console.log("🌊 Log-View-Machine: handleStart called, sendResponse type:", typeof sendResponse);
         this.logMessage('start-requested', 'Start wave reader requested');
         
+        // Create a safe wrapper to ensure sendResponse is only called once
+        let responseSent = false;
+        const safeSendResponse = (response: any) => {
+            if (responseSent) {
+                console.warn("🌊 Log-View-Machine: Attempted to send response multiple times, ignoring");
+                return;
+            }
+            responseSent = true;
+            try {
+                sendResponse(response);
+                console.log("🌊 Log-View-Machine: Response sent successfully:", response);
+            } catch (error: any) {
+                console.error("🌊 Log-View-Machine: Error sending response (channel may be closed):", error);
+            }
+        };
+        
         try {
             // Get active tab
             console.log("🌊 Log-View-Machine: Getting active tab...");
@@ -763,19 +789,17 @@ export class LogViewBackgroundSystem {
             
             // Check epileptic blacklist
             try {
-                const { EpilepticBlacklistService } = await import('../services/epileptic-blacklist');
                 await EpilepticBlacklistService.initialize();
                 
                 if (tab.url && EpilepticBlacklistService.isBlacklisted(tab.url)) {
                     console.log("🌊 Log-View-Machine: Site is blacklisted, ignoring start command", tab.url);
                     this.logMessage('start-skipped', `Skipping start for blacklisted URL: ${tab.url}`);
                     console.log("🌊 Log-View-Machine: Sending blacklisted response");
-                    sendResponse({ 
+                    safeSendResponse({ 
                         success: false, 
                         error: 'Site is blacklisted',
                         blacklisted: true
                     });
-                    console.log("🌊 Log-View-Machine: Blacklisted response sent");
                     return; // Don't start if site is blacklisted
                 }
             } catch (error) {
@@ -784,12 +808,19 @@ export class LogViewBackgroundSystem {
             
             // Send start message to content script via chrome.tabs.sendMessage
             console.log("BACKGROUND->CONTENT: Sending start message to tab", tab.id);
-            await this.injectMessageToContentScript(tab.id, {
+            const contentMessage = {
                 from: 'background-script',
                 name: 'start',
                 options: message.options,
                 timestamp: Date.now()
+            };
+            console.log("BACKGROUND->CONTENT: Message payload:", {
+                hasOptions: !!contentMessage.options,
+                optionsType: typeof contentMessage.options,
+                optionsKeys: contentMessage.options ? Object.keys(contentMessage.options) : [],
+                messageKeys: Object.keys(contentMessage)
             });
+            await this.injectMessageToContentScript(tab.id, contentMessage);
             console.log("BACKGROUND->CONTENT: Start message sent to content script");
             
             // Update active tabs tracking
@@ -813,16 +844,14 @@ export class LogViewBackgroundSystem {
                     startTime: Date.now()
                 }
             };
-            sendResponse(response);
-            console.log("🌊 Log-View-Machine: Success response sent:", response);
+            safeSendResponse(response);
             
         } catch (error: any) {
             console.error('🌊 Log-View-Machine: Failed to start wave reader:', error);
             this.logMessage('start-error', `Failed to start: ${error.message}`);
             console.log("🌊 Log-View-Machine: Sending error response");
             const errorResponse = { success: false, error: error.message };
-            sendResponse(errorResponse);
-            console.log("🌊 Log-View-Machine: Error response sent:", errorResponse);
+            safeSendResponse(errorResponse);
         }
     }
 
