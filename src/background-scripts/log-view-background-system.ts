@@ -365,8 +365,11 @@ export class LogViewBackgroundSystem {
                     
                 case 'start':
                     console.log("BACKGROUND->CONTENT: Processing start message");
-                    this.handleStart(message, sender, sendResponse);
-                    break;
+                    this.handleStart(message, sender, sendResponse).catch((error: any) => {
+                        console.error('🌊 Log-View-Machine: Unhandled error in handleStart:', error);
+                        sendResponse({ success: false, error: error?.message || 'Unknown error' });
+                    });
+                    return true; // Keep message channel open for async handler
                     
                 case 'stop':
                     console.log("BACKGROUND->CONTENT: Processing stop message");
@@ -741,11 +744,14 @@ export class LogViewBackgroundSystem {
 
     private async handleStart(message: any, sender: any, sendResponse: any) {
         console.log("🌊 Log-View-Machine: Handling start message:", message);
+        console.log("🌊 Log-View-Machine: handleStart called, sendResponse type:", typeof sendResponse);
         this.logMessage('start-requested', 'Start wave reader requested');
         
         try {
             // Get active tab
+            console.log("🌊 Log-View-Machine: Getting active tab...");
             const tab = await this.getActiveTab();
+            console.log("🌊 Log-View-Machine: Got tab:", { tabId: tab?.id, url: tab?.url });
             if (!tab) {
                 throw new Error('No active tab found');
             }
@@ -753,6 +759,27 @@ export class LogViewBackgroundSystem {
             // Check if the tab URL is accessible
             if (!this.isUrlAccessible(tab.url)) {
                 throw new Error(`Cannot access restricted URL: ${tab.url}`);
+            }
+            
+            // Check epileptic blacklist
+            try {
+                const { EpilepticBlacklistService } = await import('../services/epileptic-blacklist');
+                await EpilepticBlacklistService.initialize();
+                
+                if (tab.url && EpilepticBlacklistService.isBlacklisted(tab.url)) {
+                    console.log("🌊 Log-View-Machine: Site is blacklisted, ignoring start command", tab.url);
+                    this.logMessage('start-skipped', `Skipping start for blacklisted URL: ${tab.url}`);
+                    console.log("🌊 Log-View-Machine: Sending blacklisted response");
+                    sendResponse({ 
+                        success: false, 
+                        error: 'Site is blacklisted',
+                        blacklisted: true
+                    });
+                    console.log("🌊 Log-View-Machine: Blacklisted response sent");
+                    return; // Don't start if site is blacklisted
+                }
+            } catch (error) {
+                console.warn('🌊 Log-View-Machine: Error checking blacklist, proceeding with start', error);
             }
             
             // Send start message to content script via chrome.tabs.sendMessage
@@ -763,6 +790,7 @@ export class LogViewBackgroundSystem {
                 options: message.options,
                 timestamp: Date.now()
             });
+            console.log("BACKGROUND->CONTENT: Start message sent to content script");
             
             // Update active tabs tracking
             this.activeTabs.set(tab.id, {
@@ -775,7 +803,8 @@ export class LogViewBackgroundSystem {
             });
             
             this.logMessage('start-success', 'Wave reader started successfully');
-            sendResponse({ 
+            console.log("🌊 Log-View-Machine: Sending success response");
+            const response = { 
                 success: true, 
                 message: 'Wave reader started',
                 data: {
@@ -783,12 +812,17 @@ export class LogViewBackgroundSystem {
                     tabId: tab.id,
                     startTime: Date.now()
                 }
-            });
+            };
+            sendResponse(response);
+            console.log("🌊 Log-View-Machine: Success response sent:", response);
             
         } catch (error: any) {
             console.error('🌊 Log-View-Machine: Failed to start wave reader:', error);
             this.logMessage('start-error', `Failed to start: ${error.message}`);
-            sendResponse({ success: false, error: error.message });
+            console.log("🌊 Log-View-Machine: Sending error response");
+            const errorResponse = { success: false, error: error.message };
+            sendResponse(errorResponse);
+            console.log("🌊 Log-View-Machine: Error response sent:", errorResponse);
         }
     }
 
@@ -970,6 +1004,25 @@ export class LogViewBackgroundSystem {
             // Check if the tab URL is accessible
             if (!this.isUrlAccessible(tab.url)) {
                 throw new Error(`Cannot access restricted URL: ${tab.url}`);
+            }
+            
+            // Check epileptic blacklist
+            try {
+                const { EpilepticBlacklistService } = await import('../services/epileptic-blacklist');
+                await EpilepticBlacklistService.initialize();
+                
+                if (tab.url && EpilepticBlacklistService.isBlacklisted(tab.url)) {
+                    console.log("🌊 Log-View-Machine: Site is blacklisted, ignoring toggle command", tab.url);
+                    this.logMessage('toggle-skipped', `Skipping toggle for blacklisted URL: ${tab.url}`);
+                    sendResponse({ 
+                        success: false, 
+                        error: 'Site is blacklisted',
+                        blacklisted: true
+                    });
+                    return; // Don't toggle if site is blacklisted
+                }
+            } catch (error) {
+                console.warn('🌊 Log-View-Machine: Error checking blacklist, proceeding with toggle', error);
             }
             
             // Send toggle message to content script via chrome.tabs.sendMessage

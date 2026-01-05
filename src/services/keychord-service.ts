@@ -6,6 +6,7 @@ import {
     sortKeyChord,
     compareKeyChords
 } from '../components/util/user-input';
+import { EpilepticBlacklistService } from './epileptic-blacklist';
 
 /**
  * KeyChord Service
@@ -361,30 +362,50 @@ export class KeyChordService {
         
         // Check epileptic blacklist before toggling
         try {
-            const { EpilepticBlacklistService } = await import('./epileptic-blacklist');
             await EpilepticBlacklistService.initialize();
             
-            // Get current URL
+            // Get current URL - in content script context, use window.location
             let currentUrl: string | null = null;
-            if (typeof chrome !== 'undefined' && chrome.tabs) {
+            if (typeof window !== 'undefined' && window.location) {
+                currentUrl = window.location.href;
+                console.log('⌨️ KeyChordService: Got URL from window.location:', currentUrl);
+            } else if (typeof chrome !== 'undefined' && chrome.tabs) {
                 try {
                     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
                     currentUrl = tabs[0]?.url || null;
+                    console.log('⌨️ KeyChordService: Got URL from chrome.tabs:', currentUrl);
                 } catch (e) {
-                    // Fallback to window.location if available
-                    if (typeof window !== 'undefined' && window.location) {
-                        currentUrl = window.location.href;
-                    }
+                    console.warn('⌨️ KeyChordService: Could not get URL from chrome.tabs:', e);
                 }
-            } else if (typeof window !== 'undefined' && window.location) {
-                currentUrl = window.location.href;
             }
             
-            if (currentUrl && EpilepticBlacklistService.isBlacklisted(currentUrl)) {
-                console.log('⌨️ KeyChordService: Site is blacklisted, ignoring keyboard shortcut', currentUrl);
-                return; // Don't toggle if site is blacklisted
+            if (currentUrl) {
+                const isBlacklisted = EpilepticBlacklistService.isBlacklisted(currentUrl);
+                const normalizedUrl = EpilepticBlacklistService.getBlacklistedUrls().find(url => 
+                    url === currentUrl || currentUrl?.includes(url)
+                );
+                console.log('⌨️ KeyChordService: Blacklist check', {
+                    currentUrl,
+                    isBlacklisted,
+                    blacklistSize: EpilepticBlacklistService.getBlacklistedUrls().length,
+                    blacklistedUrls: EpilepticBlacklistService.getBlacklistedUrls(),
+                    normalizedMatch: normalizedUrl
+                });
+                
+                if (isBlacklisted) {
+                    console.log('⌨️ KeyChordService: Site is blacklisted, ignoring keyboard shortcut', {
+                        url: currentUrl,
+                        normalized: EpilepticBlacklistService.isBlacklisted(currentUrl)
+                    });
+                    return; // Don't toggle if site is blacklisted
+                }
+            } else {
+                console.warn('⌨️ KeyChordService: Could not determine current URL for blacklist check');
             }
         } catch (error) {
+            console.error('⌨️ KeyChordService: Error checking blacklist', error);
+            // If we can't check the blacklist, proceed anyway (fail open)
+            // This ensures the toggle still works even if blacklist service has issues
             console.warn('⌨️ KeyChordService: Error checking blacklist, proceeding with toggle', error);
         }
         
@@ -489,19 +510,52 @@ export class KeyChordService {
 
     /**
      * Set up listener for settings changes in Chrome storage
+     * Only triggers callback when toggleKeys.keyChord actually changes
      */
     static setupSettingsListener(onKeyChordChange: (newKeyChord: KeyChord) => void): (() => void) | null {
         if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.onChanged) {
             return null;
         }
 
+        let lastKeyChord: KeyChord | null = null;
+
         const listener = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
             if (areaName === 'local' || areaName === 'sync') {
                 if (changes.waveReaderSettings) {
                     const newValue = changes.waveReaderSettings.newValue;
-                    if (newValue?.toggleKeys?.keyChord) {
-                        console.log('⌨️ KeyChordService: Settings changed, updating key chord:', newValue.toggleKeys.keyChord);
-                        onKeyChordChange(newValue.toggleKeys.keyChord);
+                    const oldValue = changes.waveReaderSettings.oldValue;
+                    
+                    // Get new keychord
+                    const newKeyChord = newValue?.toggleKeys?.keyChord;
+                    const oldKeyChord = oldValue?.toggleKeys?.keyChord;
+                    
+                    // Only update if keychord actually changed
+                    if (newKeyChord && Array.isArray(newKeyChord) && newKeyChord.length > 0) {
+                        const normalizedNew = sortKeyChord(newKeyChord);
+                        const normalizedOld = oldKeyChord ? sortKeyChord(oldKeyChord) : null;
+                        const lastNormalized = lastKeyChord ? sortKeyChord(lastKeyChord) : null;
+                        
+                        // Compare with both old value and last known value
+                        const changedFromOld = !normalizedOld || !compareKeyChords(normalizedNew, normalizedOld);
+                        const changedFromLast = !lastNormalized || !compareKeyChords(normalizedNew, lastNormalized);
+                        
+                        if (changedFromOld || changedFromLast) {
+                            console.log('⌨️ KeyChordService: Key chord changed, updating:', {
+                                old: normalizedOld?.join(' + ') || 'none',
+                                new: normalizedNew.join(' + '),
+                                changedFromOld,
+                                changedFromLast
+                            });
+                            lastKeyChord = normalizedNew;
+                            onKeyChordChange(normalizedNew);
+                        } else {
+                            console.log('⌨️ KeyChordService: Settings changed but key chord unchanged, ignoring');
+                        }
+                    } else if (!newKeyChord && (oldKeyChord || lastKeyChord)) {
+                        // Key chord was removed - revert to default
+                        console.log('⌨️ KeyChordService: Key chord removed, reverting to default');
+                        lastKeyChord = null;
+                        onKeyChordChange(['Shift', 'W']);
                     }
                 }
             }

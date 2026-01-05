@@ -66,6 +66,9 @@ export const createChromeApiMachine = (router?: MachineRouter) => {
                         src: 'startService',
                         onDone: { target: 'idle', actions: ['handleStartComplete'] },
                         onError: { target: 'error', actions: ['setError'] }
+                    },
+                    after: {
+                        10000: { target: 'error', actions: ['setError'] } // 10 second timeout
                     }
                 },
                 stopping: {
@@ -138,6 +141,11 @@ export const createChromeApiMachine = (router?: MachineRouter) => {
                 
                 startService: async (context: any, event: any, meta: ServiceMeta) => {
                     console.log('🔌 ChromeApi: Starting wave reader');
+                    console.log('🔌 ChromeApi: StartService event:', { 
+                        hasEvent: !!event, 
+                        hasOptions: !!event?.options, 
+                        selector: event?.selector 
+                    });
                     
                     // Extract options from event (routedSend spreads payload into event object)
                     // event will be { type: 'START', options: ..., selector: ... }
@@ -157,32 +165,69 @@ export const createChromeApiMachine = (router?: MachineRouter) => {
                     const selector = event?.selector || 'p';
                     
                     console.log('🔌 ChromeApi: Start request with options:', { options: optionsPlain, selector });
+                    console.log('🔌 ChromeApi: About to send chrome.runtime.sendMessage');
                     
                     if (typeof chrome !== 'undefined' && chrome.runtime) {
-                        const response: any = await chrome.runtime.sendMessage({
-                            name: 'start',
-                            from: 'popup',
-                            timestamp: Date.now(),
-                            options: optionsPlain,
-                            selector: selector
-                        });
-                        
-                        // Notify parent via routed send
-                        if (meta.routedSend && response?.success) {
-                            await meta.routedSend('..', 'WAVE_STARTED', {
-                                success: true,
-                                data: response,
-                                timestamp: Date.now()
+                        try {
+                            const messagePayload = {
+                                name: 'start',
+                                from: 'popup',
+                                timestamp: Date.now(),
+                                options: optionsPlain,
+                                selector: selector
+                            };
+                            console.log('🔌 ChromeApi: Sending message to background:', messagePayload);
+                            
+                            const response: any = await chrome.runtime.sendMessage(messagePayload);
+                            console.log('🔌 ChromeApi: Received response from background:', {
+                                hasResponse: !!response,
+                                responseType: typeof response,
+                                responseKeys: response ? Object.keys(response) : [],
+                                success: response?.success,
+                                error: response?.error,
+                                fullResponse: response
                             });
+                            
+                            if (response && response.success) {
+                                console.log('🔌 ChromeApi: Start succeeded, notifying parent');
+                                // Notify parent via routed send
+                                if (meta.routedSend) {
+                                    await meta.routedSend('..', 'WAVE_STARTED', {
+                                        success: true,
+                                        data: response,
+                                        timestamp: Date.now()
+                                    });
+                                    console.log('🔌 ChromeApi: WAVE_STARTED event sent to parent');
+                                }
+                                
+                                // Also send directly to parent machine if available
+                                if (meta.machine?.parentMachine?.appMachine) {
+                                    meta.machine.parentMachine.appMachine.send('WAVE_STARTED');
+                                    console.log('🔌 ChromeApi: WAVE_STARTED sent directly to appMachine');
+                                }
+                                
+                                console.log('🔌 ChromeApi: StartService returning success response');
+                                return response;
+                            } else {
+                                const errorMsg = response?.error || 'Start failed';
+                                console.error('🔌 ChromeApi: Start failed - response indicates failure:', {
+                                    hasResponse: !!response,
+                                    error: response?.error,
+                                    errorMsg
+                                });
+                                throw new Error(errorMsg);
+                            }
+                        } catch (error: any) {
+                            console.error('🔌 ChromeApi: Start error caught:', {
+                                errorMessage: error?.message,
+                                errorName: error?.name,
+                                errorStack: error?.stack,
+                                fullError: error
+                            });
+                            throw error;
                         }
-                        
-                        // Also send directly to parent machine if available
-                        if (meta.machine?.parentMachine?.appMachine) {
-                            meta.machine.parentMachine.appMachine.send('WAVE_STARTED');
-                        }
-                        
-                        return response;
                     } else {
+                        console.error('🔌 ChromeApi: Chrome runtime not available');
                         throw new Error('Chrome runtime not available');
                     }
                 },

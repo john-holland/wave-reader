@@ -131,10 +131,14 @@ export const createAppMachine = (router?: MachineRouter) => {
                         src: 'startService',
                         onDone: { target: 'waving', actions: ['completeStart'] },
                         onError: { target: 'error', actions: ['handleStartError'] }
+                    },
+                    after: {
+                        10000: { target: 'error', actions: ['handleStartError'] } // 10 second timeout
                     }
                 },
                 waving: {
                     on: {
+                        START: { target: 'starting' }, // Allow restarting while waving (e.g., to update settings)
                         STOP: { target: 'stopping' },
                         TOGGLE: { target: 'toggling' },
                         SELECTOR_UPDATE: { target: 'selectorUpdating', actions: ['updateSelector'] },
@@ -166,6 +170,9 @@ export const createAppMachine = (router?: MachineRouter) => {
                         src: 'stopService',
                         onDone: { target: 'ready', actions: ['completeStop'] },
                         onError: { target: 'error', actions: ['handleStopError'] }
+                    },
+                    after: {
+                        10000: { target: 'error', actions: ['handleStopError'] } // 10 second timeout
                     }
                 },
                 selectorUpdating: {
@@ -351,8 +358,10 @@ export const createAppMachine = (router?: MachineRouter) => {
                 handleStartError: {
                     exec: (context: any, event: any, meta: any) => {
                         const log = getActionLog(meta, 'app-machine');
-                        log('🌊 App Machine: Start error', event);
-                        context.viewModel.error = event.error || 'Failed to start';
+                        const errorMsg = event?.error?.message || event?.error || event?.type === 'xstate.after(10000)#app-machine.starting' ? 'Start timeout - service did not respond within 10 seconds' : 'Failed to start';
+                        log('🌊 App Machine: Start error', { event, errorMsg });
+                        context.viewModel.error = errorMsg;
+                        context.viewModel.going = false; // Ensure going is false on error
                     }
                 },
                 handleStopError: {
@@ -624,20 +633,47 @@ export const createAppMachine = (router?: MachineRouter) => {
                                 ? (options.toJSON ? options.toJSON() : JSON.parse(JSON.stringify(options)))
                                 : options;
                             
+                            log('🌊 App Machine: About to send START to ChromeApiMachine via routedSend', {
+                                target: MACHINE_NAMES.CHROME_API,
+                                hasOptions: !!optionsPlain,
+                                selector: context.viewModel.selector || 'p'
+                            });
+                            
                             // Send START to ChromeApiMachine via router with options
                             const response = await meta.routedSend(MACHINE_NAMES.CHROME_API, 'START', {
                                 options: optionsPlain,
                                 selector: context.viewModel.selector || 'p'
                             });
-                            log('🌊 App Machine: ChromeApiMachine response', response);
+                            
+                            log('🌊 App Machine: ChromeApiMachine response received', {
+                                hasResponse: !!response,
+                                responseType: typeof response,
+                                responseKeys: response ? Object.keys(response) : [],
+                                success: response?.success,
+                                fullResponse: response
+                            });
+                            
+                            // Only update state if start was successful
+                            // If it failed, the ChromeApi Machine will have thrown an error
+                            log('🌊 App Machine: Setting going = true and saved = false');
+                            context.viewModel.going = true;
+                            context.viewModel.saved = false;
                         } catch (error: any) {
-                            log('🌊 App Machine: ChromeApiMachine not available, updating local state only', error.message);
+                            log('🌊 App Machine: Failed to start wave reader - error caught in startService', {
+                                errorMessage: error?.message,
+                                errorName: error?.name,
+                                errorStack: error?.stack?.substring(0, 200),
+                                fullError: error
+                            });
+                            // Don't set going = true if start failed
+                            log('🌊 App Machine: Re-throwing error to trigger onError transition');
+                            throw error; // Re-throw to trigger onError transition
                         }
+                    } else {
+                        // If no routedSend, we can't actually start, so don't set going = true
+                        log('🌊 App Machine: ChromeApiMachine not available, cannot start - no routedSend');
+                        throw new Error('ChromeApiMachine not available');
                     }
-                    
-                    // Update local state
-                    context.viewModel.going = true;
-                    context.viewModel.saved = false;
                     
                     await SyncSystem.saveViewModelToStorage(context.viewModel, log);
                     

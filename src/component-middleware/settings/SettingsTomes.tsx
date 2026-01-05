@@ -701,7 +701,8 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
               setSaved(true);
               console.log('⚙️ SettingsTomes: Settings loaded and state updated');
             } else {
-              console.warn('⚙️ SettingsTomes: No settings found in storage');
+              // This is normal on first load - don't warn, just log
+              console.log('⚙️ SettingsTomes: No settings found in storage, using defaults');
             }
             
             if (result.waveReaderDomainPaths) {

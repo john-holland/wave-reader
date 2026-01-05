@@ -8,6 +8,7 @@ import { SimpleColorServiceAdapter } from '../services/simple-color-service';
 import Options from '../models/options';
 import { initializeKeyChordService, cleanupKeyChordService, setToggleCallback } from '../services/keychord-content-integration';
 import { replaceKeyframePlaceholders } from '../models/wave';
+import { EpilepticBlacklistService } from '../services/epileptic-blacklist';
 
 /**
  * Integrated Content System with Proxy State Machine
@@ -72,6 +73,17 @@ export class LogViewContentSystemIntegrated {
     
     // Initialize DOM service
     this.domService.initialize();
+    
+    // Initialize epileptic blacklist proactively
+    try {
+      await EpilepticBlacklistService.initialize();
+      console.log("🌊 Integrated System: Epileptic blacklist initialized", {
+        blacklistSize: EpilepticBlacklistService.getBlacklistedUrls().length,
+        blacklistedUrls: EpilepticBlacklistService.getBlacklistedUrls()
+      });
+    } catch (error) {
+      console.warn("🌊 Integrated System: Failed to initialize epileptic blacklist", error);
+    }
     
     // Load settings from storage proactively so they're available when wave starts
     console.log("🌊 Integrated System: Loading settings from storage...");
@@ -222,36 +234,52 @@ export class LogViewContentSystemIntegrated {
       
       // Check epileptic blacklist before toggling
       try {
-        const { EpilepticBlacklistService } = await import('../services/epileptic-blacklist');
         await EpilepticBlacklistService.initialize();
         
-        // Get current URL
+        // Get current URL - in content script, use window.location
         let currentUrl: string | null = null;
-        if (typeof chrome !== 'undefined' && chrome.tabs) {
+        if (typeof window !== 'undefined' && window.location) {
+          currentUrl = window.location.href;
+          console.log('⌨️ Integrated System: Got URL from window.location:', currentUrl);
+        } else if (typeof chrome !== 'undefined' && chrome.tabs) {
           try {
             const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
             currentUrl = tabs[0]?.url || null;
+            console.log('⌨️ Integrated System: Got URL from chrome.tabs:', currentUrl);
           } catch (e) {
-            // Fallback to window.location if available
-            if (typeof window !== 'undefined' && window.location) {
-              currentUrl = window.location.href;
-            }
+            console.warn('⌨️ Integrated System: Could not get URL from chrome.tabs:', e);
           }
-        } else if (typeof window !== 'undefined' && window.location) {
-          currentUrl = window.location.href;
         }
         
-        if (currentUrl && EpilepticBlacklistService.isBlacklisted(currentUrl)) {
-          console.log('⌨️ Integrated System: Site is blacklisted, ignoring keyboard shortcut', currentUrl);
-          return; // Don't toggle if site is blacklisted
+        if (currentUrl) {
+          const isBlacklisted = EpilepticBlacklistService.isBlacklisted(currentUrl);
+          console.log('⌨️ Integrated System: Blacklist check', {
+            currentUrl,
+            isBlacklisted,
+            blacklistSize: EpilepticBlacklistService.getBlacklistedUrls().length,
+            blacklistedUrls: EpilepticBlacklistService.getBlacklistedUrls()
+          });
+          
+          if (isBlacklisted) {
+            console.log('⌨️ Integrated System: Site is blacklisted, ignoring keyboard shortcut', {
+              url: currentUrl,
+              normalized: EpilepticBlacklistService.isBlacklisted(currentUrl)
+            });
+            return; // Don't toggle if site is blacklisted
+          }
+        } else {
+          console.warn('⌨️ Integrated System: Could not determine current URL for blacklist check');
         }
       } catch (error) {
+        console.error('⌨️ Integrated System: Error checking blacklist', error);
+        // If we can't check the blacklist, proceed anyway (fail open)
+        // This ensures the toggle still works even if blacklist service has issues
         console.warn('⌨️ Integrated System: Error checking blacklist, proceeding with toggle', error);
       }
       
       console.log('⌨️ Integrated System: Calling handleToggle');
       // Use the integrated system's toggle handler which properly routes to start/stop
-      this.handleToggle({
+      await this.handleToggle({
         name: 'toggle',
         from: 'keyboard-shortcut',
         timestamp: Date.now(),
@@ -596,7 +624,7 @@ export class LogViewContentSystemIntegrated {
     // Wrap in try-catch to ensure errors don't prevent start from completing
     try {
       const { setToggleCallback } = await import('../services/keychord-content-integration');
-      await setToggleCallback(() => {
+      await setToggleCallback(async () => {
         // Use arrow function to capture 'this' and ensure we check current state at execution time
         const currentGoingState = this.going;
         console.log('⌨️ Integrated System: Keyboard shortcut triggered in callback', {
@@ -604,7 +632,7 @@ export class LogViewContentSystemIntegrated {
           hasLatestOptions: !!this.latestOptions,
           timestamp: new Date().toISOString()
         });
-        this.handleToggle({
+        await this.handleToggle({
           name: 'toggle',
           from: 'keyboard-shortcut',
           timestamp: Date.now(),
@@ -625,7 +653,7 @@ export class LogViewContentSystemIntegrated {
     this.logMessage('start', 'Integrated system started');
   }
 
-  private async handleStop(message: any) {
+  private async handleStop(message: any): Promise<void> {
     console.log("🌊 Integrated System: Handling stop message", {
       currentGoingState: this.going,
       messageFrom: message.from
@@ -647,33 +675,34 @@ export class LogViewContentSystemIntegrated {
     
     // Ensure keyboard shortcut callback is set after all stop operations complete
     // This ensures the shortcut can start a new wave after stopping
-    // Do this asynchronously and non-blocking so it doesn't interfere with stop flow
-    import('../services/keychord-content-integration').then(({ setToggleCallback }) => {
-      setToggleCallback(() => {
+    // Do this synchronously to ensure it's set before any other operations
+    try {
+      const { setToggleCallback } = await import('../services/keychord-content-integration');
+      await setToggleCallback(async () => {
         // Use arrow function to capture 'this' and ensure we check current state at execution time
         const currentGoingState = this.going;
-        console.log('⌨️ Integrated System: Keyboard shortcut triggered', {
+        console.log('⌨️ Integrated System: Keyboard shortcut triggered after stop', {
           currentGoingState,
           timestamp: new Date().toISOString()
         });
-        this.handleToggle({
+        await this.handleToggle({
           name: 'toggle',
           from: 'keyboard-shortcut',
           timestamp: Date.now(),
           options: this.latestOptions
         });
-      }).catch((error: any) => {
-        console.warn('⌨️ Integrated System: Failed to set keyboard shortcut callback after stop', error);
       });
-    }).catch((error: any) => {
-      console.warn('⌨️ Integrated System: Failed to import keychord service after stop', error);
-    });
+      console.log('⌨️ Integrated System: Keyboard shortcut callback set after stop');
+    } catch (error: any) {
+      console.error('⌨️ Integrated System: Failed to set keyboard shortcut callback after stop', error);
+      // Don't throw - allow stop to complete even if callback setup fails
+    }
     
     this.messageService.logMessage('stop', 'Integrated system stopped');
     this.logMessage('stop', 'Integrated system stopped');
   }
 
-  private handleToggle(message: any) {
+  private async handleToggle(message: any): Promise<void> {
     console.log("🌊 Integrated System: Handling toggle message", {
       currentGoingState: this.going,
       messageFrom: message.from,
@@ -689,10 +718,10 @@ export class LogViewContentSystemIntegrated {
     
     if (currentState) {
       console.log("🌊 Integrated System: Current state is going=true, calling handleStop");
-      this.handleStop(message);
+      await this.handleStop(message);
     } else {
       console.log("🌊 Integrated System: Current state is going=false, calling handleStart");
-      this.handleStart(message);
+      await this.handleStart(message);
     }
   }
 
