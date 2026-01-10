@@ -9,6 +9,7 @@ import Options from '../models/options';
 import { initializeKeyChordService, cleanupKeyChordService, setToggleCallback } from '../services/keychord-content-integration';
 import { replaceKeyframePlaceholders } from '../models/wave';
 import { EpilepticBlacklistService } from '../services/epileptic-blacklist';
+import SettingsService from '../services/settings';
 
 /**
  * Integrated Content System with Proxy State Machine
@@ -24,6 +25,7 @@ export class LogViewContentSystemIntegrated {
   private mlService: MLSettingsService;
   private selectorService: SelectorHierarchy;
   private colorService: SimpleColorServiceAdapter;
+  private settingsService: SettingsService | null = null;
   
   private going: boolean = false;
   private lastSyncedGoingState: boolean | null = null; // Track last synced state to avoid spam
@@ -44,6 +46,30 @@ export class LogViewContentSystemIntegrated {
     this.mlService = new MLSettingsService();
     this.domService = new ContentSystemDOMService();
     this.messageService = new ContentSystemMessageService(this.sessionId);
+    
+    // Initialize SettingsService with tab URL provider
+    // This allows us to get domain/path-specific settings for the current page
+    if (typeof chrome !== 'undefined' && chrome.tabs) {
+      const tabUrlProvider = (): Promise<string> => {
+        return new Promise((resolve) => {
+          // In content script context, use window.location
+          if (typeof window !== 'undefined' && window.location) {
+            resolve(window.location.href);
+          } else {
+            // Fallback: try to get from chrome.tabs if available
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+              if (tabs.length > 0 && tabs[0].url) {
+                resolve(tabs[0].url);
+              } else {
+                resolve('https://example.com');
+              }
+            });
+          }
+        });
+      };
+      this.settingsService = SettingsService.withTabUrlProvider(tabUrlProvider);
+      console.log("🌊 Integrated System: SettingsService initialized for domain/path-specific settings");
+    }
     
     // Initialize Tomes by calling create() to get actual instances
     this.contentTome = LogViewContentSystemTomes.create({});
@@ -112,11 +138,36 @@ export class LogViewContentSystemIntegrated {
     console.log("🌊 Integrated System: loadSettingsFromStorage called", {
       hasChrome: typeof chrome !== 'undefined',
       hasStorage: typeof chrome !== 'undefined' && !!chrome.storage,
-      hasLocal: typeof chrome !== 'undefined' && !!chrome.storage?.local
+      hasLocal: typeof chrome !== 'undefined' && !!chrome.storage?.local,
+      hasSettingsService: !!this.settingsService
     });
     
     try {
       const Options = (await import('../models/options')).default;
+      
+      // First, try to load from domain/path-specific settings using SettingsService
+      if (this.settingsService) {
+        try {
+          console.log("🌊 Integrated System: Loading domain/path-specific settings...");
+          const options = await this.settingsService.getCurrentSettings();
+          this.latestOptions = options;
+          console.log("🌊 Integrated System: Proactively loaded domain/path-specific settings on init", {
+            hasOptions: !!this.latestOptions,
+            hasWave: !!this.latestOptions?.wave,
+            waveSpeed: this.latestOptions?.wave?.waveSpeed,
+            cssTemplateLength: this.latestOptions?.wave?.cssTemplate?.length || 0
+          });
+          return;
+        } catch (settingsServiceError) {
+          console.warn("🌊 Integrated System: Failed to load from SettingsService, falling back to flat storage", {
+            error: settingsServiceError,
+            errorMessage: settingsServiceError instanceof Error ? settingsServiceError.message : String(settingsServiceError)
+          });
+          // Fall through to flat storage loading
+        }
+      }
+      
+      // Fallback: Load from flat storage (for backwards compatibility or if SettingsService unavailable)
       const Wave = (await import('../models/wave')).default;
       
       if (typeof chrome !== 'undefined' && chrome.storage) {
@@ -156,7 +207,7 @@ export class LogViewContentSystemIntegrated {
             }
             
             this.latestOptions = new Options(optionsData);
-            console.log("🌊 Integrated System: Proactively loaded settings from storage on init", {
+            console.log("🌊 Integrated System: Proactively loaded settings from flat storage on init", {
               hasOptions: !!this.latestOptions,
               hasWave: !!this.latestOptions?.wave,
               waveSpeed: this.latestOptions?.wave?.waveSpeed,
@@ -492,13 +543,36 @@ export class LogViewContentSystemIntegrated {
         });
       }
     } else {
-      console.warn("🌊 Integrated System: No options found in start message, loading defaults");
-      this.messageService.logMessage('start-warning', 'No options in start message, using defaults');
+      console.warn("🌊 Integrated System: No options found in start message, loading from storage");
+      this.messageService.logMessage('start-warning', 'No options in start message, loading from storage');
       
-      // Load default options if none provided
+      // Load options from storage (prefer domain/path-specific, fallback to flat storage)
       try {
         const Options = (await import('../models/options')).default;
-        // Try to load from Chrome storage first
+        
+        // First, try to load from domain/path-specific settings using SettingsService
+        if (this.settingsService) {
+          try {
+            console.log("🌊 Integrated System: Loading domain/path-specific settings for start...");
+            const options = await this.settingsService.getCurrentSettings();
+            this.latestOptions = options;
+            console.log("🌊 Integrated System: Loaded domain/path-specific settings for start", {
+              hasOptions: !!this.latestOptions,
+              hasWave: !!this.latestOptions?.wave,
+              waveSpeed: this.latestOptions?.wave?.waveSpeed,
+              cssTemplateLength: this.latestOptions?.wave?.cssTemplate?.length || 0
+            });
+            // Continue with normal start flow - don't return early, let it fall through to apply animation
+          } catch (settingsServiceError) {
+            console.warn("🌊 Integrated System: Failed to load from SettingsService, falling back to flat storage", {
+              error: settingsServiceError,
+              errorMessage: settingsServiceError instanceof Error ? settingsServiceError.message : String(settingsServiceError)
+            });
+            // Fall through to flat storage loading
+          }
+        }
+        
+        // Fallback: Try to load from Chrome flat storage
         if (typeof chrome !== 'undefined' && chrome.storage) {
           try {
             const result = await chrome.storage.local.get(['waveReaderSettings']);
