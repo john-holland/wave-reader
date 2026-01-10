@@ -100,16 +100,47 @@ class SettingsMessageHandler {
         // Set up message listeners based on context
         if (typeof chrome !== 'undefined' && chrome.runtime) {
             chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-                this.handleIncomingMessage(message, sender, sendResponse);
-                return true; // Keep message channel open for async response
+                // Let handleIncomingMessage decide if we should keep channel open
+                return this.handleIncomingMessage(message, sender, sendResponse) || false;
             });
         }
     }
 
     handleIncomingMessage(message, sender, sendResponse) {
+        // Only process messages that are meant for Settings handler
+        // Messages should have a 'type' field (not 'name') and be from known sources
+        // Ignore messages that don't have the expected format
+        if (!message || typeof message !== 'object') {
+            return false; // Not a message for us
+        }
+        
+        // Check if this is a message meant for Settings handler
+        // Settings messages should have a 'type' field (RobotCopy format)
+        // If it has 'name' field, it's likely from the integrated content system and not for us
+        if (!message.type && message.name) {
+            // This is a message from integrated content system or other system, not for Settings
+            return false; // Don't process, let other handlers deal with it
+        }
+        
+        // Also ignore response messages (have success/error but no type)
+        if (!message.type && (message.success !== undefined || message.error !== undefined)) {
+            return false;
+        }
+        
+        // If message has 'from' field and it's from integrated-content-system, ignore it
+        if (message.from === 'integrated-content-system') {
+            return false;
+        }
+        
         const { type, data, source, target, traceId } = message;
         
-        console.log('⚙️ Settings: Received message:', { type, source, target, traceId });
+        // Only log if we have a type (meaningful message for us)
+        if (type) {
+            console.log('⚙️ Settings: Received message:', { type, source, target, traceId });
+        } else {
+            // Silently ignore messages without type
+            return false;
+        }
         
         // Route message to appropriate handler
         if (this.messageHandlers.has(type)) {
@@ -121,10 +152,15 @@ class SettingsMessageHandler {
                 console.error('⚙️ Settings: Error handling message:', error);
                 sendResponse({ success: false, error: error.message, traceId });
             }
-        } else {
+            return true; // Keep message channel open for async response
+        } else if (type) {
+            // Only warn if we have a type but no handler (this is a Settings message we don't handle)
             console.warn('⚙️ Settings: No handler for message type:', type);
             sendResponse({ success: false, error: 'No handler for message type: ' + type, traceId });
+            return true;
         }
+        
+        return false; // Not a message for us
     }
 
     registerMessageHandler(messageType, handler) {

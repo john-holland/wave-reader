@@ -356,8 +356,8 @@ export class LogViewContentSystemIntegrated {
     // Listen for messages from the popup and background
     if (typeof chrome !== 'undefined' && chrome.runtime) {
       chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        this.handleRuntimeMessage(message, sender, sendResponse);
-        return true; // Keep message channel open
+        const shouldKeepChannelOpen = this.handleRuntimeMessage(message, sender, sendResponse);
+        return shouldKeepChannelOpen !== false; // Keep channel open unless explicitly told not to
       });
     }
 
@@ -369,7 +369,7 @@ export class LogViewContentSystemIntegrated {
     });
   }
 
-  private handleRuntimeMessage(message: any, sender: any, sendResponse: any) {
+  private handleRuntimeMessage(message: any, sender: any, sendResponse: any): boolean {
     console.log("🌊 Integrated System: Handling runtime message", {
       message,
       messageType: typeof message,
@@ -408,6 +408,19 @@ export class LogViewContentSystemIntegrated {
     
     console.log("🌊 Integrated System: Normalized message name:", normalizedMessage.name, "from:", normalizedMessage.from);
     
+    // Ignore messages that we sent ourselves (they're responses to our own messages)
+    // Messages from 'integrated-content-system' are ones we sent, so we should ignore them
+    if (normalizedMessage.from === 'integrated-content-system') {
+      console.log("🌊 Integrated System: Ignoring message we sent ourselves:", normalizedMessage.name);
+      return false; // Don't keep the message channel open
+    }
+    
+    // Ignore messages that are responses (have success/error fields but no 'name')
+    if (!normalizedMessage.name && (normalizedMessage.success !== undefined || normalizedMessage.error !== undefined)) {
+      console.log("🌊 Integrated System: Ignoring response message:", normalizedMessage);
+      return false;
+    }
+    
     try {
       switch (normalizedMessage.name) {
         case 'start':
@@ -417,7 +430,7 @@ export class LogViewContentSystemIntegrated {
             console.error("🌊 Integrated System: Error in handleStart", error);
             sendResponse({ success: false, error: error.message });
           });
-          break;
+          return true; // Keep channel open for async response
         case 'stop':
           this.handleStop(normalizedMessage).then(() => {
             sendResponse({ success: true, state: this.proxyState });
@@ -425,7 +438,7 @@ export class LogViewContentSystemIntegrated {
             console.error("🌊 Integrated System: Error in handleStop", error);
             sendResponse({ success: false, error: error.message });
           });
-          break;
+          return true; // Keep channel open for async response
         case 'toggle':
         case 'toggle-wave-reader':
           try {
@@ -435,15 +448,15 @@ export class LogViewContentSystemIntegrated {
             console.error("🌊 Integrated System: Error in handleToggle", error);
             sendResponse({ success: false, error: error.message });
           }
-          break;
+          return true;
         case 'ping':
           this.handlePing(normalizedMessage);
           sendResponse({ success: true, state: this.proxyState });
-          break;
+          return true;
         case 'get-status':
           this.handleGetStatus(normalizedMessage);
           sendResponse({ success: true, status: this.getCurrentState() });
-          break;
+          return true;
         case 'settings_updated':
           console.log('🚨🚨🚨 CONTENT: Received SETTINGS_UPDATED message', {
             hasOptions: !!normalizedMessage.options,
@@ -455,14 +468,22 @@ export class LogViewContentSystemIntegrated {
             console.error("🌊 Integrated System: Error in handleSettingsUpdated", error);
             sendResponse({ success: false, error: error.message });
           });
-          break;
+          return true; // Keep channel open for async response
         default:
-          console.log("🌊 Integrated System: Unknown runtime message type:", normalizedMessage.name);
-          sendResponse({ success: false, error: 'Unknown message type' });
+          // Only log if it's a message we're supposed to handle (from background or popup)
+          if (normalizedMessage.from === 'background' || normalizedMessage.from === 'background-script' || normalizedMessage.from === 'popup') {
+            console.log("🌊 Integrated System: Unknown runtime message type:", normalizedMessage.name, "from:", normalizedMessage.from);
+            sendResponse({ success: false, error: 'Unknown message type' });
+            return true;
+          } else {
+            // Silently ignore messages from unknown sources
+            return false;
+          }
       }
     } catch (error: any) {
       console.error("🌊 Integrated System: Error handling runtime message:", error);
       sendResponse({ success: false, error: error.message });
+      return true;
     }
   }
 
