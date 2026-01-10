@@ -47,8 +47,8 @@ const config = merge(baseConfig, {
                     },
                     format: {
                         comments: false,
-                        // Preserve Unicode characters (including emojis) instead of escaping to \uXXXX
-                        // Setting ascii_only to false ensures emojis are preserved as-is in the output
+                        // In Terser 5.x, ascii_only defaults to false (preserves Unicode), but explicitly set it
+                        // to ensure emojis are never escaped to \uXXXX sequences
                         ascii_only: false
                     }
                 },

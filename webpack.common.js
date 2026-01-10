@@ -134,10 +134,11 @@ const createCommonConfig = (options = {}) => {
             new HtmlWebpackPlugin({
                 title: "boilerplate", // change this to your app title
                 meta: {
-                    charset: "utf-8",
                     viewport: "width=device-width, initial-scale=1, shrink-to-fit=no",
                     "theme-color": "#000000"
                 },
+                // charset is set directly in the HTML template, not via meta object
+                // HtmlWebpackPlugin's meta.charset creates invalid <meta name="charset"> tag
                 manifest: "manifest.json",
                 filename: "index.html",
                 template: "./static/index.html",
