@@ -46,7 +46,10 @@ const config = merge(baseConfig, {
                         } : {})
                     },
                     format: {
-                        comments: false
+                        comments: false,
+                        // Preserve Unicode characters (including emojis) instead of escaping to \uXXXX
+                        // Setting ascii_only to false ensures emojis are preserved as-is in the output
+                        ascii_only: false
                     }
                 },
                 extractComments: false

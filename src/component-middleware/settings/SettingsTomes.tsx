@@ -466,8 +466,8 @@ const DEFAULT_SETTINGS: Settings = {
   cssTemplate: '',
   cssMouseTemplate: '',
   waveSpeed: 2,
-  axisTranslateAmountXMax: 0,  // Changed from 4 to 0
-  axisTranslateAmountXMin: -1,  // Changed from -4 to -1
+  axisTranslateAmountXMax: 1,
+  axisTranslateAmountXMin: 0,
   axisRotationAmountYMax: 1,
   axisRotationAmountYMin: -1,
   autoGenerateCss: true,

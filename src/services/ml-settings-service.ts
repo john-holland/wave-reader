@@ -123,7 +123,7 @@ export class MLSettingsService {
                 selector: 'p, h1, h2, h3, .content, .article-body',
                 waveSpeed: 3,
                 axisTranslateAmountXMax: 1,
-                axisTranslateAmountXMin: -1,
+                axisTranslateAmountXMin: 0,
                 axisRotationAmountYMax: 1,
                 axisRotationAmountYMin: -1,
                 mouseFollowInterval: 80
@@ -444,21 +444,56 @@ export class MLSettingsService {
                 return 0.6;
             }
         }
-        
+
         return 0.0;
     }
 
     private calculatePathSimilarity(path1: string, path2: string): number {
         if (path1 === path2) return 1.0;
         
-        const segments1 = path1.split('/').filter(s => s.length > 0);
-        const segments2 = path2.split('/').filter(s => s.length > 0);
+        // Clean paths to remove query parameters for comparison
+        const cleanPath1 = this.cleanPath(path1);
+        const cleanPath2 = this.cleanPath(path2);
+        
+        if (cleanPath1 === cleanPath2) return 1.0;
+        
+        const segments1 = cleanPath1.split('/').filter(s => s.length > 0);
+        const segments2 = cleanPath2.split('/').filter(s => s.length > 0);
         
         if (segments1.length === 0 && segments2.length === 0) return 1.0;
         if (segments1.length === 0 || segments2.length === 0) return 0.0;
         
+        // Count matching segments from the start (order matters)
+        let matchingSegments = 0;
+        const minLength = Math.min(segments1.length, segments2.length);
+        for (let i = 0; i < minLength; i++) {
+            if (segments1[i] === segments2[i]) {
+                matchingSegments++;
+            } else {
+                break; // Stop at first mismatch for ordered similarity
+            }
+        }
+        
+        // Calculate similarity based on matching prefix segments
+        // When paths share common base segments (e.g., /search/query1 and /search/query2),
+        // they auto-associate even if domains differ
+        const baseSimilarity = matchingSegments / Math.max(segments1.length, segments2.length);
+        
+        // TODO: Review whether path association heuristics need to be specified or configurable.
+        // Currently, any paths sharing common segments (like /search, /settings) will auto-associate
+        // when domain similarity is low. Should we:
+        // 1. Make path patterns configurable (e.g., allow specifying which paths should associate)?
+        // 2. Add different similarity weights for different path types?
+        // 3. Allow users to customize path association rules per domain?
+        
+        // Also check for common segments anywhere (not just prefix)
         const commonSegments = segments1.filter(s => segments2.includes(s));
-        return commonSegments.length / Math.max(segments1.length, segments2.length);
+        const unorderedSimilarity = commonSegments.length / Math.max(segments1.length, segments2.length);
+        
+        // Return the higher of ordered or unordered similarity
+        // This ensures paths like /search/query1 and /search/query2 get good similarity
+        // even when they're from different domains
+        return Math.max(baseSimilarity, unorderedSimilarity);
     }
 
     private calculateSelectorSimilarity(selector1: string, selector2: string): number {
