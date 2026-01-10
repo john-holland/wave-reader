@@ -12,6 +12,10 @@ Wave Reader ("we," "our," or "us") is committed to protecting your privacy. This
 
 By using the Wave Reader extension, you agree to the collection and use of information in accordance with this policy.
 
+## 2.0 Clause
+
+We reserve the right to introduce a public development backend that may include some light service messaging, or additional OAuth integrations. Currently however all of the statements below about service usage are true and hold.
+
 ---
 
 ## Summary
@@ -122,7 +126,7 @@ All stored data is used **solely for the extension's functionality**:
 Wave Reader **does not share, sell, rent, or disclose** your information to:
 - ❌ Third-party services or APIs
 - ❌ Advertising networks
-- ❌ Analytics platforms (Google Analytics, etc.)
+- ❌ Analytics platforms
 - ❌ Data brokers or aggregators
 - ❌ Any external servers or services
 
@@ -144,7 +148,6 @@ Wave Reader does **not integrate with** third-party services:
 - ❌ No Facebook Pixel
 - ❌ No advertising networks
 - ❌ No external analytics platforms
-- ❌ No cloud services
 - ❌ No remote APIs (except optional development backend, disabled in production)
 
 ### Optional Development Features
@@ -359,4 +362,6 @@ Wave Reader is open source. The source code is publicly available, allowing you 
 ---
 
 *This privacy policy applies to Wave Reader browser extension version 1.0.4 and later.*
+*2.0 Clause not yet ennacted!*
+*Eat wheat!*
 
