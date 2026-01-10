@@ -9,6 +9,9 @@ import { AppTome } from '../../app/tomes/AppTome';
 import { KeyChord, normalizeKey, compareKeyChords, sortKeyChord } from '../../components/util/user-input';
 import { KeyChordDefaultFactory } from '../../models/defaults';
 import { EpilepticBlacklistService } from '../../services/epileptic-blacklist';
+import SettingsService from '../../services/settings';
+import Options from '../../models/options';
+import { WaveAnimationControl } from '../../models/defaults';
 
 // Styled components for the Tomes-based settings
 const SettingsContainer = styled.div`
@@ -266,6 +269,68 @@ const BackButton = styled.button`
     background: #5a6268;
     transform: translateY(-1px);
   }
+`;
+
+const ConfirmationDialogOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+`;
+
+const ConfirmationDialog = styled.div`
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+`;
+
+const ConfirmationMessage = styled.p`
+  margin: 0 0 20px 0;
+  color: #2c3e50;
+  font-size: 14px;
+  line-height: 1.5;
+`;
+
+const ConfirmationButtons = styled.div`
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+`;
+
+const ConfirmationButton = styled.button<{ variant?: 'primary' | 'secondary' }>`
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  ${props => props.variant === 'primary' ? `
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+  ` : `
+    background: #6c757d;
+    color: white;
+    
+    &:hover {
+      background: #5a6268;
+    }
+  `}
 `;
 
 const Button = styled.button`
@@ -629,9 +694,128 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [router, setRouter] = useState<MachineRouter | null>(null);
   const [epilepticBlacklist, setEpilepticBlacklist] = useState<string>('');
+  
+  // Domain/path settings management state
+  const [domainSpecificLoading, setDomainSpecificLoading] = useState<boolean>(false);
+  const [pathSpecificSaving, setPathSpecificSaving] = useState<boolean>(false);
+  const [pathSpecificLoading, setPathSpecificLoading] = useState<boolean>(false);
+  const [checkboxSettingsInitialized, setCheckboxSettingsInitialized] = useState<boolean>(false);
+  const [copiedSettings, setCopiedSettings] = useState<any | null>(null);
+  const [copiedDomain, setCopiedDomain] = useState<string | null>(null);
+  const [copiedPath, setCopiedPath] = useState<string | null>(null);
+  
+  // Confirmation dialog state
+  const [confirmationDialog, setConfirmationDialog] = useState<{
+    show: boolean;
+    message: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+  }>({
+    show: false,
+    message: '',
+    onConfirm: () => {},
+    onCancel: () => {}
+  });
 
   // Refs
   const settingsRef = useRef<Settings>(settings);
+  const settingsServiceRef = useRef<SettingsService | null>(null);
+
+  // Conversion functions between Settings and Options
+  const convertSettingsToOptions = useCallback((settings: Settings): Options => {
+    const options = new Options();
+    
+    // Update Options with settings values
+    options.showNotifications = settings.showNotifications ?? options.showNotifications;
+    options.waveAnimationControl = settings.waveAnimationControl === 'CSS' 
+      ? WaveAnimationControl.CSS 
+      : WaveAnimationControl.MOUSE;
+    
+    if (settings.toggleKeys?.keyChord) {
+      options.toggleKeys.keyChord = settings.toggleKeys.keyChord;
+    }
+    
+    if (!options.wave) {
+      options.wave = new Wave();
+    }
+    
+    // Update wave properties
+    if (settings.textColor !== undefined) {
+      if (!options.wave.text) {
+        options.wave.text = new Text({ size: 'initial', color: 'initial' });
+      }
+      options.wave.text.color = settings.textColor;
+    }
+    
+    if (settings.textSize !== undefined) {
+      if (!options.wave.text) {
+        options.wave.text = new Text({ size: 'initial', color: 'initial' });
+      }
+      options.wave.text.size = settings.textSize;
+    }
+    
+    if (settings.cssTemplate !== undefined) {
+      options.wave.cssTemplate = settings.cssTemplate;
+    }
+    
+    if (settings.cssMouseTemplate !== undefined) {
+      options.wave.cssMouseTemplate = settings.cssMouseTemplate;
+    }
+    
+    if (settings.waveSpeed !== undefined && typeof settings.waveSpeed === 'number') {
+      options.wave.waveSpeed = settings.waveSpeed;
+    }
+    
+    if (settings.axisTranslateAmountXMax !== undefined && typeof settings.axisTranslateAmountXMax === 'number') {
+      options.wave.axisTranslateAmountXMax = settings.axisTranslateAmountXMax;
+    }
+    
+    if (settings.axisTranslateAmountXMin !== undefined && typeof settings.axisTranslateAmountXMin === 'number') {
+      options.wave.axisTranslateAmountXMin = settings.axisTranslateAmountXMin;
+    }
+    
+    if (settings.axisRotationAmountYMax !== undefined && typeof settings.axisRotationAmountYMax === 'number') {
+      options.wave.axisRotationAmountYMax = settings.axisRotationAmountYMax;
+    }
+    
+    if (settings.axisRotationAmountYMin !== undefined && typeof settings.axisRotationAmountYMin === 'number') {
+      options.wave.axisRotationAmountYMin = settings.axisRotationAmountYMin;
+    }
+    
+    // Update selectors
+    if (settings.selector && options.selectors) {
+      if (options.selectors.length > 0) {
+        options.selectors[0] = settings.selector;
+      } else {
+        options.selectors = [settings.selector];
+      }
+    }
+    
+    return options;
+  }, []);
+  
+  const convertOptionsToSettings = useCallback((options: Options): Settings => {
+    return {
+      showNotifications: options.showNotifications ?? true,
+      waveAnimationControl: (options.waveAnimationControl === WaveAnimationControl.CSS ? 'CSS' : 'MOUSE') as 'CSS' | 'MOUSE',
+      toggleKeys: { 
+        keyChord: options.toggleKeys?.keyChord ?? KeyChordDefaultFactory() as KeyChord,
+        hasSetKeyChord: options.toggleKeys?.keyChord ? true : false
+      },
+      textColor: options.wave?.text?.color ?? 'initial',
+      textSize: options.wave?.text?.size ?? 'initial',
+      selector: options.selectors?.[0] ?? 'body',
+      cssTemplate: options.wave?.cssTemplate ?? '',
+      cssMouseTemplate: options.wave?.cssMouseTemplate ?? '',
+      waveSpeed: options.wave?.waveSpeed ?? 2.0,
+      axisTranslateAmountXMax: options.wave?.axisTranslateAmountXMax ?? 0,
+      axisTranslateAmountXMin: options.wave?.axisTranslateAmountXMin ?? -1,
+      axisRotationAmountYMax: options.wave?.axisRotationAmountYMax ?? 1,
+      axisRotationAmountYMin: options.wave?.axisRotationAmountYMin ?? -1,
+      autoGenerateCss: true, // Default value
+      cssGenerationMode: 'template' as 'template' | 'hardcoded', // Default value
+    };
+  }, []);
 
   // Load blacklist function
   const loadBlacklist = useCallback(async () => {
@@ -642,6 +826,31 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
     } catch (error) {
       console.warn('Failed to load epileptic blacklist:', error);
     }
+  }, []);
+
+  // Initialize SettingsService
+  useEffect(() => {
+    const initializeSettingsService = async () => {
+      if (typeof chrome !== 'undefined' && chrome.tabs) {
+        const tabUrlProvider = (): Promise<string> => {
+          return new Promise((resolve) => {
+            chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
+              if (tabs.length > 0 && tabs[0].url) {
+                resolve(tabs[0].url);
+              } else {
+                resolve('https://example.com');
+              }
+            });
+          });
+        };
+        
+        const service = SettingsService.withTabUrlProvider(tabUrlProvider);
+        settingsServiceRef.current = service;
+        console.log('⚙️ SettingsTomes: SettingsService initialized');
+      }
+    };
+    
+    initializeSettingsService();
   }, []);
 
   // Initialize component
@@ -671,38 +880,96 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
         if (chrome.storage && chrome.storage.local) {
           try {
             console.log('⚙️ SettingsTomes: Attempting to read from chrome.storage.local...');
-            const result = await chrome.storage.local.get(['waveReaderSettings', 'waveReaderDomainPaths']);
+            const result = await chrome.storage.local.get(['waveReaderSettings', 'waveReaderDomainPaths', 'waveReaderCheckboxSettings']);
             console.log('⚙️ SettingsTomes: Storage read result', {
               hasResult: !!result,
               hasSettings: !!result.waveReaderSettings,
               hasDomainPaths: !!result.waveReaderDomainPaths,
+              hasCheckboxSettings: !!result.waveReaderCheckboxSettings,
               settingsKeys: result.waveReaderSettings ? Object.keys(result.waveReaderSettings) : [],
               waveSpeed: result.waveReaderSettings?.waveSpeed,
               cssTemplateLength: result.waveReaderSettings?.cssTemplate?.length || 0
             });
             
-            if (result.waveReaderSettings) {
-              console.log('⚙️ SettingsTomes: Loading settings from storage:', {
-                waveSpeed: result.waveReaderSettings.waveSpeed,
-                axisRotationAmountYMax: result.waveReaderSettings.axisRotationAmountYMax,
-                cssTemplateLength: result.waveReaderSettings.cssTemplate?.length || 0,
-                fullSettings: result.waveReaderSettings
+            // Load checkbox settings first (these control how we load other settings)
+            let loadedDomainSpecificLoading = false;
+            let loadedPathSpecificSaving = false;
+            let loadedPathSpecificLoading = false;
+            
+            if (result.waveReaderCheckboxSettings) {
+              loadedDomainSpecificLoading = result.waveReaderCheckboxSettings.domainSpecificLoading ?? false;
+              loadedPathSpecificSaving = result.waveReaderCheckboxSettings.pathSpecificSaving ?? false;
+              loadedPathSpecificLoading = result.waveReaderCheckboxSettings.pathSpecificLoading ?? false;
+              
+              // Update state
+              setDomainSpecificLoading(loadedDomainSpecificLoading);
+              setPathSpecificSaving(loadedPathSpecificSaving);
+              setPathSpecificLoading(loadedPathSpecificLoading);
+              console.log('⚙️ SettingsTomes: Checkbox settings loaded:', {
+                domainSpecificLoading: loadedDomainSpecificLoading,
+                pathSpecificSaving: loadedPathSpecificSaving,
+                pathSpecificLoading: loadedPathSpecificLoading
               });
-              setSettings(prev => {
-                const sanitized = sanitizeSettings({ ...prev, ...result.waveReaderSettings });
-                console.log('⚙️ SettingsTomes: Sanitized settings', {
-                  toggleKeys: sanitized.toggleKeys,
-                  waveSpeed: sanitized.waveSpeed,
-                  axisRotationAmountYMax: sanitized.axisRotationAmountYMax,
-                  cssTemplateLength: sanitized.cssTemplate?.length || 0
+            }
+            
+            // Mark checkbox settings as initialized to allow auto-save
+            setCheckboxSettingsInitialized(true);
+            
+            // Load settings based on checkbox state (use loaded values directly)
+            if (loadedDomainSpecificLoading && settingsServiceRef.current) {
+              // Load from domain/path system
+              try {
+                let options: Options;
+                
+                if (loadedPathSpecificLoading) {
+                  // Load from specific path
+                  const domain = localCurrentDomain || '';
+                  const path = normalizePath(localCurrentPath || '');
+                  options = await settingsServiceRef.current.getPathOptionsForDomain(domain, path, true, true) || Options.getDefaultOptions();
+                } else {
+                  // Load from current domain/path using getCurrentSettings
+                  options = await settingsServiceRef.current.getCurrentSettings();
+                }
+                
+                // Convert Options to Settings
+                const settingsFromOptions = convertOptionsToSettings(options);
+                setSettings(prev => {
+                  const sanitized = sanitizeSettings({ ...prev, ...settingsFromOptions });
+                  return sanitized;
                 });
-                return sanitized;
-              });
-              setSaved(true);
-              console.log('⚙️ SettingsTomes: Settings loaded and state updated');
-            } else {
-              // This is normal on first load - don't warn, just log
-              console.log('⚙️ SettingsTomes: No settings found in storage, using defaults');
+                setSaved(true);
+                console.log('⚙️ SettingsTomes: Settings loaded from domain/path system');
+              } catch (error) {
+                console.error('⚙️ SettingsTomes: Failed to load from domain/path system, falling back to flat storage', error);
+                // Fall through to flat storage loading
+              }
+            }
+            
+            // Load from flat storage if not using domain/path system or if domain/path loading failed
+            if (!loadedDomainSpecificLoading || !settingsServiceRef.current) {
+              if (result.waveReaderSettings) {
+                console.log('⚙️ SettingsTomes: Loading settings from storage:', {
+                  waveSpeed: result.waveReaderSettings.waveSpeed,
+                  axisRotationAmountYMax: result.waveReaderSettings.axisRotationAmountYMax,
+                  cssTemplateLength: result.waveReaderSettings.cssTemplate?.length || 0,
+                  fullSettings: result.waveReaderSettings
+                });
+                setSettings(prev => {
+                  const sanitized = sanitizeSettings({ ...prev, ...result.waveReaderSettings });
+                  console.log('⚙️ SettingsTomes: Sanitized settings', {
+                    toggleKeys: sanitized.toggleKeys,
+                    waveSpeed: sanitized.waveSpeed,
+                    axisRotationAmountYMax: sanitized.axisRotationAmountYMax,
+                    cssTemplateLength: sanitized.cssTemplate?.length || 0
+                  });
+                  return sanitized;
+                });
+                setSaved(true);
+                console.log('⚙️ SettingsTomes: Settings loaded and state updated');
+              } else {
+                // This is normal on first load - don't warn, just log
+                console.log('⚙️ SettingsTomes: No settings found in storage, using defaults');
+              }
             }
             
             if (result.waveReaderDomainPaths) {
@@ -744,7 +1011,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
     };
 
     initializeComponent();
-  }, [loadBlacklist]);
+  }, [loadBlacklist, localCurrentDomain, localCurrentPath]);
 
   // Listen for storage changes to refresh blacklist
   useEffect(() => {
@@ -768,6 +1035,37 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
+
+  // Auto-save checkbox values when they change (separate from Settings, not domain/path-specific)
+  useEffect(() => {
+    if (!isExtension || !chrome.storage?.local || !checkboxSettingsInitialized) {
+      return;
+    }
+
+    // Only save if we've initialized (avoid saving default values on first render)
+    const saveCheckboxSettings = async () => {
+      try {
+        await chrome.storage.local.set({
+          waveReaderCheckboxSettings: {
+            domainSpecificLoading,
+            pathSpecificSaving,
+            pathSpecificLoading
+          }
+        });
+        console.log('⚙️ SettingsTomes: Auto-saved checkbox settings', {
+          domainSpecificLoading,
+          pathSpecificSaving,
+          pathSpecificLoading
+        });
+      } catch (error) {
+        console.error('⚙️ SettingsTomes: Failed to auto-save checkbox settings', error);
+      }
+    };
+
+    // Debounce saves to avoid too many writes
+    const timeoutId = setTimeout(saveCheckboxSettings, 500);
+    return () => clearTimeout(timeoutId);
+  }, [isExtension, checkboxSettingsInitialized, domainSpecificLoading, pathSpecificSaving, pathSpecificLoading]);
 
   // Auto-generate CSS templates when settings change and auto-generate is enabled
   useEffect(() => {
@@ -809,12 +1107,6 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
       return null;
     }
   };
-
-  // Event handlers
-  const handleViewChange = useCallback((view: typeof currentView) => {
-    console.log('⚙️ SettingsTomes: Switching to view:', view);
-    setCurrentView(view);
-  }, []);
 
   const handleSettingChange = useCallback((key: keyof Settings, value: any) => {
     console.log('⚙️ SettingsTomes: Updating setting:', key, value);
@@ -879,29 +1171,6 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
     }
   }, [handleSettingChange, settings.autoGenerateCss]);
 
-  const handleDomainSettingChange = useCallback((key: 'domain' | 'path', value: string) => {
-    console.log('⚙️ SettingsTomes: Updating domain setting:', key, value);
-    
-    if (key === 'domain') {
-      setLocalCurrentDomain(value);
-      // Reset path when domain changes
-      const newPaths = localDomainPaths.find(dp => dp.domain === value)?.paths || [];
-      if (newPaths.length > 0) {
-        setLocalCurrentPath(newPaths[0]);
-        if (onDomainPathChange) {
-          onDomainPathChange(value, newPaths[0]);
-        }
-      }
-    } else {
-      setLocalCurrentPath(value);
-      if (onDomainPathChange) {
-        onDomainPathChange(localCurrentDomain, value);
-      }
-    }
-    
-    setSaved(false);
-  }, [localDomainPaths, localCurrentDomain, onDomainPathChange]);
-
   const handleToggleKeyChange = useCallback((index: number, selectedValue: string) => {
     console.log('⚙️ SettingsTomes: Updating toggle key:', index, selectedValue);
 
@@ -933,6 +1202,459 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
     setSaved(false);
   }, []);
 
+  // Normalize path: empty string or "/" both become "/"
+  const normalizePath = useCallback((path: string): string => {
+    return path === '' || path === '/' ? '/' : path;
+  }, []);
+
+  // Reload settings from domain/path system or flat storage
+  const reloadSettingsForCurrentContext = useCallback(async () => {
+    if (!isExtension || !chrome.storage?.local) {
+      return;
+    }
+
+    if (domainSpecificLoading && settingsServiceRef.current) {
+      // Load from domain/path system
+      try {
+        let options: Options;
+        
+        if (pathSpecificLoading) {
+          // Load from specific path
+          const domain = localCurrentDomain || '';
+          const path = normalizePath(localCurrentPath || '');
+          if (domain && domain.trim() !== '') {
+            options = await settingsServiceRef.current.getPathOptionsForDomain(domain, path, true, true) || Options.getDefaultOptions();
+          } else {
+            // Fallback to current domain/path
+            options = await settingsServiceRef.current.getCurrentSettings();
+          }
+        } else {
+          // Load from current domain/path using getCurrentSettings
+          options = await settingsServiceRef.current.getCurrentSettings();
+        }
+        
+        // Convert Options to Settings
+        const settingsFromOptions = convertOptionsToSettings(options);
+        setSettings(prev => {
+          const sanitized = sanitizeSettings({ ...prev, ...settingsFromOptions });
+          return sanitized;
+        });
+        settingsRef.current = sanitizeSettings(settingsFromOptions);
+        setSaved(true);
+        console.log('⚙️ SettingsTomes: Settings reloaded from domain/path system');
+      } catch (error) {
+        console.error('⚙️ SettingsTomes: Failed to reload from domain/path system', error);
+      }
+    } else {
+      // Load from flat storage
+      try {
+        const result = await chrome.storage.local.get(['waveReaderSettings']);
+        if (result.waveReaderSettings) {
+          setSettings(prev => {
+            const sanitized = sanitizeSettings({ ...prev, ...result.waveReaderSettings });
+            return sanitized;
+          });
+          settingsRef.current = sanitizeSettings(result.waveReaderSettings);
+          setSaved(true);
+          console.log('⚙️ SettingsTomes: Settings reloaded from flat storage');
+        }
+      } catch (error) {
+        console.error('⚙️ SettingsTomes: Failed to reload from flat storage', error);
+      }
+    }
+  }, [isExtension, domainSpecificLoading, pathSpecificLoading, localCurrentDomain, localCurrentPath, convertOptionsToSettings, normalizePath]);
+
+  const handleDomainSettingChange = useCallback(async (key: 'domain' | 'path', value: string) => {
+    console.log('⚙️ SettingsTomes: Updating domain setting:', key, value);
+    
+    if (key === 'domain') {
+      setLocalCurrentDomain(value);
+      // Reset path when domain changes
+      const newPaths = localDomainPaths.find(dp => dp.domain === value)?.paths || [];
+      if (newPaths.length > 0) {
+        setLocalCurrentPath(newPaths[0]);
+        if (onDomainPathChange) {
+          onDomainPathChange(value, newPaths[0]);
+        }
+      }
+    } else {
+      setLocalCurrentPath(value);
+      if (onDomainPathChange) {
+        onDomainPathChange(localCurrentDomain, value);
+      }
+    }
+    
+    // If domain-specific loading is enabled, reload settings for the new domain/path
+    // Only reload if there are no unsaved changes (saved === true)
+    if (domainSpecificLoading && settingsServiceRef.current && saved) {
+      await reloadSettingsForCurrentContext();
+    } else {
+      setSaved(false);
+    }
+  }, [localDomainPaths, localCurrentDomain, onDomainPathChange, domainSpecificLoading, saved, reloadSettingsForCurrentContext]);
+
+  // Event handlers
+  const handleViewChange = useCallback(async (view: typeof currentView) => {
+    console.log('⚙️ SettingsTomes: Switching to view:', view);
+    setCurrentView(view);
+    
+    // When switching to domain view, fetch current domain/path if not already set
+    if (view === 'domain' && settingsServiceRef.current) {
+      if (!localCurrentDomain || localCurrentDomain.trim() === '') {
+        try {
+          const domainPaths = await settingsServiceRef.current.getCurrentDomainAndPaths();
+          if (domainPaths && domainPaths.domain) {
+            console.log('⚙️ SettingsTomes: Auto-setting current domain/path:', domainPaths);
+            setLocalCurrentDomain(domainPaths.domain);
+            if (domainPaths.paths && domainPaths.paths.length > 0) {
+              setLocalCurrentPath(domainPaths.paths[0]);
+            }
+            
+            // Also add to domain paths list if not already present
+            setLocalDomainPaths(prev => {
+              const existing = prev.find(dp => dp.domain === domainPaths.domain);
+              if (!existing) {
+                return [...prev, { domain: domainPaths.domain, paths: domainPaths.paths || [] }];
+              }
+              return prev;
+            });
+          }
+        } catch (error) {
+          console.warn('⚙️ SettingsTomes: Failed to get current domain/path:', error);
+        }
+      }
+    }
+    
+    // Reload settings when switching to any view (to ensure we show current settings)
+    // Only reload if we're not currently editing (saved === true means no unsaved changes)
+    if (saved) {
+      await reloadSettingsForCurrentContext();
+    }
+  }, [localCurrentDomain, saved, reloadSettingsForCurrentContext]);
+
+  // Handler for Save Path Settings
+  const handleSavePathSettings = useCallback(async () => {
+    if (!settingsServiceRef.current || !pathSpecificSaving) {
+      console.warn('⚙️ SettingsTomes: Cannot save path settings - service not initialized or path-specific saving disabled');
+      return;
+    }
+
+    let domain = localCurrentDomain || '';
+    
+    // If domain is empty, try to get current domain from the page
+    if (!domain || domain.trim() === '') {
+      try {
+        const domainPaths = await settingsServiceRef.current.getCurrentDomainAndPaths();
+        if (domainPaths && domainPaths.domain) {
+          domain = domainPaths.domain;
+          setLocalCurrentDomain(domain);
+          console.log('⚙️ SettingsTomes: Auto-set domain from current page:', domain);
+        }
+      } catch (error) {
+        console.warn('⚙️ SettingsTomes: Failed to get current domain:', error);
+      }
+    }
+    
+    if (!domain || domain.trim() === '') {
+      console.warn('⚙️ SettingsTomes: Cannot save path settings - no domain selected');
+      setError('Please enter a domain before saving path settings');
+      return;
+    }
+
+    let path = localCurrentPath || '';
+    
+    // If path is empty, try to get current path from the page
+    if (!path || path.trim() === '') {
+      try {
+        const domainPaths = await settingsServiceRef.current.getCurrentDomainAndPaths();
+        if (domainPaths && domainPaths.paths && domainPaths.paths.length > 0) {
+          path = domainPaths.paths[0];
+          setLocalCurrentPath(path);
+          console.log('⚙️ SettingsTomes: Auto-set path from current page:', path);
+        }
+      } catch (error) {
+        console.warn('⚙️ SettingsTomes: Failed to get current path:', error);
+      }
+    }
+    
+    path = normalizePath(path);
+    const currentSettings = settingsRef.current;
+    
+    try {
+      // Check if path settings already exist
+      const existingOptions = await settingsServiceRef.current.getPathOptionsForDomain(domain, path, false, false);
+      
+      if (existingOptions) {
+        // Show confirmation dialog
+        setConfirmationDialog({
+          show: true,
+          message: `Settings already exist for ${domain}${path}. Do you want to overwrite them?`,
+          onConfirm: async () => {
+            setConfirmationDialog({ show: false, message: '', onConfirm: () => {}, onCancel: () => {} });
+            
+            const service = settingsServiceRef.current;
+            if (!service) {
+              console.error('⚙️ SettingsTomes: SettingsService not initialized');
+              return;
+            }
+            
+            const options = convertSettingsToOptions(currentSettings);
+            await service.addSettingsForDomain(domain, path, options);
+            setSaved(true);
+            console.log('⚙️ SettingsTomes: Path settings saved successfully');
+          },
+          onCancel: () => {
+            setConfirmationDialog({ show: false, message: '', onConfirm: () => {}, onCancel: () => {} });
+          }
+        });
+      } else {
+        // No existing settings, save directly
+        const service = settingsServiceRef.current;
+        if (!service) {
+          console.error('⚙️ SettingsTomes: SettingsService not initialized');
+          return;
+        }
+        
+        const options = convertSettingsToOptions(currentSettings);
+        await service.addSettingsForDomain(domain, path, options);
+        setSaved(true);
+        console.log('⚙️ SettingsTomes: Path settings saved successfully');
+      }
+    } catch (error) {
+      console.error('⚙️ SettingsTomes: Failed to save path settings', error);
+      setError('Failed to save path settings');
+    }
+  }, [pathSpecificSaving, localCurrentDomain, localCurrentPath, convertSettingsToOptions, normalizePath]);
+
+  // Handler for Save Domain Settings
+  const handleSaveDomainSettings = useCallback(async () => {
+    if (!settingsServiceRef.current) {
+      console.warn('⚙️ SettingsTomes: Cannot save domain settings - service not initialized');
+      return;
+    }
+
+    let domain = localCurrentDomain || '';
+    
+    // If domain is empty, try to get current domain from the page
+    if (!domain || domain.trim() === '') {
+      try {
+        const domainPaths = await settingsServiceRef.current.getCurrentDomainAndPaths();
+        if (domainPaths && domainPaths.domain) {
+          domain = domainPaths.domain;
+          setLocalCurrentDomain(domain);
+          console.log('⚙️ SettingsTomes: Auto-set domain from current page:', domain);
+        }
+      } catch (error) {
+        console.warn('⚙️ SettingsTomes: Failed to get current domain:', error);
+      }
+    }
+    
+    if (!domain || domain.trim() === '') {
+      console.warn('⚙️ SettingsTomes: Cannot save domain settings - no domain selected');
+      setError('Please enter a domain before saving domain settings');
+      return;
+    }
+
+    const currentSettings = settingsRef.current;
+    
+    try {
+      // Get domain settings to check if it exists
+      const domainSettings = await settingsServiceRef.current.getSettingsForDomain(domain, false);
+      
+      if (domainSettings && domainSettings.pathSettings.size > 0) {
+        // Show confirmation dialog
+        setConfirmationDialog({
+          show: true,
+          message: `Settings already exist for ${domain} with ${domainSettings.pathSettings.size} path(s). Do you want to overwrite all path settings?`,
+          onConfirm: async () => {
+            setConfirmationDialog({ show: false, message: '', onConfirm: () => {}, onCancel: () => {} });
+            
+            const service = settingsServiceRef.current;
+            if (!service) {
+              console.error('⚙️ SettingsTomes: SettingsService not initialized');
+              return;
+            }
+            
+            const options = convertSettingsToOptions(currentSettings);
+            // Save to all existing paths
+            for (const path of domainSettings.pathSettings.keys()) {
+              await service.addSettingsForDomain(domain, path, options);
+            }
+            setSaved(true);
+            console.log('⚙️ SettingsTomes: Domain settings saved successfully');
+          },
+          onCancel: () => {
+            setConfirmationDialog({ show: false, message: '', onConfirm: () => {}, onCancel: () => {} });
+          }
+        });
+      } else {
+        // No existing settings, create default path
+        const service = settingsServiceRef.current;
+        if (!service) {
+          console.error('⚙️ SettingsTomes: SettingsService not initialized');
+          return;
+        }
+        
+        const options = convertSettingsToOptions(currentSettings);
+        const defaultPath = normalizePath(localCurrentPath || '');
+        await service.addSettingsForDomain(domain, defaultPath, options);
+        setSaved(true);
+        console.log('⚙️ SettingsTomes: Domain settings saved successfully');
+      }
+    } catch (error) {
+      console.error('⚙️ SettingsTomes: Failed to save domain settings', error);
+      setError('Failed to save domain settings');
+    }
+  }, [localCurrentDomain, localCurrentPath, convertSettingsToOptions, normalizePath]);
+
+  // Handler for Copy Settings
+  const handleCopySettings = useCallback(async () => {
+    const domain = localCurrentDomain;
+    const path = normalizePath(localCurrentPath);
+    const currentSettings = settingsRef.current;
+    
+    const copyData = {
+      domain,
+      path,
+      settings: currentSettings
+    };
+    
+    try {
+      // Try to use clipboard API
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(JSON.stringify(copyData, null, 2));
+        console.log('⚙️ SettingsTomes: Settings copied to clipboard');
+        
+        // Store in component state as well
+        setCopiedSettings(copyData.settings);
+        setCopiedDomain(domain);
+        setCopiedPath(path);
+      } else {
+        // Fallback: use prompt
+        const jsonString = JSON.stringify(copyData, null, 2);
+        prompt('Copy these settings (Ctrl+C to copy):', jsonString);
+        setCopiedSettings(copyData.settings);
+        setCopiedDomain(domain);
+        setCopiedPath(path);
+      }
+    } catch (error) {
+      console.error('⚙️ SettingsTomes: Failed to copy settings', error);
+      // Fallback: use prompt
+      const jsonString = JSON.stringify(copyData, null, 2);
+      prompt('Copy these settings (Ctrl+C to copy):', jsonString);
+      setCopiedSettings(copyData.settings);
+      setCopiedDomain(domain);
+      setCopiedPath(path);
+    }
+  }, [localCurrentDomain, localCurrentPath, normalizePath]);
+
+  // Handler for Paste Settings
+  const handlePasteSettings = useCallback(async () => {
+    try {
+      let jsonString: string;
+      
+      // Try to use clipboard API
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        try {
+          jsonString = await navigator.clipboard.readText();
+        } catch (clipboardError: any) {
+          // Handle clipboard permission denied error
+          const errorMessage = clipboardError?.message || clipboardError?.toString() || 'Unknown clipboard error';
+          console.error('⚙️ SettingsTomes: Clipboard read permission denied', {
+            error: clipboardError,
+            errorMessage: errorMessage,
+            errorName: clipboardError?.name,
+            errorStack: clipboardError?.stack
+          });
+          
+          // Show user-friendly error message and fallback to prompt
+          setError(`Clipboard access denied: ${errorMessage}. Please paste settings manually.`);
+          jsonString = prompt('Clipboard access is not available. Please paste settings JSON here:') || '';
+          
+          if (!jsonString || jsonString.trim() === '') {
+            return;
+          }
+        }
+      } else {
+        // Fallback: use prompt if clipboard API not available
+        jsonString = prompt('Paste settings JSON:') || '';
+      }
+      
+      if (!jsonString || jsonString.trim() === '') {
+        console.warn('⚙️ SettingsTomes: No data to paste');
+        return;
+      }
+      
+      // Parse JSON
+      let pasteData: any;
+      try {
+        pasteData = JSON.parse(jsonString);
+      } catch (parseError: any) {
+        console.error('⚙️ SettingsTomes: Failed to parse JSON', parseError);
+        setError(`Invalid JSON format: ${parseError?.message || 'Could not parse JSON'}`);
+        return;
+      }
+      
+      // Validate structure
+      if (!pasteData.domain || !pasteData.path || !pasteData.settings) {
+        console.error('⚙️ SettingsTomes: Invalid paste data structure');
+        setError('Invalid settings format. Expected: { domain, path, settings }');
+        return;
+      }
+      
+      // Check if overwriting existing settings
+      const willOverwrite = settingsRef.current && Object.keys(settingsRef.current).length > 0;
+      
+      if (willOverwrite) {
+        // Show confirmation dialog
+        setConfirmationDialog({
+          show: true,
+          message: `This will overwrite the current settings for ${localCurrentDomain}${normalizePath(localCurrentPath)}. Do you want to continue?`,
+          onConfirm: () => {
+            setConfirmationDialog({ show: false, message: '', onConfirm: () => {}, onCancel: () => {} });
+            
+            // Update settings
+            const sanitized = sanitizeSettings(pasteData.settings);
+            setSettings(sanitized);
+            settingsRef.current = sanitized;
+            
+            // Optionally update selected domain/path to match copied ones
+            if (pasteData.domain !== localCurrentDomain) {
+              setLocalCurrentDomain(pasteData.domain);
+            }
+            if (pasteData.path !== localCurrentPath) {
+              setLocalCurrentPath(pasteData.path);
+            }
+            
+            setSaved(false);
+            console.log('⚙️ SettingsTomes: Settings pasted successfully');
+          },
+          onCancel: () => {
+            setConfirmationDialog({ show: false, message: '', onConfirm: () => {}, onCancel: () => {} });
+          }
+        });
+      } else {
+        // No existing settings, paste directly
+        const sanitized = sanitizeSettings(pasteData.settings);
+        setSettings(sanitized);
+        settingsRef.current = sanitized;
+        
+        if (pasteData.domain !== localCurrentDomain) {
+          setLocalCurrentDomain(pasteData.domain);
+        }
+        if (pasteData.path !== localCurrentPath) {
+          setLocalCurrentPath(pasteData.path);
+        }
+        
+        setSaved(false);
+        console.log('⚙️ SettingsTomes: Settings pasted successfully');
+      }
+    } catch (error) {
+      console.error('⚙️ SettingsTomes: Failed to paste settings', error);
+      setError('Failed to paste settings. Invalid JSON format.');
+    }
+  }, [localCurrentDomain, localCurrentPath, normalizePath]);
+
   const handleSaveSettings = useCallback(async () => {
     console.log('⚙️ SettingsTomes: Saving settings');
     console.log('🚨🚨🚨 SETTINGS SAVE: handleSaveSettings called with settings:', {
@@ -953,8 +1675,20 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
         .filter(url => url.length > 0);
       await EpilepticBlacklistService.setBlacklist(blacklistUrls);
       console.log('⚙️ SettingsTomes: Saved epileptic blacklist', blacklistUrls.length, 'URLs');
-      // Save to storage
-      if (isExtension) {
+      
+      // Save to storage based on checkbox state
+      if (pathSpecificSaving && settingsServiceRef.current) {
+        // Save to domain/path system
+        const domain = localCurrentDomain;
+        const path = normalizePath(localCurrentPath);
+        const options = convertSettingsToOptions(settingsRef.current);
+        const service = settingsServiceRef.current;
+        if (service) {
+          await service.addSettingsForDomain(domain, path, options);
+          console.log('⚙️ SettingsTomes: Saved to domain/path system');
+        }
+      } else if (isExtension) {
+        // Save to flat storage
         console.log('🚨🚨🚨 SETTINGS SAVE: About to send SETTINGS_SAVED message to background', {
           type: 'SETTINGS_SAVED',
           hasSettings: !!settingsRef.current,
@@ -982,10 +1716,21 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
           
           await chrome.storage.local.set({ 
             waveReaderSettings: settingsRef.current,
-            waveReaderDomainPaths: localDomainPaths
+            waveReaderDomainPaths: localDomainPaths,
+            waveReaderCheckboxSettings: {
+              domainSpecificLoading,
+              pathSpecificSaving,
+              pathSpecificLoading
+            }
           });
           
-          console.log('🚨🚨🚨 SETTINGS SAVE: Successfully saved to chrome.storage.local');
+          console.log('🚨🚨🚨 SETTINGS SAVE: Successfully saved to chrome.storage.local', {
+            checkboxSettings: {
+              domainSpecificLoading,
+              pathSpecificSaving,
+              pathSpecificLoading
+            }
+          });
         }
         
         // Send settings to content script for CSS consumption
@@ -1033,6 +1778,16 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
       }
       
       setSaved(true);
+      
+      // Reload settings immediately after saving to ensure we have the latest data from storage.
+      // This avoids a race condition where setSaved(true) and setCurrentView() might be batched
+      // together, causing handleViewChange to see stale saved state and skip the reload.
+      // By calling reloadSettingsForCurrentContext directly here, we ensure settings are refreshed
+      // right after saving, regardless of React's batching behavior.
+      if (domainSpecificLoading || pathSpecificSaving) {
+        await reloadSettingsForCurrentContext();
+      }
+      
       setCurrentView('general');
       
     } catch (error) {
@@ -1040,7 +1795,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
       setError(error instanceof Error ? error.message : 'Unknown error');
       setCurrentView('error');
     }
-  }, [isExtension, localDomainPaths, onUpdateSettings, epilepticBlacklist]);
+  }, [isExtension, localDomainPaths, onUpdateSettings, epilepticBlacklist, domainSpecificLoading, pathSpecificSaving, reloadSettingsForCurrentContext]);
 
   const handleResetSettings = useCallback(async () => {
     console.log('⚙️ SettingsTomes: Resetting settings');
@@ -1074,6 +1829,31 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
     setError(null);
     setCurrentView('general');
   }, []);
+
+  // Render confirmation dialog if shown
+  const renderConfirmationDialog = () => {
+    if (!confirmationDialog.show) return null;
+    
+    return (
+      <ConfirmationDialogOverlay onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          confirmationDialog.onCancel();
+        }
+      }}>
+        <ConfirmationDialog>
+          <ConfirmationMessage>{confirmationDialog.message}</ConfirmationMessage>
+          <ConfirmationButtons>
+            <ConfirmationButton variant="secondary" onClick={confirmationDialog.onCancel}>
+              Cancel
+            </ConfirmationButton>
+            <ConfirmationButton variant="primary" onClick={confirmationDialog.onConfirm}>
+              Confirm
+            </ConfirmationButton>
+          </ConfirmationButtons>
+        </ConfirmationDialog>
+      </ConfirmationDialogOverlay>
+    );
+  };
 
   // Render different views based on currentView
   if (currentView === 'saving') {
@@ -1498,31 +2278,117 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
               <SettingGroupTitle>Domain Configuration</SettingGroupTitle>
               
               <SettingItem>
+                <SettingLabel>
+                  <SettingCheckbox
+                    type="checkbox"
+                    checked={domainSpecificLoading}
+                    onChange={(e) => setDomainSpecificLoading(e.target.checked)}
+                  />
+                  Domain Specific Loading
+                </SettingLabel>
+                <HelpText>When enabled, settings are loaded from the domain/path system</HelpText>
+              </SettingItem>
+              
+              <SettingItem>
+                <SettingLabel>
+                  <SettingCheckbox
+                    type="checkbox"
+                    checked={pathSpecificSaving}
+                    onChange={(e) => setPathSpecificSaving(e.target.checked)}
+                  />
+                  Path Specific Saving
+                </SettingLabel>
+                <HelpText>When enabled, settings are saved to path-specific storage</HelpText>
+              </SettingItem>
+              
+              <SettingItem>
+                <SettingLabel>
+                  <SettingCheckbox
+                    type="checkbox"
+                    checked={pathSpecificLoading}
+                    onChange={(e) => setPathSpecificLoading(e.target.checked)}
+                  />
+                  Path Specific Loading
+                </SettingLabel>
+                <HelpText>When enabled, settings are loaded from path-specific storage</HelpText>
+              </SettingItem>
+              
+              <SettingItem>
                 <SettingLabel>Current Domain:</SettingLabel>
-                <SettingSelect
-                  value={localCurrentDomain}
-                  onChange={(e) => handleDomainSettingChange('domain', e.target.value)}
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <SettingInput
+                    type="text"
+                    className="text"
+                    list="domain-options"
+                    value={localCurrentDomain || ''}
+                    onChange={(e) => handleDomainSettingChange('domain', e.target.value)}
+                    placeholder="Enter domain (e.g., example.com)"
+                  />
+                  <datalist id="domain-options">
+                    {localDomainPaths.map(dp => (
+                      <option key={dp.domain} value={dp.domain} />
+                    ))}
+                  </datalist>
+                </div>
+                <Button 
+                  className="btn btn-secondary" 
+                  onClick={handleSaveDomainSettings}
+                  style={{ marginTop: '8px' }}
                 >
-                  {localDomainPaths.map(dp => (
-                    <option key={dp.domain} value={dp.domain}>
-                      {dp.domain}
-                    </option>
-                  ))}
-                </SettingSelect>
+                  💾 Save Domain Settings
+                </Button>
               </SettingItem>
               
               <SettingItem>
                 <SettingLabel>Current Path:</SettingLabel>
-                <SettingSelect
-                  value={localCurrentPath}
-                  onChange={(e) => handleDomainSettingChange('path', e.target.value)}
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <SettingInput
+                    type="text"
+                    className="text"
+                    list="path-options"
+                    value={localCurrentPath || ''}
+                    onChange={(e) => handleDomainSettingChange('path', e.target.value)}
+                    placeholder="Enter path (e.g., / or /path/to/page)"
+                  />
+                  <datalist id="path-options">
+                    {(() => {
+                      const paths = localDomainPaths.find(dp => dp.domain === localCurrentDomain)?.paths || [];
+                      const normalizedPaths = paths.map(p => normalizePath(p));
+                      const uniquePaths = Array.from(new Set(['/', ...normalizedPaths]));
+                      return uniquePaths.map(path => (
+                        <option key={path} value={path} />
+                      ));
+                    })()}
+                  </datalist>
+                </div>
+                <Button 
+                  className="btn btn-secondary" 
+                  onClick={handleSavePathSettings}
+                  style={{ marginTop: '8px' }}
                 >
-                  {(localDomainPaths.find(dp => dp.domain === localCurrentDomain)?.paths || []).map(path => (
-                    <option key={path} value={path}>
-                      {path}
-                    </option>
-                  ))}
-                </SettingSelect>
+                  💾 Save Path Settings
+                </Button>
+              </SettingItem>
+              
+              <SettingItem>
+                <SettingLabel>Copy/Paste Settings</SettingLabel>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                  <Button 
+                    className="btn btn-secondary" 
+                    onClick={handleCopySettings}
+                  >
+                    📋 Copy Settings
+                  </Button>
+                  <Button 
+                    className="btn btn-secondary" 
+                    onClick={handlePasteSettings}
+                  >
+                    📄 Paste Settings
+                  </Button>
+                </div>
+                <HelpText>
+                  Copy stores the selected domain and path settings (e.g. domain: "google.com", path: "/search"), and paste overwrites the newly selected path or domain with the copied settings. Click "save settings" to save the overwritten (e.g. to move settings from "google.com/search" to "google.com/maps")!
+                </HelpText>
               </SettingItem>
             </SettingGroup>
             
@@ -1644,6 +2510,7 @@ const SettingsTomes: FunctionComponent<SettingsTomesProps> = ({
         )}
       </SettingsContent>
     </SettingsContainer>
+    {renderConfirmationDialog()}
     </EditorWrapper>
   );
 };
